@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Filament\Pages\Redemption;
+
+use App\Filament\Concerns\ListsRedemptions;
+use Filament\Pages\Page;
+use Filament\Tables\Contracts\HasTable;
+
+use App\Support\NavigationBadgeCounts;
+
+class RedemptionRequests extends Page implements HasTable
+{
+    use ListsRedemptions;
+
+    protected static ?string $navigationIcon = 'heroicon-o-inbox-arrow-down';
+
+    protected static ?string $navigationGroup = 'Redemption Management';
+
+    protected static ?string $navigationLabel = 'Redemption Requests';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static string $view = 'admin.redemption.list';
+
+    protected function redemptionStatuses(): ?array
+    {
+        return ['pending'];
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Review and approve or reject new redemption requests.';
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return NavigationBadgeCounts::format(NavigationBadgeCounts::pendingRedemptions());
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'primary';
+    }
+}
