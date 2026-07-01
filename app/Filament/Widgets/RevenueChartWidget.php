@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Services\DashboardService;
+use App\Support\AdminPermissions;
 use Filament\Widgets\ChartWidget;
 
 class RevenueChartWidget extends ChartWidget
@@ -12,6 +13,11 @@ class RevenueChartWidget extends ChartWidget
     protected static ?string $description = 'Revenue trend over the last 30 days';
 
     protected static ?int $sort = 2;
+
+    public static function canView(): bool
+    {
+        return AdminPermissions::canViewModule('dashboard');
+    }
 
     protected static ?string $pollingInterval = null;
 

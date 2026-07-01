@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Wallet;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\WalletTransactionResource;
 use App\Models\User;
 use App\Models\WalletTransaction;
@@ -14,7 +15,13 @@ use Illuminate\Support\Facades\Auth;
 
 class CreditDebitManagement extends Page implements HasForms
 {
+    use InteractsWithAdminPermissions;
     use InteractsWithForms;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'wallet_credit_debit';
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-plus-circle';
 
@@ -42,7 +49,9 @@ class CreditDebitManagement extends Page implements HasForms
 
     public function form(Form $form): Form
     {
-        return WalletTransactionResource::form($form)->statePath('data');
+        return WalletTransactionResource::form(
+            $form->model(WalletTransaction::class),
+        )->statePath('data');
     }
 
     public function save(): void

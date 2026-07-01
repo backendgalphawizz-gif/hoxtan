@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\PushNotificationResource\Pages;
 
 use App\Filament\Resources\PushNotificationResource;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\Pages\BaseCreateRecord;
 use Illuminate\Support\Facades\Auth;
 
-class CreatePushNotification extends CreateRecord
+class CreatePushNotification extends BaseCreateRecord
 {
     protected static string $resource = PushNotificationResource::class;
 

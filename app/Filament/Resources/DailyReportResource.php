@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\DailyReportResource\Pages;
 use App\Models\DailyReport;
 use App\Support\FilamentDateFilters;
@@ -14,6 +15,13 @@ use Filament\Tables\Table;
 
 class DailyReportResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'daily_reports';
+    }
+
     protected static ?string $model = DailyReport::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';

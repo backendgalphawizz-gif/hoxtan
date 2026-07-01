@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\RedemptionResource\Pages;
 use App\Models\Redemption;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -16,6 +18,13 @@ use Illuminate\Support\Facades\Auth;
 
 class RedemptionResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'redemption_requests';
+    }
+
     protected static ?string $model = Redemption::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-gift';
@@ -80,8 +89,7 @@ class RedemptionResource extends Resource
                             ->required()
                             ->maxLength(1000)
                             ->columnSpanFull(),
-                        Forms\Components\TextInput::make('courier_name')
-                            ->maxLength(255),
+                        FilamentFormFields::name('courier_name', 'Courier Name', required: false),
                         Forms\Components\TextInput::make('tracking_number')
                             ->maxLength(255),
                         Forms\Components\DateTimePicker::make('dispatched_at')
@@ -204,9 +212,8 @@ class RedemptionResource extends Resource
                     ->tooltip('Dispatch')
                     ->visible(fn (Redemption $record) => in_array($record->status, ['approved', 'processing']))
                     ->form([
-                        Forms\Components\TextInput::make('courier_name')
-                            ->required()
-                            ->maxLength(255),
+                        FilamentFormFields::name('courier_name', 'Courier Name')
+                            ->required(),
                         Forms\Components\TextInput::make('tracking_number')
                             ->required()
                             ->maxLength(255),

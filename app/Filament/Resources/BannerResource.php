@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\BannerResource\Pages;
 use App\Models\Banner;
 use App\Support\FilamentDateFilters;
@@ -14,6 +15,13 @@ use Filament\Tables\Table;
 
 class BannerResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'banners';
+    }
+
     protected static ?string $model = Banner::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-photo';

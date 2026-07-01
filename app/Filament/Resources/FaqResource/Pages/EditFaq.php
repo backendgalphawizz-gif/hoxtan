@@ -4,9 +4,9 @@ namespace App\Filament\Resources\FaqResource\Pages;
 
 use App\Filament\Resources\FaqResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditFaq extends EditRecord
+class EditFaq extends BaseEditRecord
 {
     protected static string $resource = FaqResource::class;
 

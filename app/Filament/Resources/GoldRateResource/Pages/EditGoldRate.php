@@ -4,9 +4,9 @@ namespace App\Filament\Resources\GoldRateResource\Pages;
 
 use App\Filament\Resources\GoldRateResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditGoldRate extends EditRecord
+class EditGoldRate extends BaseEditRecord
 {
     protected static string $resource = GoldRateResource::class;
 

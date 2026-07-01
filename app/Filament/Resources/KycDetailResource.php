@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\KycDetailResource\Pages;
 use App\Models\KycDetail;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
 use Filament\Forms;
@@ -17,6 +19,13 @@ use Illuminate\Support\Facades\Auth;
 
 class KycDetailResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'kyc';
+    }
+
     protected static ?string $model = KycDetail::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-identification';
@@ -40,15 +49,10 @@ class KycDetailResource extends Resource
                             ->searchable()
                             ->required()
                             ->disabled(fn (?KycDetail $record) => $record !== null),
-                        Forms\Components\TextInput::make('full_name')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('pan_number')
-                            ->regex('/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/')
-                            ->maxLength(10),
-                        Forms\Components\TextInput::make('aadhaar_number')
-                            ->regex('/^\d{12}$/')
-                            ->maxLength(12),
+                        FilamentFormFields::fullName()
+                            ->required(),
+                        FilamentFormFields::panNumber(),
+                        FilamentFormFields::aadhaarNumber(),
                         Forms\Components\DatePicker::make('date_of_birth')
                             ->native(false)
                             ->maxDate(now()->subYears(18))

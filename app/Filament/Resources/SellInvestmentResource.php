@@ -11,6 +11,11 @@ class SellInvestmentResource extends InvestmentResource
 
     protected static ?int $navigationSort = 2;
 
+    protected static function adminPermissionModule(): string
+    {
+        return 'sell_transactions';
+    }
+
     protected static function transactionType(): string
     {
         return 'sell';

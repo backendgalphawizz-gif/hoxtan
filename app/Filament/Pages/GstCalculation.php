@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Models\GstRecord;
 use App\Services\GstService;
 use App\Support\FilamentDateFilters;
@@ -19,8 +20,14 @@ use Filament\Tables\Table;
 
 class GstCalculation extends Page implements HasForms, HasTable
 {
+    use InteractsWithAdminPermissions;
     use InteractsWithForms;
     use InteractsWithTable;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'gst_calculation';
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-calculator';
 

@@ -2,15 +2,21 @@
 
 namespace App\Filament\Pages\Redemption;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Concerns\ListsRedemptions;
+use App\Support\NavigationBadgeCounts;
 use Filament\Pages\Page;
 use Filament\Tables\Contracts\HasTable;
 
-use App\Support\NavigationBadgeCounts;
-
 class DispatchManagement extends Page implements HasTable
 {
+    use InteractsWithAdminPermissions;
     use ListsRedemptions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'dispatch_management';
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 

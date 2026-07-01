@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Models\MetalRate;
 use App\Support\FilamentTableActions;
 use Filament\Forms;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 abstract class MetalRateResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
     protected static ?string $model = MetalRate::class;
 
     protected static ?string $navigationGroup = 'Finance';

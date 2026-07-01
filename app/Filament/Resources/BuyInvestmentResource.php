@@ -11,6 +11,11 @@ class BuyInvestmentResource extends InvestmentResource
 
     protected static ?int $navigationSort = 1;
 
+    protected static function adminPermissionModule(): string
+    {
+        return 'buy_transactions';
+    }
+
     protected static function transactionType(): string
     {
         return 'buy';

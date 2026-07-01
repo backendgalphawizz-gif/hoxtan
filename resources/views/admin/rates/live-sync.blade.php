@@ -24,7 +24,10 @@
                 {{ $currentRate['updated_at'] ?? 'Not synced yet' }}
             </p>
             @if ($currentRate['source'])
-                <p class="mt-1 text-xs capitalize text-gray-500">Source: {{ str_replace('_', ' ', $currentRate['source']) }}</p>
+                <p class="mt-1 text-xs capitalize text-gray-500">Active source: {{ str_replace('_', ' ', $currentRate['source']) }}</p>
+            @endif
+            @if (! empty($currentRate['live_source']))
+                <p class="mt-1 text-xs capitalize text-gray-500">Live feed: {{ str_replace('_', ' ', $currentRate['live_source']) }}</p>
             @endif
         </x-filament::section>
     </div>

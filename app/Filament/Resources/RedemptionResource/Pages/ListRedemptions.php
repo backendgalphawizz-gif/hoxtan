@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\RedemptionResource\Pages;
 
+use App\Filament\Exports\RedemptionExporter;
 use App\Filament\Resources\RedemptionResource;
-use Filament\Actions;
+use App\Support\FilamentExportActions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListRedemptions extends ListRecords
@@ -13,7 +14,7 @@ class ListRedemptions extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            FilamentExportActions::headerExport(RedemptionExporter::class, 'redemption_requests'),
         ];
     }
 }

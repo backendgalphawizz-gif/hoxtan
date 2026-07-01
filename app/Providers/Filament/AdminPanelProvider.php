@@ -52,7 +52,7 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => '<link rel="preconnect" href="https://fonts.bunny.net">'
                     .'<link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet">'
-                    .'<link rel="stylesheet" href="'.asset('css/admin-theme.css').'?v=13">',
+                    .'<link rel="stylesheet" href="'.asset('css/admin-theme.css').'?v=15">',
             )
             ->authGuard('admin')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
@@ -71,6 +71,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('CMS Management'),
                 NavigationGroup::make('Reports'),
                 NavigationGroup::make('Notification Management'),
+                NavigationGroup::make('System'),
             ])
             ->middleware([
                 EncryptCookies::class,

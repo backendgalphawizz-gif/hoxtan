@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Services\DashboardService;
+use App\Support\AdminPermissions;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -11,6 +12,11 @@ class StatsOverviewWidget extends BaseWidget
     protected static ?int $sort = 1;
 
     protected static bool $isLazy = false;
+
+    public static function canView(): bool
+    {
+        return AdminPermissions::canViewModule('dashboard');
+    }
 
     protected int|string|array $columnSpan = 'full';
 

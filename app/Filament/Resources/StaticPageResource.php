@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\StaticPageResource\Pages;
 use App\Models\StaticPage;
 use App\Support\FilamentTableActions;
@@ -14,6 +15,13 @@ use Illuminate\Support\Str;
 
 class StaticPageResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'static_pages';
+    }
+
     protected static ?string $model = StaticPage::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';

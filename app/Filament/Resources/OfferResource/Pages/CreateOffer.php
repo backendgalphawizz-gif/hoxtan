@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\OfferResource\Pages;
 
 use App\Filament\Resources\OfferResource;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\Pages\BaseCreateRecord;
 
-class CreateOffer extends CreateRecord
+class CreateOffer extends BaseCreateRecord
 {
     protected static string $resource = OfferResource::class;
 }

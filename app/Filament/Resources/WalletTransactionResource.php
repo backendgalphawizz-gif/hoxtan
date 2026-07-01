@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\WalletTransactionResource\Pages;
 use App\Models\User;
 use App\Models\WalletTransaction;
@@ -16,6 +17,13 @@ use Illuminate\Validation\ValidationException;
 
 class WalletTransactionResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'wallet_transactions';
+    }
+
     protected static ?string $model = WalletTransaction::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
@@ -85,6 +93,8 @@ class WalletTransactionResource extends Resource
                                 'investment' => 'Investment',
                                 'redemption' => 'Redemption',
                                 'refund' => 'Refund',
+                                'welcome_bonus' => 'Welcome Bonus',
+                                'referral_bonus' => 'Referral Bonus',
                                 'other' => 'Other',
                             ])
                             ->required()
@@ -143,6 +153,8 @@ class WalletTransactionResource extends Resource
                         'investment' => 'Investment',
                         'redemption' => 'Redemption',
                         'refund' => 'Refund',
+                        'welcome_bonus' => 'Welcome Bonus',
+                        'referral_bonus' => 'Referral Bonus',
                         'other' => 'Other',
                     ]),
                 Tables\Filters\SelectFilter::make('user_id')

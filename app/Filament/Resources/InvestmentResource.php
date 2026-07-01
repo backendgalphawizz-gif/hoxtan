@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Models\Investment;
 use App\Services\GstService;
+use App\Services\MetalRateService;
 use App\Support\FilamentDateFilters;
 use App\Support\FilamentTableActions;
 use Filament\Forms;
@@ -15,6 +17,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 abstract class InvestmentResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
     protected static ?string $model = Investment::class;
 
     protected static ?string $navigationGroup = 'Investment Management';
@@ -56,21 +60,28 @@ abstract class InvestmentResource extends Resource
                         Forms\Components\Select::make('metal_type')
                             ->options(['gold' => 'Gold', 'silver' => 'Silver'])
                             ->required()
-                            ->live(),
+                            ->live()
+                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state): void {
+                                static::applyActiveMetalRate($set, $state);
+                                static::recalculateFormAmounts($set, $get);
+                            }),
                         Forms\Components\TextInput::make('quantity_grams')
                             ->label('Quantity (grams)')
                             ->required()
                             ->numeric()
                             ->minValue(0.0001)
                             ->step(0.0001)
-                            ->live(onBlur: true),
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => static::recalculateFormAmounts($set, $get)),
                         Forms\Components\TextInput::make('rate_per_gram')
                             ->label('Rate per Gram')
                             ->required()
                             ->numeric()
                             ->minValue(0.01)
                             ->prefix('₹')
-                            ->live(onBlur: true),
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => static::recalculateFormAmounts($set, $get))
+                            ->helperText('Auto-filled from the active metal rate. You can override if needed.'),
                         Forms\Components\TextInput::make('amount')
                             ->label('Base Amount')
                             ->numeric()
@@ -78,7 +89,7 @@ abstract class InvestmentResource extends Resource
                             ->disabled()
                             ->dehydrated(),
                         Forms\Components\TextInput::make('gst_amount')
-                            ->label('GST (3%)')
+                            ->label(fn (): string => 'GST ('.app(GstService::class)->ratePercent().'%)')
                             ->numeric()
                             ->prefix('₹')
                             ->disabled()
@@ -147,5 +158,30 @@ abstract class InvestmentResource extends Resource
         $data['total_amount'] = $gst['total'];
 
         return $data;
+    }
+
+    protected static function applyActiveMetalRate(Forms\Set $set, ?string $metalType): void
+    {
+        if (blank($metalType)) {
+            return;
+        }
+
+        $rates = app(MetalRateService::class);
+        $active = $rates->getActiveRate($metalType);
+        $rate = $active?->rate_per_gram ?? $rates->getLiveRate($metalType);
+
+        $set('rate_per_gram', $rate);
+    }
+
+    protected static function recalculateFormAmounts(Forms\Set $set, Forms\Get $get): void
+    {
+        $amounts = static::calculateAmounts([
+            'quantity_grams' => $get('quantity_grams'),
+            'rate_per_gram' => $get('rate_per_gram'),
+        ]);
+
+        $set('amount', $amounts['amount']);
+        $set('gst_amount', $amounts['gst_amount']);
+        $set('total_amount', $amounts['total_amount']);
     }
 }

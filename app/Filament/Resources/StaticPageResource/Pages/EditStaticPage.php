@@ -4,9 +4,9 @@ namespace App\Filament\Resources\StaticPageResource\Pages;
 
 use App\Filament\Resources\StaticPageResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditStaticPage extends EditRecord
+class EditStaticPage extends BaseEditRecord
 {
     protected static string $resource = StaticPageResource::class;
 

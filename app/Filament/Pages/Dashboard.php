@@ -2,10 +2,18 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'dashboard';
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-home';
 
     protected static ?string $navigationGroup = 'Dashboard';

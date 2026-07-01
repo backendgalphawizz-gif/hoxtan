@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\GoldRate;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Services\MetalRateService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -9,6 +10,13 @@ use Filament\Pages\Page;
 
 class LiveSync extends Page
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'gold_live_sync';
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
 
     protected static ?string $navigationGroup = 'Gold Rate Management';
@@ -63,6 +71,7 @@ class LiveSync extends Page
         $this->currentRate = [
             'active' => $active?->rate_per_gram,
             'live' => $live,
+            'live_source' => $rates->getLiveRateSource('gold'),
             'updated_at' => $active?->updated_at?->format('M d, Y g:i A'),
             'source' => $active?->source,
         ];

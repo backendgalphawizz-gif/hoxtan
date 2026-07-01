@@ -5,9 +5,9 @@ namespace App\Filament\Resources\SellInvestmentResource\Pages;
 use App\Filament\Resources\InvestmentResource;
 use App\Filament\Resources\SellInvestmentResource;
 use Filament\Actions;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\Pages\BaseCreateRecord;
 
-class CreateSellInvestment extends CreateRecord
+class CreateSellInvestment extends BaseCreateRecord
 {
     protected static string $resource = SellInvestmentResource::class;
 
@@ -15,6 +15,11 @@ class CreateSellInvestment extends CreateRecord
     {
         $data['type'] = 'sell';
 
+        return InvestmentResource::calculateAmounts($data);
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
         return InvestmentResource::calculateAmounts($data);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\OfferResource\Pages;
 use App\Models\Offer;
 use App\Support\FilamentDateFilters;
@@ -14,6 +15,13 @@ use Filament\Tables\Table;
 
 class OfferResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'offers';
+    }
+
     protected static ?string $model = Offer::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';

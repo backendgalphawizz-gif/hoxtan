@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\UserResource\RelationManagers;
 
 use App\Models\KycDetail;
+use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -22,17 +23,10 @@ class KycDetailRelationManager extends RelationManager
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('full_name')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('pan_number')
-                    ->regex('/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/')
-                    ->validationMessages(['regex' => 'Invalid PAN format (e.g. ABCDE1234F)'])
-                    ->maxLength(10),
-                Forms\Components\TextInput::make('aadhaar_number')
-                    ->regex('/^\d{12}$/')
-                    ->validationMessages(['regex' => 'Aadhaar must be 12 digits'])
-                    ->maxLength(12),
+                FilamentFormFields::fullName()
+                    ->required(),
+                FilamentFormFields::panNumber(),
+                FilamentFormFields::aadhaarNumber(),
                 Forms\Components\DatePicker::make('date_of_birth')
                     ->maxDate(now()->subYears(18))
                     ->native(false)
@@ -40,11 +34,9 @@ class KycDetailRelationManager extends RelationManager
                 Forms\Components\Textarea::make('address')
                     ->maxLength(500)
                     ->columnSpanFull(),
-                Forms\Components\TextInput::make('city')->maxLength(100),
-                Forms\Components\TextInput::make('state')->maxLength(100),
-                Forms\Components\TextInput::make('pincode')
-                    ->regex('/^\d{6}$/')
-                    ->maxLength(10),
+                FilamentFormFields::city(),
+                FilamentFormFields::state(),
+                FilamentFormFields::pincode(),
                 Forms\Components\FileUpload::make('pan_document')
                     ->image()
                     ->directory('kyc/pan'),

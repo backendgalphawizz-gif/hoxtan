@@ -4,9 +4,9 @@ namespace App\Filament\Resources\InvestmentGoalResource\Pages;
 
 use App\Filament\Resources\InvestmentGoalResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditInvestmentGoal extends EditRecord
+class EditInvestmentGoal extends BaseEditRecord
 {
     protected static string $resource = InvestmentGoalResource::class;
 

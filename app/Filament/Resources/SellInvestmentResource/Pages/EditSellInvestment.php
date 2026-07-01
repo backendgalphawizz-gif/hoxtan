@@ -4,9 +4,9 @@ namespace App\Filament\Resources\SellInvestmentResource\Pages;
 
 use App\Filament\Resources\SellInvestmentResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditSellInvestment extends EditRecord
+class EditSellInvestment extends BaseEditRecord
 {
     protected static string $resource = SellInvestmentResource::class;
 

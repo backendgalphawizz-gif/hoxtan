@@ -5,9 +5,9 @@ namespace App\Filament\Resources\PushNotificationResource\Pages;
 use App\Filament\Resources\PushNotificationResource;
 use Filament\Actions;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditPushNotification extends EditRecord
+class EditPushNotification extends BaseEditRecord
 {
     protected static string $resource = PushNotificationResource::class;
 

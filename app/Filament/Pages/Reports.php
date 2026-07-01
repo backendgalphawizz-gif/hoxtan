@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Exports\InvestmentReportExporter;
 use App\Filament\Exports\RedemptionReportExporter;
 use App\Filament\Exports\RevenueReportExporter;
@@ -12,8 +13,8 @@ use App\Models\Investment;
 use App\Models\Redemption;
 use App\Models\User;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentExportActions;
 use Filament\Pages\Page;
-use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -21,7 +22,13 @@ use Filament\Tables\Table;
 
 class Reports extends Page implements HasTable
 {
+    use InteractsWithAdminPermissions;
     use InteractsWithTable;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'reports';
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar-square';
 
@@ -80,7 +87,7 @@ class Reports extends Page implements HasTable
                 FilamentDateFilters::tableFilter('transaction_date', 'created_at', 'Transaction Date'),
             ])
             ->headerActions([
-                ExportAction::make()->exporter(InvestmentReportExporter::class),
+                FilamentExportActions::tableExport(InvestmentReportExporter::class, 'reports'),
             ])
             ->defaultSort('created_at', 'desc')
             ->paginated([10, 25, 50]);
@@ -107,7 +114,7 @@ class Reports extends Page implements HasTable
                 FilamentDateFilters::tableFilter('transaction_date', 'created_at', 'Transaction Date'),
             ])
             ->headerActions([
-                ExportAction::make()->exporter(RevenueReportExporter::class),
+                FilamentExportActions::tableExport(RevenueReportExporter::class, 'reports'),
             ])
             ->defaultSort('created_at', 'desc')
             ->paginated([10, 25, 50]);
@@ -131,7 +138,7 @@ class Reports extends Page implements HasTable
                 FilamentDateFilters::tableFilter('registration_date', 'created_at', 'Registration Date'),
             ])
             ->headerActions([
-                ExportAction::make()->exporter(UserReportExporter::class),
+                FilamentExportActions::tableExport(UserReportExporter::class, 'reports'),
             ])
             ->defaultSort('created_at', 'desc')
             ->paginated([10, 25, 50]);
@@ -153,7 +160,7 @@ class Reports extends Page implements HasTable
                 FilamentDateFilters::tableFilter('report_date', 'report_date', 'Report Date'),
             ])
             ->headerActions([
-                ExportAction::make()->exporter(TaxReportExporter::class),
+                FilamentExportActions::tableExport(TaxReportExporter::class, 'reports'),
             ])
             ->defaultSort('report_date', 'desc')
             ->paginated([10, 25, 50]);
@@ -176,7 +183,7 @@ class Reports extends Page implements HasTable
                 FilamentDateFilters::tableFilter('request_date', 'created_at', 'Request Date'),
             ])
             ->headerActions([
-                ExportAction::make()->exporter(RedemptionReportExporter::class),
+                FilamentExportActions::tableExport(RedemptionReportExporter::class, 'reports'),
             ])
             ->defaultSort('created_at', 'desc')
             ->paginated([10, 25, 50]);

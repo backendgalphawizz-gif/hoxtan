@@ -6,6 +6,7 @@ use App\Filament\Resources\DailyReportResource;
 use App\Models\DailyReport;
 use App\Services\DashboardService;
 use App\Services\GstService;
+use App\Support\AdminPermissions;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 
@@ -14,6 +15,11 @@ class DailyReportsWidget extends BaseWidget
     protected static ?string $heading = 'Daily Reports';
 
     protected static ?int $sort = 4;
+
+    public static function canView(): bool
+    {
+        return AdminPermissions::canViewModule('daily_reports');
+    }
 
     protected int|string|array $columnSpan = 'full';
 

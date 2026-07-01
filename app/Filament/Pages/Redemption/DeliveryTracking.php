@@ -2,15 +2,21 @@
 
 namespace App\Filament\Pages\Redemption;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Concerns\ListsRedemptions;
+use App\Support\NavigationBadgeCounts;
 use Filament\Pages\Page;
 use Filament\Tables\Contracts\HasTable;
 
-use App\Support\NavigationBadgeCounts;
-
 class DeliveryTracking extends Page implements HasTable
 {
+    use InteractsWithAdminPermissions;
     use ListsRedemptions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'delivery_tracking';
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-map-pin';
 

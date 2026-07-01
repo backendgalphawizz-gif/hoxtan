@@ -4,9 +4,9 @@ namespace App\Filament\Resources\KycDetailResource\Pages;
 
 use App\Filament\Resources\KycDetailResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditKycDetail extends EditRecord
+class EditKycDetail extends BaseEditRecord
 {
     protected static string $resource = KycDetailResource::class;
 

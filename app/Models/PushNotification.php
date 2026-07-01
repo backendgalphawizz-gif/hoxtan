@@ -15,6 +15,7 @@ class PushNotification extends Model
         'status',
         'scheduled_at',
         'sent_at',
+        'recipients_count',
         'created_by',
     ];
 

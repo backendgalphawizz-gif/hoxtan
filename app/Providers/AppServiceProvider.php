@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Investment;
+use App\Observers\InvestmentObserver;
+use App\Support\FilamentAdminForm;
 use App\Support\FilamentFormat;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Support\ServiceProvider;
@@ -15,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Investment::observe(InvestmentObserver::class);
+
+        FilamentAdminForm::configureRequiredFields();
+
         // Avoid intl dependency — Filament's ->money() and ->numeric() require ext-intl
         TextColumn::macro('inr', function (int $decimals = 2): TextColumn {
             /** @var TextColumn $this */

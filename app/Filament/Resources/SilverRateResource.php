@@ -12,6 +12,11 @@ class SilverRateResource extends MetalRateResource
 
     protected static ?int $navigationSort = 3;
 
+    protected static function adminPermissionModule(): string
+    {
+        return 'silver_rate_history';
+    }
+
     protected static function metalType(): string
     {
         return 'silver';

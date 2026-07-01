@@ -4,9 +4,9 @@ namespace App\Filament\Resources\BannerResource\Pages;
 
 use App\Filament\Resources\BannerResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditBanner extends EditRecord
+class EditBanner extends BaseEditRecord
 {
     protected static string $resource = BannerResource::class;
 

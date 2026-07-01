@@ -5,10 +5,10 @@ namespace App\Filament\Resources\GoldRateResource\Pages;
 use App\Filament\Resources\GoldRateResource;
 use App\Models\MetalRate;
 use Filament\Actions;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\Pages\BaseCreateRecord;
 use Illuminate\Support\Facades\Auth;
 
-class CreateGoldRate extends CreateRecord
+class CreateGoldRate extends BaseCreateRecord
 {
     protected static string $resource = GoldRateResource::class;
 

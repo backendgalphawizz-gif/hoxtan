@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\FaqResource\Pages;
 use App\Models\Faq;
 use App\Support\FilamentTableActions;
@@ -13,6 +14,13 @@ use Filament\Tables\Table;
 
 class FaqResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'faqs';
+    }
+
     protected static ?string $model = Faq::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-question-mark-circle';

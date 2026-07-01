@@ -4,10 +4,10 @@ namespace App\Filament\Resources\WalletTransactionResource\Pages;
 
 use App\Filament\Resources\WalletTransactionResource;
 use App\Models\User;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\Pages\BaseCreateRecord;
 use Illuminate\Support\Facades\Auth;
 
-class CreateWalletTransaction extends CreateRecord
+class CreateWalletTransaction extends BaseCreateRecord
 {
     protected static string $resource = WalletTransactionResource::class;
 

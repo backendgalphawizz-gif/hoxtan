@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\BuyInvestmentResource\Pages;
 
+use App\Filament\Exports\InvestmentReportExporter;
 use App\Filament\Resources\BuyInvestmentResource;
+use App\Support\FilamentExportActions;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -12,6 +14,9 @@ class ListBuyInvestments extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [Actions\CreateAction::make()];
+        return [
+            FilamentExportActions::headerExport(InvestmentReportExporter::class, 'buy_transactions'),
+            Actions\CreateAction::make(),
+        ];
     }
 }

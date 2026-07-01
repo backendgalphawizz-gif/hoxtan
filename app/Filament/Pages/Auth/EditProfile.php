@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Auth;
 
+use App\Support\FilamentFormFields;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -21,15 +22,11 @@ class EditProfile extends BaseEditProfile
                 Section::make('Profile Information')
                     ->description('Update your admin account details.')
                     ->schema([
-                        TextInput::make('name')
-                            ->label('Full Name')
-                            ->required()
-                            ->maxLength(255),
-                        TextInput::make('email')
+                        FilamentFormFields::name('name', 'Full Name')
+                            ->required(),
+                        FilamentFormFields::email()
                             ->label('Email Address')
-                            ->email()
                             ->required()
-                            ->maxLength(255)
                             ->unique(ignoreRecord: true),
                     ])
                     ->columns(2),

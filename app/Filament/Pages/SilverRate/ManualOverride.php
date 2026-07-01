@@ -2,7 +2,8 @@
 
 namespace App\Filament\Pages\SilverRate;
 
-use App\Models\MetalRate;
+use App\Filament\Concerns\InteractsWithAdminPermissions;
+use App\Services\MetalRateService;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -12,11 +13,16 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Illuminate\Support\Facades\Auth;
 
 class ManualOverride extends Page implements HasForms
 {
+    use InteractsWithAdminPermissions;
     use InteractsWithForms;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'silver_manual_override';
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-pencil-square';
 
@@ -73,18 +79,16 @@ class ManualOverride extends Page implements HasForms
             ->statePath('data');
     }
 
-    public function save(): void
+    public function save(MetalRateService $rates): void
     {
         $data = $this->form->getState();
 
-        MetalRate::create([
-            'metal_type' => 'silver',
-            'rate_per_gram' => $data['rate_per_gram'],
-            'source' => 'manual_override',
-            'is_active' => $data['is_active'] ?? true,
-            'updated_by' => Auth::guard('admin')->id(),
-            'notes' => $data['notes'] ?? null,
-        ]);
+        $rates->applyManualRate(
+            'silver',
+            (float) $data['rate_per_gram'],
+            (bool) ($data['is_active'] ?? true),
+            $data['notes'] ?? null,
+        );
 
         Notification::make()
             ->title('Manual silver rate saved')

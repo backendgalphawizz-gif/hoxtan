@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Services\DashboardService;
+use App\Support\AdminPermissions;
 use Filament\Widgets\ChartWidget;
 
 class TransactionChartWidget extends ChartWidget
@@ -12,6 +13,11 @@ class TransactionChartWidget extends ChartWidget
     protected static ?string $description = 'Buy and sell transactions over the last 30 days';
 
     protected static ?int $sort = 3;
+
+    public static function canView(): bool
+    {
+        return AdminPermissions::canViewModule('dashboard');
+    }
 
     protected static ?string $pollingInterval = null;
 

@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\RedemptionResource\Pages;
 
 use App\Filament\Resources\RedemptionResource;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\Pages\BaseCreateRecord;
 
-class CreateRedemption extends CreateRecord
+class CreateRedemption extends BaseCreateRecord
 {
     protected static string $resource = RedemptionResource::class;
 }

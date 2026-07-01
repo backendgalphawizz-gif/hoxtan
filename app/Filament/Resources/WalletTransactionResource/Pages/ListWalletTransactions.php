@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\WalletTransactionResource\Pages;
 
+use App\Filament\Exports\WalletTransactionExporter;
 use App\Filament\Resources\WalletTransactionResource;
-use Filament\Actions;
+use App\Support\FilamentExportActions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListWalletTransactions extends ListRecords
@@ -12,6 +13,8 @@ class ListWalletTransactions extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            FilamentExportActions::headerExport(WalletTransactionExporter::class, 'wallet_transactions'),
+        ];
     }
 }

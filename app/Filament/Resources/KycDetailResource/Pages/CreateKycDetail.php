@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\KycDetailResource\Pages;
 
 use App\Filament\Resources\KycDetailResource;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\Resources\Pages\BaseCreateRecord;
 
-class CreateKycDetail extends CreateRecord
+class CreateKycDetail extends BaseCreateRecord
 {
     protected static string $resource = KycDetailResource::class;
 

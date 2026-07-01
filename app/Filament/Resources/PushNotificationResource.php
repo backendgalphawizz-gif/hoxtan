@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\PushNotificationResource\Pages;
 use App\Models\PushNotification;
 use App\Models\User;
+use App\Services\PushNotificationDispatchService;
 use App\Support\FilamentDateFilters;
 use App\Support\FilamentTableActions;
 use Filament\Forms;
@@ -16,6 +18,13 @@ use Filament\Tables\Table;
 
 class PushNotificationResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'push_notifications';
+    }
+
     protected static ?string $model = PushNotification::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-bell-alert';
@@ -112,6 +121,10 @@ class PushNotificationResource extends Resource
                     ->dateTime('d M Y H:i')
                     ->sortable()
                     ->toggleable(),
+                Tables\Columns\TextColumn::make('recipients_count')
+                    ->label('Recipients')
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('creator.name')
                     ->label('Created By')
                     ->toggleable(),
@@ -148,15 +161,12 @@ class PushNotificationResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Send Push Notification')
                     ->modalDescription('This will mark the notification as sent and dispatch it to the target audience.')
-                    ->action(function (PushNotification $record) {
-                        $record->update([
-                            'status' => 'sent',
-                            'sent_at' => now(),
-                        ]);
+                    ->action(function (PushNotification $record, PushNotificationDispatchService $dispatch) {
+                        $count = $dispatch->dispatch($record);
 
                         Notification::make()
                             ->title('Push notification sent')
-                            ->body('Notification "'.$record->title.'" has been dispatched.')
+                            ->body('Notification "'.$record->title.'" delivered to '.$count.' users.')
                             ->success()
                             ->send();
                     }),

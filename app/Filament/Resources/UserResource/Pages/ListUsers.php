@@ -4,6 +4,7 @@ namespace App\Filament\Resources\UserResource\Pages;
 
 use App\Filament\Exports\UserReportExporter;
 use App\Filament\Resources\UserResource;
+use App\Support\FilamentExportActions;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -19,11 +20,7 @@ class ListUsers extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\ExportAction::make()
-                ->exporter(UserReportExporter::class)
-                ->label('Export')
-                ->color('gray')
-                ->icon('heroicon-o-arrow-down-tray'),
+            FilamentExportActions::headerExport(UserReportExporter::class, 'users'),
             Actions\CreateAction::make()
                 ->label('Add User')
                 ->icon('heroicon-o-plus'),

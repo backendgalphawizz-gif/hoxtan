@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Auth;
 
+use App\Support\FilamentFormFields;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Component;
 use Filament\Forms\Components\TextInput;
@@ -31,9 +32,7 @@ class Login extends BaseLogin
 
     protected function getEmailFormComponent(): Component
     {
-        return TextInput::make('email')
-            ->label('Email ID or Username')
-            ->email()
+        return FilamentFormFields::email('email', 'Email ID or Username')
             ->required()
             ->autocomplete()
             ->autofocus()

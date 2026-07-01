@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\RelationManagers\KycDetailRelationManager;
 use App\Models\User;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
 use Filament\Forms;
@@ -17,10 +19,16 @@ use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'users';
+    }
+
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
@@ -35,45 +43,69 @@ class UserResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Users';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with('referredBy');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Basic Information')
+                Forms\Components\Section::make('Registration Details')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
+                        FilamentFormFields::name()
+                            ->required(),
+                        FilamentFormFields::mobile()
                             ->required()
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('email')
-                            ->email()
-                            ->required()
-                            ->unique(ignoreRecord: true)
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('phone')
-                            ->tel()
-                            ->unique(ignoreRecord: true)
-                            ->regex('/^[6-9]\d{9}$/')
-                            ->validationMessages([
-                                'regex' => 'Enter a valid 10-digit Indian mobile number.',
-                            ])
-                            ->maxLength(20),
+                            ->unique(ignoreRecord: true),
+                        FilamentFormFields::mpin()
+                            ->required(fn (string $operation) => $operation === 'create')
+                            ->visible(fn (string $operation) => $operation === 'create'),
+                        FilamentFormFields::mpin('mpin', 'New MPIN', false)
+                            ->helperText('Leave blank to keep current MPIN.')
+                            ->visible(fn (string $operation) => $operation === 'edit'),
+                        Forms\Components\TextInput::make('referral_code_input')
+                            ->label('Referral Code (optional)')
+                            ->maxLength(12)
+                            ->visible(fn (string $operation) => $operation === 'create')
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('referral_code')
+                            ->label('User Referral Code')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->visible(fn (string $operation) => $operation === 'edit'),
+                        Forms\Components\Placeholder::make('referred_by_display')
+                            ->label('Referred By')
+                            ->content(fn (?User $record): string => $record?->referredBy
+                                ? $record->referredBy->name.' ('.$record->referredBy->phone.')'
+                                : '—')
+                            ->visible(fn (?User $record) => $record?->referred_by_id !== null),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Nominee Details')
+                    ->description('Nominee information for the user profile.')
+                    ->schema([
+                        FilamentFormFields::fullName('nominee_name', 'Nominee Name', false),
+                        Forms\Components\TextInput::make('nominee_relation')
+                            ->label('Relation')
+                            ->maxLength(50),
+                        FilamentFormFields::mobile('nominee_phone', 'Nominee Mobile', false),
+                        Forms\Components\DatePicker::make('nominee_date_of_birth')
+                            ->label('Nominee Date of Birth')
+                            ->native(false)
+                            ->maxDate(now()),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Account Status')
+                    ->schema([
                         Forms\Components\Select::make('role')
                             ->options([
                                 'user' => 'User',
                                 'investor' => 'Investor',
                             ])
-                            ->required(),
-                        Forms\Components\TextInput::make('password')
-                            ->password()
-                            ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
-                            ->dehydrated(fn ($state) => filled($state))
-                            ->required(fn (string $operation) => $operation === 'create')
-                            ->minLength(8)
-                            ->maxLength(255),
-                    ])->columns(2),
-
-                Forms\Components\Section::make('Account Status')
-                    ->schema([
+                            ->required()
+                            ->default('user'),
                         Forms\Components\Select::make('kyc_status')
                             ->options([
                                 'pending' => 'Pending',
@@ -96,22 +128,23 @@ class UserResource extends Resource
                     ])->columns(2),
 
                 Forms\Components\Section::make('Holdings & Wallet')
+                    ->description('Holdings are calculated automatically from completed buy/sell transactions. Wallet balance updates via wallet transactions.')
                     ->schema([
                         Forms\Components\TextInput::make('gold_holdings')
                             ->numeric()
                             ->suffix('grams')
-                            ->minValue(0)
-                            ->step(0.0001),
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\TextInput::make('silver_holdings')
                             ->numeric()
                             ->suffix('grams')
-                            ->minValue(0)
-                            ->step(0.0001),
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\TextInput::make('wallet_balance')
                             ->numeric()
                             ->prefix('₹')
-                            ->minValue(0)
-                            ->step(0.01),
+                            ->disabled()
+                            ->dehydrated(false),
                     ])->columns(3),
             ]);
     }
@@ -151,6 +184,11 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('phone')
                     ->label('Mobile No')
                     ->searchable(),
+
+                Tables\Columns\TextColumn::make('referral_code')
+                    ->label('Referral Code')
+                    ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('email')
                     ->label('Email')

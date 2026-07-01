@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\InvestmentGoalResource\Pages;
 use App\Models\InvestmentGoal;
 use App\Support\FilamentDateFilters;
@@ -14,6 +15,13 @@ use Filament\Tables\Table;
 
 class InvestmentGoalResource extends Resource
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'investment_goals';
+    }
+
     protected static ?string $model = InvestmentGoal::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-flag';
@@ -52,12 +60,11 @@ class InvestmentGoalResource extends Resource
                             ->suffix('g'),
                         Forms\Components\TextInput::make('current_grams')
                             ->label('Current (grams)')
-                            ->required()
                             ->numeric()
-                            ->minValue(0)
-                            ->step(0.0001)
                             ->suffix('g')
-                            ->default(0),
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Updated automatically from user holdings.'),
                         Forms\Components\TextInput::make('target_amount')
                             ->label('Target Amount')
                             ->numeric()

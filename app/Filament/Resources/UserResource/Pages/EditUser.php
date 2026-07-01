@@ -4,9 +4,9 @@ namespace App\Filament\Resources\UserResource\Pages;
 
 use App\Filament\Resources\UserResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditUser extends EditRecord
+class EditUser extends BaseEditRecord
 {
     protected static string $resource = UserResource::class;
 
@@ -16,5 +16,14 @@ class EditUser extends EditRecord
             Actions\ViewAction::make(),
             Actions\DeleteAction::make(),
         ];
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (blank($data['mpin'] ?? null)) {
+            unset($data['mpin']);
+        }
+
+        return $data;
     }
 }

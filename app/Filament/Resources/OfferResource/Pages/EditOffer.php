@@ -4,9 +4,9 @@ namespace App\Filament\Resources\OfferResource\Pages;
 
 use App\Filament\Resources\OfferResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\BaseEditRecord;
 
-class EditOffer extends EditRecord
+class EditOffer extends BaseEditRecord
 {
     protected static string $resource = OfferResource::class;
 

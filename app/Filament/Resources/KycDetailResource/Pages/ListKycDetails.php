@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\KycDetailResource\Pages;
 
+use App\Filament\Exports\KycDetailExporter;
 use App\Filament\Resources\KycDetailResource;
-use Filament\Actions;
+use App\Support\FilamentExportActions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListKycDetails extends ListRecords
@@ -12,11 +13,13 @@ class ListKycDetails extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'View KYC details, face verification review, and approve or reject submissions.';
+        return 'Review and verify user KYC submissions.';
     }
 
     protected function getHeaderActions(): array
     {
-        return [Actions\CreateAction::make()];
+        return [
+            FilamentExportActions::headerExport(KycDetailExporter::class, 'kyc'),
+        ];
     }
 }

@@ -2,22 +2,21 @@
 
 namespace App\Filament\Pages\SilverRate;
 
-use App\Models\MetalRate;
+use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Services\MetalRateService;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Illuminate\Support\Facades\Auth;
 
 class LiveSync extends Page
 {
+    use InteractsWithAdminPermissions;
+
+    protected static function adminPermissionModule(): string
+    {
+        return 'silver_live_sync';
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
 
     protected static ?string $navigationGroup = 'Silver Rate Management';
@@ -74,6 +73,7 @@ class LiveSync extends Page
         $this->currentRate = [
             'active' => $active?->rate_per_gram,
             'live' => $live,
+            'live_source' => $rates->getLiveRateSource('silver'),
             'updated_at' => $active?->updated_at?->format('M d, Y g:i A'),
             'source' => $active?->source,
         ];

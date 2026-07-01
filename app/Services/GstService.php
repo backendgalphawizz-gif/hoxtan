@@ -8,7 +8,19 @@ use Carbon\Carbon;
 
 class GstService
 {
-    public const GST_RATE = 0.03; // 3% GST (1.5% CGST + 1.5% SGST)
+    public function __construct(
+        protected AppSettingService $settings,
+    ) {}
+
+    public function rate(): float
+    {
+        return $this->settings->gstRate();
+    }
+
+    public function ratePercent(): float
+    {
+        return $this->settings->gstRatePercent();
+    }
 
     public function calculateForDate(Carbon $date): GstRecord
     {
@@ -38,7 +50,7 @@ class GstService
 
     public function calculateGstAmount(float $amount): array
     {
-        $gstAmount = round($amount * self::GST_RATE, 2);
+        $gstAmount = round($amount * $this->rate(), 2);
         $cgst = round($gstAmount / 2, 2);
         $sgst = round($gstAmount / 2, 2);
 

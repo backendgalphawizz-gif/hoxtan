@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\RedemptionResource\Pages;
 
 use App\Filament\Resources\RedemptionResource;
+use App\Support\FilamentFormFields;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -54,9 +55,8 @@ class ViewRedemption extends ViewRecord
                 ->color('info')
                 ->visible(fn () => in_array($this->record->status, ['approved', 'processing']))
                 ->form([
-                    Forms\Components\TextInput::make('courier_name')
-                        ->required()
-                        ->maxLength(255),
+                    FilamentFormFields::name('courier_name', 'Courier Name')
+                        ->required(),
                     Forms\Components\TextInput::make('tracking_number')
                         ->required()
                         ->maxLength(255),

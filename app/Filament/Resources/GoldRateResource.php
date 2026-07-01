@@ -12,6 +12,11 @@ class GoldRateResource extends MetalRateResource
 
     protected static ?int $navigationSort = 3;
 
+    protected static function adminPermissionModule(): string
+    {
+        return 'gold_rate_history';
+    }
+
     protected static function metalType(): string
     {
         return 'gold';
