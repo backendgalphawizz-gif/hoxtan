@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\UserRegistrationService;
+use App\Support\ApiResponse;
 use App\Support\MpinRules;
+use App\Support\PhoneRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,11 +33,12 @@ class AuthController extends Controller
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Registration successful.',
+        return ApiResponse::success([
+            'mpin' => $data['mpin'],
+            'mpin_length' => MpinRules::length(),
             'token' => $token,
             'user' => $this->userPayload($user),
-        ], 201);
+        ], 'Registration successful.', 201);
     }
 
     public function login(Request $request): JsonResponse
@@ -42,39 +46,43 @@ class AuthController extends Controller
         $length = MpinRules::length();
 
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^\d{10}$/'],
+            'phone' => PhoneRules::rules(),
             'mpin' => ['required', 'string', "digits:{$length}", 'regex:/^\d+$/'],
-        ], MpinRules::validationMessages());
+        ], array_merge(PhoneRules::messages(), MpinRules::validationMessages()));
 
-        $user = \App\Models\User::query()
-            ->where('phone', $data['phone'])
+        $phone = PhoneRules::normalize($data['phone']);
+
+        $user = User::query()
+            ->where('phone', $phone)
             ->first();
 
         if (! $user || ! $user->verifyMpin($data['mpin'])) {
-            return response()->json(['message' => 'Invalid mobile number or MPIN.'], 401);
+            return ApiResponse::error('Invalid mobile number or MPIN.', [], 401);
         }
 
         if ($user->is_blocked) {
-            return response()->json(['message' => 'Your account has been blocked.'], 403);
+            return ApiResponse::error('Your account has been blocked.', [], 403);
         }
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Login successful.',
+        return ApiResponse::success([
+            'phone' => $phone,
+            'mpin' => $data['mpin'],
+            'mpin_length' => $length,
             'token' => $token,
             'user' => $this->userPayload($user),
-        ]);
+        ], 'Login successful.');
     }
 
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()?->delete();
 
-        return response()->json(['message' => 'Logged out successfully.']);
+        return ApiResponse::success([], 'Logged out successfully.');
     }
 
-    protected function userPayload(\App\Models\User $user): array
+    protected function userPayload(User $user): array
     {
         return [
             'id' => $user->id,
@@ -91,5 +99,30 @@ class AuthController extends Controller
                 'date_of_birth' => $user->nominee_date_of_birth?->toDateString(),
             ],
         ];
+    }
+
+    protected function loginWithMpin(User $user, string $phone, string $mpin, \App\Services\OtpService $otp): JsonResponse
+    {
+        if ($user->is_blocked) {
+            return ApiResponse::error('Your account has been blocked.', [], 403);
+        }
+
+        if (! $user->verifyMpin($mpin)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'mpin' => ['Invalid M-PIN. Please try again.'],
+            ]);
+        }
+
+        $otp->clearVerification($phone, 'login');
+
+        $token = $user->createToken('mobile-app')->plainTextToken;
+
+        return ApiResponse::success([
+            'phone' => $phone,
+            'mpin' => $mpin,
+            'mpin_length' => MpinRules::length(),
+            'token' => $token,
+            'user' => $this->userPayload($user),
+        ], 'Login successful.');
     }
 }

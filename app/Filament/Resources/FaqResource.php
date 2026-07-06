@@ -46,6 +46,12 @@ class FaqResource extends Resource
                         Forms\Components\RichEditor::make('answer')
                             ->required()
                             ->columnSpanFull(),
+                        Forms\Components\Select::make('category')
+                            ->options(collect(config('app_content.faq_categories', []))
+                                ->pluck('label', 'value')
+                                ->all())
+                            ->default('trading')
+                            ->required(),
                         Forms\Components\TextInput::make('sort_order')
                             ->numeric()
                             ->minValue(0)
@@ -65,6 +71,10 @@ class FaqResource extends Resource
                 Tables\Columns\TextColumn::make('question')
                     ->searchable()
                     ->limit(60)
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('category')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state) => App\Support\AppConfigPayload::faqCategoryLabel($state ?? 'general'))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sort_order')
                     ->sortable(),

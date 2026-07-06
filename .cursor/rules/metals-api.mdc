@@ -1,0 +1,49 @@
+---
+description: Live gold and silver rates use Metals-API (metals-api.com)
+globs:
+  - app/Services/MetalRateService.php
+  - app/Services/MetalsApiService.php
+  - app/Filament/Pages/GoldRate/**
+  - app/Filament/Pages/SilverRate/**
+  - config/services.php
+  - config/app_settings.php
+alwaysApply: false
+---
+
+# Live metal rates — Metals-API
+
+This project fetches **live gold and silver rates** from [Metals-API](https://metals-api.com/).
+
+## Configuration
+
+Set in `.env`:
+
+```
+METALS_API_KEY=your_key_here
+METALS_API_GOLD_SYMBOL=VISA-24k
+METALS_API_CURRENCY=INR
+```
+
+Optional admin override: **System → Settings → Metal Rates → Metals-API Gold Symbol**
+
+## How rates are fetched
+
+| Metal | Metals-API endpoint | Unit |
+|-------|---------------------|------|
+| Gold | `/api/gold-price-india` | INR per gram (24k symbol e.g. `VISA-24k`) |
+| Silver | `/api/convert` XAG→INR, fallback `/api/latest` USDXAG+INR | INR per gram |
+
+## Sync
+
+- Admin: **Live Gold/Silver Rate Sync → Sync Live Rate**
+- CLI: `php artisan metals:sync-live`
+- Scheduler: hourly via `metals:sync-live`
+
+## Fallback order
+
+1. Metals-API (if `METALS_API_KEY` set)
+2. Custom API URL from admin settings
+3. Current active DB rate
+4. Fallback rate from settings
+
+Do not hardcode gold/silver prices — always use `MetalRateService` or `MetalsApiService`.

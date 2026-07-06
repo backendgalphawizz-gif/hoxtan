@@ -31,7 +31,10 @@ class RedemptionResource extends Resource
 
     protected static ?string $navigationGroup = 'Redemption Management';
 
-    protected static bool $shouldRegisterNavigation = false;
+    public static function shouldRegisterNavigation(): bool
+    {
+        return (bool) config('admin_navigation.redemption_management', true);
+    }
 
     protected static ?string $navigationLabel = 'Redemption Requests';
 

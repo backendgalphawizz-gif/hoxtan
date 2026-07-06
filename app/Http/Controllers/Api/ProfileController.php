@@ -4,90 +4,184 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Models\User;
 use App\Services\InvoiceService;
+use App\Support\ApiResponse;
+use App\Support\MpinRules;
+use App\Support\UserProfilePayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProfileController extends Controller
 {
     public function show(Request $request): JsonResponse
     {
-        $user = $request->user()->load('referredBy:id,name,phone');
-
-        return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'referral_code' => $user->referral_code,
-                'wallet_balance' => (float) $user->wallet_balance,
-                'gold_holdings' => (float) $user->gold_holdings,
-                'silver_holdings' => (float) $user->silver_holdings,
-                'kyc_status' => $user->kyc_status,
-                'referred_by' => $user->referredBy ? [
-                    'name' => $user->referredBy->name,
-                    'phone' => $user->referredBy->phone,
-                ] : null,
-                'nominee' => [
-                    'name' => $user->nominee_name,
-                    'relation' => $user->nominee_relation,
-                    'phone' => $user->nominee_phone,
-                    'date_of_birth' => $user->nominee_date_of_birth?->toDateString(),
-                ],
-            ],
+        return ApiResponse::success([
+            'user' => UserProfilePayload::make($request->user()),
         ]);
     }
 
     public function update(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         $data = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:32', 'regex:/^[A-Za-z\s]+$/'],
+            'name' => ['sometimes', 'required', 'string', 'max:100', 'regex:/^[A-Za-z\s]+$/'],
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'primary_residence' => ['nullable', 'string', 'max:255'],
+            'gender' => ['nullable', 'string', Rule::in(['male', 'female', 'other'])],
+            'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'market_alerts' => ['nullable', 'boolean'],
+            'profile_photo' => ['nullable', 'image', 'max:2048'],
+            'image' => ['nullable', 'image', 'max:2048'],
+            'profile_image' => ['nullable', 'image', 'max:2048'],
+            'nominee' => ['nullable', 'array'],
+            'nominee.name' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z\s]+$/'],
+            'nominee.relation' => ['nullable', 'string', 'max:50'],
+            'nominee.phone' => ['nullable', 'string', 'regex:/^\d{10}$/'],
+            'nominee.date_of_birth' => ['nullable', 'date', 'before:today'],
             'nominee_name' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z\s]+$/'],
             'nominee_relation' => ['nullable', 'string', 'max:50'],
             'nominee_phone' => ['nullable', 'string', 'regex:/^\d{10}$/'],
             'nominee_date_of_birth' => ['nullable', 'date', 'before:today'],
         ]);
 
-        $user = $request->user();
-        $user->update($data);
+        $updates = collect($data)->only([
+            'name',
+            'email',
+            'primary_residence',
+            'gender',
+            'date_of_birth',
+            'market_alerts',
+        ])->all();
 
-        return response()->json([
-            'message' => 'Profile updated successfully.',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'nominee' => [
-                    'name' => $user->nominee_name,
-                    'relation' => $user->nominee_relation,
-                    'phone' => $user->nominee_phone,
-                    'date_of_birth' => $user->nominee_date_of_birth?->toDateString(),
-                ],
-            ],
+        if (array_key_exists('email', $updates) && blank($updates['email'])) {
+            $updates['email'] = $user->phone.'@hoxtan.app';
+        }
+
+        if ($photo = $this->resolveProfilePhotoFile($request)) {
+            $updates['profile_photo'] = $this->storeProfilePhoto($user, $photo);
+        }
+
+        if ($request->has('nominee')) {
+            $nominee = $data['nominee'] ?? [];
+            $updates = array_merge($updates, array_filter([
+                'nominee_name' => $nominee['name'] ?? null,
+                'nominee_relation' => $nominee['relation'] ?? null,
+                'nominee_phone' => $nominee['phone'] ?? null,
+                'nominee_date_of_birth' => $nominee['date_of_birth'] ?? null,
+            ], fn ($value) => $value !== null));
+        }
+
+        foreach (['nominee_name', 'nominee_relation', 'nominee_phone', 'nominee_date_of_birth'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $updates[$field] = $data[$field];
+            }
+        }
+
+        if ($updates === []) {
+            throw ValidationException::withMessages([
+                'message' => ['No profile fields were provided to update.'],
+            ]);
+        }
+
+        $user->update($updates);
+
+        return ApiResponse::success([
+            'user' => UserProfilePayload::make($user->fresh()),
+        ], 'Profile updated successfully.');
+    }
+
+    public function updatePhoto(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'profile_photo' => ['nullable', 'image', 'max:2048'],
+            'image' => ['nullable', 'image', 'max:2048'],
+            'profile_image' => ['nullable', 'image', 'max:2048'],
         ]);
+
+        $photo = $this->resolveProfilePhotoFile($request);
+
+        if (! $photo) {
+            throw ValidationException::withMessages([
+                'profile_photo' => ['Please upload a profile photo (use field name profile_photo, image, or profile_image).'],
+            ]);
+        }
+
+        $user->update([
+            'profile_photo' => $this->storeProfilePhoto($user, $photo),
+        ]);
+
+        return ApiResponse::success([
+            'user' => UserProfilePayload::make($user->fresh()),
+        ], 'Profile photo updated successfully.');
     }
 
     public function updateMpin(Request $request): JsonResponse
     {
-        $length = \App\Support\MpinRules::length();
+        $length = MpinRules::length();
 
         $data = $request->validate([
             'current_mpin' => ['required', 'string', "digits:{$length}", 'regex:/^\d+$/'],
             'mpin' => ['required', 'string', "digits:{$length}", 'regex:/^\d+$/', 'different:current_mpin'],
-            'mpin_confirmation' => ['required', 'same:mpin'],
-        ], \App\Support\MpinRules::validationMessages());
+        ], array_merge(MpinRules::validationMessages(), [
+            'mpin.different' => 'New M-PIN must be different from your current M-PIN.',
+        ]));
 
         $user = $request->user();
 
         if (! $user->verifyMpin($data['current_mpin'])) {
-            return response()->json(['message' => 'Current MPIN is incorrect.'], 422);
+            throw ValidationException::withMessages([
+                'current_mpin' => ['Current M-PIN is incorrect.'],
+            ]);
         }
 
         $user->update(['mpin' => $data['mpin']]);
 
-        return response()->json(['message' => 'MPIN updated successfully.']);
+        return ApiResponse::success([
+            'mpin' => $data['mpin'],
+            'mpin_length' => $length,
+        ], 'M-PIN updated successfully.');
+    }
+
+    public function destroy(Request $request): JsonResponse
+    {
+        $length = MpinRules::length();
+
+        $data = $request->validate([
+            'mpin' => ['required', 'string', "digits:{$length}", 'regex:/^\d+$/'],
+        ], MpinRules::validationMessages());
+
+        /** @var User $user */
+        $user = $request->user();
+
+        if (! $user->verifyMpin($data['mpin'])) {
+            throw ValidationException::withMessages([
+                'mpin' => ['Invalid M-PIN. Account could not be closed.'],
+            ]);
+        }
+
+        $user->tokens()->delete();
+
+        if (filled($user->profile_photo)) {
+            Storage::disk('public')->delete($user->profile_photo);
+        }
+
+        $user->delete();
+
+        return ApiResponse::success([], 'Your account has been closed successfully.');
     }
 
     public function referralStats(Request $request): JsonResponse
@@ -100,7 +194,7 @@ class ProfileController extends Controller
             ->where('status', 'credited')
             ->sum('bonus_amount');
 
-        return response()->json([
+        return ApiResponse::success([
             'referral_code' => $user->referral_code,
             'successful_referrals' => (int) $user->successful_referrals,
             'total_earned' => (float) $totalEarned,
@@ -124,13 +218,15 @@ class ProfileController extends Controller
                 'download_url' => route('api.invoices.download', $invoice),
             ]);
 
-        return response()->json(['invoices' => $invoices]);
+        return ApiResponse::success([
+            'invoices' => $invoices,
+        ]);
     }
 
     public function downloadInvoice(Request $request, Invoice $invoice, InvoiceService $invoices): StreamedResponse|JsonResponse
     {
         if ($invoice->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+            return ApiResponse::error('Unauthorized.', [], 403);
         }
 
         if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
@@ -143,5 +239,25 @@ class ProfileController extends Controller
             $invoice->invoice_number.'.html',
             ['Content-Type' => 'text/html'],
         );
+    }
+
+    protected function resolveProfilePhotoFile(Request $request): ?UploadedFile
+    {
+        foreach (['profile_photo', 'image', 'profile_image'] as $field) {
+            if ($request->hasFile($field)) {
+                return $request->file($field);
+            }
+        }
+
+        return null;
+    }
+
+    protected function storeProfilePhoto(User $user, UploadedFile $photo): string
+    {
+        if (filled($user->profile_photo)) {
+            Storage::disk('public')->delete($user->profile_photo);
+        }
+
+        return $photo->store('profile-photos', 'public');
     }
 }

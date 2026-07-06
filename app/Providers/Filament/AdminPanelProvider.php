@@ -52,7 +52,7 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => '<link rel="preconnect" href="https://fonts.bunny.net">'
                     .'<link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet">'
-                    .'<link rel="stylesheet" href="'.asset('css/admin-theme.css').'?v=15">',
+                    .'<link rel="stylesheet" href="'.asset('css/admin-theme.css').'?v=16">',
             )
             ->authGuard('admin')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
@@ -60,19 +60,21 @@ class AdminPanelProvider extends PanelProvider
             ->pages([])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([])
-            ->navigationGroups([
+            ->navigationGroups(array_values(array_filter([
                 NavigationGroup::make('Dashboard')->collapsed(false),
                 NavigationGroup::make('User Management'),
                 NavigationGroup::make('Gold Rate Management'),
                 NavigationGroup::make('Silver Rate Management'),
                 NavigationGroup::make('Investment Management'),
-                NavigationGroup::make('Redemption Management'),
+                config('admin_navigation.redemption_management')
+                    ? NavigationGroup::make('Redemption Management')
+                    : null,
                 NavigationGroup::make('Wallet Management'),
                 NavigationGroup::make('CMS Management'),
                 NavigationGroup::make('Reports'),
                 NavigationGroup::make('Notification Management'),
                 NavigationGroup::make('System'),
-            ])
+            ])))
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

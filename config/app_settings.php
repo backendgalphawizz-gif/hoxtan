@@ -30,11 +30,18 @@ return [
             'description' => 'GST percentage applied on buy transactions (split equally as CGST + SGST).',
             'default' => '3',
         ],
+        'metals_api_gold_symbol' => [
+            'group' => 'metal_rates',
+            'label' => 'Metals-API Gold Symbol (India)',
+            'type' => 'text',
+            'description' => 'India gold symbol from Metals-API (e.g. VISA-24k, VIJA-22k, SALE-22k). Requires METALS_API_KEY in .env.',
+            'default' => 'VISA-24k',
+        ],
         'gold_live_api_url' => [
             'group' => 'metal_rates',
-            'label' => 'Gold Live API URL',
+            'label' => 'Gold Custom API URL (optional)',
             'type' => 'url',
-            'description' => 'HTTP GET endpoint returning JSON. Leave empty to use fallback rate.',
+            'description' => 'Fallback custom URL if Metals-API is unavailable. Leave empty when using Metals-API.',
             'default' => '',
         ],
         'gold_live_api_json_path' => [
@@ -53,9 +60,9 @@ return [
         ],
         'silver_live_api_url' => [
             'group' => 'metal_rates',
-            'label' => 'Silver Live API URL',
+            'label' => 'Silver Custom API URL (optional)',
             'type' => 'url',
-            'description' => 'HTTP GET endpoint returning JSON. Leave empty to use fallback rate.',
+            'description' => 'Fallback custom URL if Metals-API is unavailable. Leave empty when using Metals-API.',
             'default' => '',
         ],
         'silver_live_api_json_path' => [

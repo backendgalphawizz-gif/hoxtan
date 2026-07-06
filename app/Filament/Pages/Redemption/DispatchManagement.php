@@ -22,6 +22,11 @@ class DispatchManagement extends Page implements HasTable
 
     protected static ?string $navigationGroup = 'Redemption Management';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return (bool) config('admin_navigation.redemption_management', true);
+    }
+
     protected static ?string $navigationLabel = 'Dispatch Management';
 
     protected static ?int $navigationSort = 3;

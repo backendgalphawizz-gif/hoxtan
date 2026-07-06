@@ -1178,3 +1178,117 @@ body,
     accent-color: var(--gs-orange);
     cursor: pointer;
 }
+
+/* ── Dashboard live metal rates ──────────────────────────── */
+
+.gs-metal-rates__header {
+    margin-bottom: 1.25rem;
+}
+
+.gs-metal-rates__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gs-text-dark);
+}
+
+.gs-metal-rates__subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--gs-text-muted);
+}
+
+.gs-metal-rates__grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+    .gs-metal-rates__grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.gs-metal-rates__card {
+    border: 1px solid var(--gs-card-border);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    background: #ffffff;
+}
+
+.gs-metal-rates__card--gold {
+    border-top: 3px solid #d97706;
+    background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+}
+
+.gs-metal-rates__card--silver {
+    border-top: 3px solid #6b7280;
+    background: linear-gradient(180deg, #f9fafb 0%, #ffffff 100%);
+}
+
+.gs-metal-rates__card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.gs-metal-rates__badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gs-text-dark);
+}
+
+.gs-metal-rates__feed {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+}
+
+.gs-metal-rates__prices {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.gs-metal-rates__label {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gs-text-muted);
+}
+
+.gs-metal-rates__value {
+    margin: 0.375rem 0 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gs-text-dark);
+    line-height: 1.2;
+}
+
+.gs-metal-rates__value span {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gs-text-muted);
+}
+
+.gs-metal-rates__value--live {
+    color: var(--gs-orange);
+}
+
+.gs-metal-rates__meta {
+    margin: 1rem 0 0;
+    font-size: 0.75rem;
+    color: var(--gs-text-muted);
+    line-height: 1.5;
+}

@@ -38,6 +38,7 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
+            \App\Filament\Widgets\CurrentMetalRatesWidget::class,
             \App\Filament\Widgets\StatsOverviewWidget::class,
             \App\Filament\Widgets\RevenueChartWidget::class,
             \App\Filament\Widgets\TransactionChartWidget::class,

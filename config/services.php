@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Metals-API (metals-api.com) — live gold & silver rates
+    |--------------------------------------------------------------------------
+    |
+    | Get your API key from https://metals-api.com/
+    | Gold uses the India endpoint (INR per gram). Silver is converted to INR/g.
+    |
+    */
+    'metals_api' => [
+        'key' => env('METALS_API_KEY'),
+        'base_url' => env('METALS_API_BASE_URL', 'https://metals-api.com/api'),
+        'gold_symbol' => env('METALS_API_GOLD_SYMBOL', 'VISA-24k'),
+        'currency' => env('METALS_API_CURRENCY', 'INR'),
+    ],
+
 ];

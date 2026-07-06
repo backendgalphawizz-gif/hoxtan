@@ -315,14 +315,23 @@ class DummyDataSeeder extends Seeder
         ]);
 
         $faqs = [
-            ['How do I buy digital gold?', 'Complete KYC, add wallet funds, and buy at live rates.'],
-            ['What is the minimum investment?', 'You can start with as little as ₹100.'],
-            ['How do I redeem physical gold?', 'Submit a redemption request from the app; we deliver to your address.'],
-            ['Is my gold secure?', 'Yes, all holdings are backed by physical gold stored in insured vaults.'],
-            ['What are the GST charges?', 'A 3% GST (1.5% CGST + 1.5% SGST) applies on all transactions.'],
+            ['vault_security', 'What are the physical storage protocols for Hoxtan Gold?', 'All holdings are stored in allocated, segregated vaults with insured deep-storage protocols and quarterly audits.'],
+            ['withdrawals', 'How long do international bullion withdrawals take to process?', 'International bullion withdrawals typically process within 3-5 business days after compliance verification.'],
+            ['trading', 'Is there a minimum liquidity requirement for elite trading?', 'Minimum trade sizes apply based on metal type. Gold 999.9 starts at 1.0oz and Silver 999 at 100oz.'],
+            ['kyc_account', 'What documentation is required for Corporate KYC?', 'Corporate KYC requires incorporation documents, beneficial ownership declarations, and authorized signatory identification.'],
+            ['trading', 'How do I buy digital gold?', 'Complete KYC, add wallet funds, and buy at live rates.'],
+            ['trading', 'What is the minimum investment?', 'You can start with as little as ₹100 for digital purchases.'],
+            ['withdrawals', 'How do I redeem physical gold?', 'Submit a redemption request from the app; we deliver to your saved address.'],
+            ['vault_security', 'Is my gold secure?', 'Yes, all holdings are backed by physical gold stored in insured vaults.'],
+            ['trading', 'What are the GST charges?', 'A 3% GST (1.5% CGST + 1.5% SGST) applies on all transactions.'],
         ];
-        foreach ($faqs as $i => [$q, $a]) {
-            Faq::updateOrCreate(['question' => $q], ['answer' => $a, 'sort_order' => $i + 1, 'is_active' => true]);
+        foreach ($faqs as $i => [$category, $q, $a]) {
+            Faq::updateOrCreate(['question' => $q], [
+                'answer' => $a,
+                'category' => $category,
+                'sort_order' => $i + 1,
+                'is_active' => true,
+            ]);
         }
 
         StaticPage::updateOrCreate(['slug' => 'terms-and-conditions'], [
