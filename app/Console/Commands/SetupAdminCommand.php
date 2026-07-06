@@ -6,7 +6,6 @@ use App\Models\Admin;
 use App\Models\AdminRole;
 use App\Support\AdminPermissions;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Hash;
 
 class SetupAdminCommand extends Command
 {
@@ -51,7 +50,7 @@ class SetupAdminCommand extends Command
             [
                 'admin_role_id' => $role->id,
                 'name' => (string) $this->option('name'),
-                'password' => Hash::make($password),
+                'password' => $password,
                 'is_active' => true,
             ],
         );

@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Admin;
 use App\Models\AdminRole;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class AdminSeeder extends Seeder
 {
@@ -18,7 +17,7 @@ class AdminSeeder extends Seeder
             [
                 'admin_role_id' => $superAdminRole?->id,
                 'name' => 'Super Admin',
-                'password' => Hash::make(env('ADMIN_PASSWORD', '12345678')),
+                'password' => env('ADMIN_PASSWORD', '12345678'),
                 'is_active' => true,
             ]
         );
@@ -30,7 +29,7 @@ class AdminSeeder extends Seeder
             [
                 'admin_role_id' => $supportRole?->id,
                 'name' => 'Support Staff',
-                'password' => Hash::make('Support@123'),
+                'password' => 'Support@123',
                 'is_active' => true,
             ]
         );
