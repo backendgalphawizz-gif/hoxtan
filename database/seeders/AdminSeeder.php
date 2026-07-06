@@ -14,11 +14,11 @@ class AdminSeeder extends Seeder
         $superAdminRole = AdminRole::where('slug', 'super-admin')->first();
 
         Admin::updateOrCreate(
-            ['email' => 'admin@goldsilver.com'],
+            ['email' => env('ADMIN_EMAIL', 'admin@gmail.com')],
             [
                 'admin_role_id' => $superAdminRole?->id,
                 'name' => 'Super Admin',
-                'password' => Hash::make('Admin@123'),
+                'password' => Hash::make(env('ADMIN_PASSWORD', '12345678')),
                 'is_active' => true,
             ]
         );
