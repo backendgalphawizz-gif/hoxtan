@@ -30,4 +30,12 @@ class FilamentFormat
 
         return number_format((float) $value, $decimals);
     }
+
+    /**
+     * Full public storage URL using the application base URL.
+     */
+    public static function storageUrl(?string $path): ?string
+    {
+        return AssetUrl::publicStorage($path);
+    }
 }

@@ -2,11 +2,11 @@
 
 namespace App\Filament\Resources\SigPlanResource\Pages;
 
+use App\Filament\Resources\Pages\BaseEditRecord;
 use App\Filament\Resources\SigPlanResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
 
-class EditSigPlan extends EditRecord
+class EditSigPlan extends BaseEditRecord
 {
     protected static string $resource = SigPlanResource::class;
 

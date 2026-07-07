@@ -19,8 +19,9 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Builder;
 
 class SigPlanResource extends Resource
 {
@@ -132,24 +133,24 @@ class SigPlanResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('plan_number')
-                    ->label('Plan ID')
-                    ->searchable()
-                    ->copyable(),
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Client')
-                    ->searchable()
+                    ->description(fn (SigPlan $record): ?string => $record->user?->phone)
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas(
+                            'user',
+                            fn (Builder $userQuery) => $userQuery
+                                ->where('name', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%")
+                        );
+                    })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('user.phone')
-                    ->label('Mobile')
-                    ->searchable()
-                    ->toggleable(),
                 Tables\Columns\TextColumn::make('title_label')
                     ->label('SIG Plan')
                     ->badge()
                     ->color(fn (SigPlan $record) => $record->metal_type === 'gold' ? 'warning' : 'gray'),
                 Tables\Columns\TextColumn::make('amount')
-                    ->label('Installment')
+                    ->label('Amount')
                     ->inr()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
@@ -160,26 +161,35 @@ class SigPlanResource extends Resource
                         'danger' => 'stopped',
                     ]),
                 Tables\Columns\TextColumn::make('next_debit_at')
-                    ->label('Next Auto Debit')
-                    ->dateTime('d M Y')
+                    ->label('Next Debit')
+                    ->date('d M Y')
                     ->placeholder('—')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('total_invested')
-                    ->inr()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('metal_accumulated_grams')
-                    ->label('Metal (g)')
-                    ->grams(4),
                 Tables\Columns\TextColumn::make('progress_label')
-                    ->label('Completed')
+                    ->label('Progress')
                     ->badge()
                     ->color('info'),
+                Tables\Columns\TextColumn::make('total_invested')
+                    ->label('Invested')
+                    ->inr()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('metal_accumulated_grams')
+                    ->label('Metal (g)')
+                    ->grams(4)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('plan_number')
+                    ->label('Plan ID')
+                    ->searchable()
+                    ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('linked_bank_label')
                     ->label('Bank')
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('activated_at')
-                    ->dateTime('d M Y')
+                    ->label('Activated')
+                    ->date('d M Y')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -207,12 +217,62 @@ class SigPlanResource extends Resource
             ])
             ->actions([
                 FilamentTableActions::view(),
-                static::pauseAction(),
-                static::resumeAction(),
-                static::stopAction(),
+                static::manageActionGroup(),
                 FilamentTableActions::edit(),
             ])
+            ->actionsColumnLabel('Actions')
             ->defaultSort('created_at', 'desc');
+    }
+
+    public static function manageActionGroup(): ActionGroup
+    {
+        return ActionGroup::make([
+            Action::make('pause')
+                ->label('Pause SIG')
+                ->icon('heroicon-o-pause')
+                ->color('warning')
+                ->visible(fn (SigPlan $record): bool => $record->status === 'active' && static::canEdit($record))
+                ->requiresConfirmation()
+                ->modalHeading('Pause SIG?')
+                ->modalDescription('Automatic deductions will stop until the SIG is resumed.')
+                ->modalSubmitActionLabel('Pause SIG')
+                ->action(function (SigPlan $record, SigPlanService $service): void {
+                    $service->pause($record);
+                    Notification::make()->title('SIG paused')->warning()->send();
+                }),
+            Action::make('resume')
+                ->label('Resume SIG')
+                ->icon('heroicon-o-play')
+                ->color('success')
+                ->visible(fn (SigPlan $record): bool => $record->status === 'paused' && static::canEdit($record))
+                ->requiresConfirmation()
+                ->modalHeading('Resume SIG?')
+                ->modalDescription('The next auto-debit will be scheduled based on the plan frequency.')
+                ->modalSubmitActionLabel('Resume SIG')
+                ->action(function (SigPlan $record, SigPlanService $service): void {
+                    $service->resume($record);
+                    Notification::make()->title('SIG resumed')->success()->send();
+                }),
+            Action::make('stop')
+                ->label('Stop SIG')
+                ->icon('heroicon-o-stop-circle')
+                ->color('danger')
+                ->visible(fn (SigPlan $record): bool => $record->status !== 'stopped' && static::canEdit($record))
+                ->requiresConfirmation()
+                ->modalHeading('Stop SIG permanently?')
+                ->modalDescription('This cannot be undone. The client will need to activate a new SIG.')
+                ->modalSubmitActionLabel('Stop SIG')
+                ->action(function (SigPlan $record, SigPlanService $service): void {
+                    $service->stop($record);
+                    Notification::make()->title('SIG stopped')->danger()->send();
+                }),
+        ])
+            ->label('Manage')
+            ->icon('heroicon-m-ellipsis-vertical')
+            ->button()
+            ->outlined()
+            ->color('gray')
+            ->size(\Filament\Support\Enums\ActionSize::Small);
     }
 
     public static function infolist(Infolist $infolist): Infolist
@@ -255,57 +315,6 @@ class SigPlanResource extends Resource
                     ])
                     ->visible(fn (SigPlan $record) => filled($record->admin_notes)),
             ]);
-    }
-
-    public static function pauseAction(): Action
-    {
-        return FilamentTableActions::make('pause')
-            ->icon('heroicon-o-pause')
-            ->color('warning')
-            ->tooltip('Pause SIG')
-            ->visible(fn (SigPlan $record): bool => $record->status === 'active' && static::canEdit($record))
-            ->requiresConfirmation()
-            ->modalHeading('Pause SIG?')
-            ->modalDescription('Automatic deductions will stop until the SIG is resumed.')
-            ->modalSubmitActionLabel('Pause SIG')
-            ->action(function (SigPlan $record, SigPlanService $service): void {
-                $service->pause($record);
-                Notification::make()->title('SIG paused')->warning()->send();
-            });
-    }
-
-    public static function resumeAction(): Action
-    {
-        return FilamentTableActions::make('resume')
-            ->icon('heroicon-o-play')
-            ->color('success')
-            ->tooltip('Resume SIG')
-            ->visible(fn (SigPlan $record): bool => $record->status === 'paused' && static::canEdit($record))
-            ->requiresConfirmation()
-            ->modalHeading('Resume SIG?')
-            ->modalDescription('The next auto-debit will be scheduled based on the plan frequency.')
-            ->modalSubmitActionLabel('Resume SIG')
-            ->action(function (SigPlan $record, SigPlanService $service): void {
-                $service->resume($record);
-                Notification::make()->title('SIG resumed')->success()->send();
-            });
-    }
-
-    public static function stopAction(): Action
-    {
-        return FilamentTableActions::make('stop')
-            ->icon('heroicon-o-stop-circle')
-            ->color('danger')
-            ->tooltip('Stop SIG')
-            ->visible(fn (SigPlan $record): bool => $record->status !== 'stopped' && static::canEdit($record))
-            ->requiresConfirmation()
-            ->modalHeading('Stop SIG permanently?')
-            ->modalDescription('This cannot be undone. The client will need to activate a new SIG.')
-            ->modalSubmitActionLabel('Stop SIG')
-            ->action(function (SigPlan $record, SigPlanService $service): void {
-                $service->stop($record);
-                Notification::make()->title('SIG stopped')->danger()->send();
-            });
     }
 
     public static function getRelations(): array

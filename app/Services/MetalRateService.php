@@ -76,6 +76,17 @@ class MetalRateService
             ->first();
     }
 
+    public function getCurrentRatePerGram(string $metalType): float
+    {
+        $active = $this->getActiveRate($metalType);
+
+        if ($active !== null) {
+            return (float) $active->rate_per_gram;
+        }
+
+        return $this->getLiveRate($metalType);
+    }
+
     public function syncLiveRate(string $metalType): MetalRate
     {
         $rate = $this->getLiveRate($metalType);

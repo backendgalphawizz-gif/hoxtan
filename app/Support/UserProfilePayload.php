@@ -66,6 +66,6 @@ class UserProfilePayload
             return null;
         }
 
-        return asset('storage/'.$path);
+        return AssetUrl::publicStorage($path);
     }
 }

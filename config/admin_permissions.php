@@ -98,6 +98,18 @@ return [
             'label' => 'Banner Management',
             'group' => 'CMS Management',
         ],
+        'jewellery_categories' => [
+            'label' => 'Jewellery Categories',
+            'group' => 'Jewellery Management',
+        ],
+        'jewellery_sub_categories' => [
+            'label' => 'Jewellery Sub Categories',
+            'group' => 'Jewellery Management',
+        ],
+        'jewellery_products' => [
+            'label' => 'Jewellery Products',
+            'group' => 'Jewellery Management',
+        ],
         'offers' => [
             'label' => 'Offers Management',
             'group' => 'CMS Management',

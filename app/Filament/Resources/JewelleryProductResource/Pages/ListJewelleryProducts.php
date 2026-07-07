@@ -1,24 +1,22 @@
 <?php
 
-namespace App\Filament\Resources\SigPlanResource\Pages;
+namespace App\Filament\Resources\JewelleryProductResource\Pages;
 
-use App\Filament\Resources\SigPlanResource;
+use App\Filament\Resources\JewelleryProductResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Enums\ActionSize;
 
-class ListSigPlans extends ListRecords
+class ListJewelleryProducts extends ListRecords
 {
-    protected static string $resource = SigPlanResource::class;
-
-    protected static string $view = 'admin.sig-plans.list';
+    protected static string $resource = JewelleryProductResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
             Actions\CreateAction::make()
-                ->label('Activate SIG')
-                ->icon('heroicon-o-bolt')
+                ->label('Add Product')
+                ->icon('heroicon-o-plus')
                 ->color('primary')
                 ->size(ActionSize::Large)
                 ->extraAttributes(['class' => 'gs-primary-action-btn']),

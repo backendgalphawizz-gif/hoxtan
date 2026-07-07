@@ -2,12 +2,12 @@
 
 namespace App\Filament\Resources\SigPlanResource\Pages;
 
+use App\Filament\Resources\Pages\BaseCreateRecord;
 use App\Filament\Resources\SigPlanResource;
 use App\Services\SigPlanService;
-use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
 
-class CreateSigPlan extends CreateRecord
+class CreateSigPlan extends BaseCreateRecord
 {
     protected static string $resource = SigPlanResource::class;
 
@@ -18,10 +18,5 @@ class CreateSigPlan extends CreateRecord
         $data['next_debit_at'] = app(SigPlanService::class)->nextDebitAt($data['frequency'])->toDateTimeString();
 
         return $data;
-    }
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
     }
 }

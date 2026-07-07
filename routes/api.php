@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ForgotMpinController;
+use App\Http\Controllers\Api\JewelleryController;
 use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -15,6 +16,11 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/app/config', [AppConfigController::class, 'index']);
     Route::get('/app/faqs', [AppConfigController::class, 'faqs']);
     Route::get('/app/pages/{slug}', [AppConfigController::class, 'page']);
+
+    Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
+    Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
+    Route::get('/jewellery/products', [JewelleryController::class, 'products']);
+    Route::get('/jewellery/products/{product}', [JewelleryController::class, 'show']);
 
     Route::get('/register/config', [RegistrationController::class, 'config']);
     Route::post('/register/send-otp', [RegistrationController::class, 'sendOtp']);

@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use App\Models\Investment;
 use App\Observers\InvestmentObserver;
+use App\Support\AssetUrl;
 use App\Support\FilamentAdminForm;
 use App\Support\FilamentFormat;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +23,10 @@ class AppServiceProvider extends ServiceProvider
     {
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
+        }
+
+        if (! $this->app->runningInConsole() && $this->app->bound('request')) {
+            Config::set('filesystems.disks.public.url', AssetUrl::base().'/storage');
         }
 
         Investment::observe(InvestmentObserver::class);
