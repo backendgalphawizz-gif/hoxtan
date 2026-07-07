@@ -8,16 +8,24 @@ use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Jobs\CreateXlsxFile;
 use Filament\Actions\Exports\Jobs\PrepareCsvExport;
 use Filament\Actions\Exports\Models\Export;
+use Filament\Facades\Filament;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FilamentImmediateExportService
 {
-    /**
-     * Build the export synchronously and return the download URL.
-     */
-    public function export(Component $livewire, string $exporterClass, string $format = 'csv'): string
+    public function download(Component $livewire, string $exporterClass, string $format = 'csv'): StreamedResponse
+    {
+        $export = $this->buildExport($livewire, $exporterClass, $format);
+
+        $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
+
+        return ExportFormat::from($format)->getDownloader()($export);
+    }
+
+    protected function buildExport(Component $livewire, string $exporterClass, string $format): Export
     {
         if (! $livewire instanceof HasTable) {
             throw new \InvalidArgumentException('Export requires a table view.');
@@ -32,7 +40,7 @@ class FilamentImmediateExportService
             ->all();
 
         $export = app(Export::class);
-        $export->user()->associate(auth()->user());
+        $export->user()->associate(Filament::auth()->user());
         $export->exporter = $exporterClass;
         $export->total_rows = $query->count();
 
@@ -83,9 +91,6 @@ class FilamentImmediateExportService
             'processed_rows' => $export->total_rows,
         ]);
 
-        return route('filament.exports.download', [
-            'export' => $export,
-            'format' => $format,
-        ], absolute: false);
+        return $export;
     }
 }

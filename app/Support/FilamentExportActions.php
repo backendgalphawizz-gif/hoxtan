@@ -59,13 +59,11 @@ class FilamentExportActions
                     ->required(),
             ])
             ->action(function (array $data, Component $livewire) use ($exporterClass) {
-                $url = app(FilamentImmediateExportService::class)->export(
+                return app(FilamentImmediateExportService::class)->download(
                     $livewire,
                     $exporterClass,
                     $data['format'] ?? 'csv',
                 );
-
-                return redirect()->to($url);
             });
     }
 }

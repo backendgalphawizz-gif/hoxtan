@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -32,6 +33,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.active' => \App\Http\Middleware\EnsureAdminIsActive::class,
         ]);
+
+        $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->is('admin/*', 'filament/*')) {
+                return route('filament.admin.auth.login');
+            }
+
+            return route('filament.admin.auth.login');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (ValidationException $e, Request $request) {
@@ -49,6 +58,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*')) {
                 return ApiResponse::error('Unauthenticated.', [], 401);
+            }
+
+            if ($request->is('admin/*', 'filament/*')) {
+                return redirect()->guest(route('filament.admin.auth.login'));
             }
         });
 

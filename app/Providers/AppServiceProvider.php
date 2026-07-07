@@ -34,6 +34,13 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Export::class, ExportPolicy::class);
 
+        $this->app->booted(function (): void {
+            app(Router::class)->middlewareGroup('filament.actions', [
+                'web',
+                'auth:admin',
+            ]);
+        });
+
         Investment::observe(InvestmentObserver::class);
 
         FilamentAdminForm::configureRequiredFields();
