@@ -4,11 +4,14 @@ namespace App\Providers;
 
 use App\Models\Investment;
 use App\Observers\InvestmentObserver;
+use App\Policies\ExportPolicy;
 use App\Support\AssetUrl;
 use App\Support\FilamentAdminForm;
 use App\Support\FilamentFormat;
+use Filament\Actions\Exports\Models\Export;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
         if (! $this->app->runningInConsole() && $this->app->bound('request')) {
             Config::set('filesystems.disks.public.url', AssetUrl::base().'/storage');
         }
+
+        Gate::policy(Export::class, ExportPolicy::class);
 
         Investment::observe(InvestmentObserver::class);
 

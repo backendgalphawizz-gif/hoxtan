@@ -15,7 +15,7 @@ trait InteractsWithReportExport
     /**
      * @param  class-string<\Filament\Actions\Exports\Exporter>  $exporterClass
      */
-    protected static function reportExportAction(string $exporterClass): \Filament\Tables\Actions\ExportAction
+    protected static function reportExportAction(string $exporterClass): \Filament\Tables\Actions\Action
     {
         return FilamentExportActions::tableExport($exporterClass, static::exportModule());
     }
