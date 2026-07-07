@@ -34,9 +34,9 @@ class Reports extends Page implements HasTable
 
     protected static ?string $navigationGroup = 'Reports';
 
-    protected static ?string $navigationLabel = 'Reports';
+    protected static ?string $navigationLabel = 'Legacy Reports';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 99;
 
     protected static string $view = 'admin.reports.index';
 

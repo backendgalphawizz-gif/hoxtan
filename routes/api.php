@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ForgotMpinController;
 use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\Api\SigController;
 use App\Http\Controllers\Api\SupportController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,5 +64,13 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/support/tickets', [SupportController::class, 'store']);
         Route::get('/support/tickets/{ticket}', [SupportController::class, 'show']);
         Route::post('/support/tickets/{ticket}/replies', [SupportController::class, 'reply']);
+
+        Route::get('/sig/config', [SigController::class, 'config']);
+        Route::get('/sig', [SigController::class, 'show']);
+        Route::get('/sig/transactions', [SigController::class, 'transactions']);
+        Route::post('/sig/activate', [SigController::class, 'activate']);
+        Route::post('/sig/pause', [SigController::class, 'pause']);
+        Route::post('/sig/resume', [SigController::class, 'resume']);
+        Route::post('/sig/stop', [SigController::class, 'stop']);
     });
 });

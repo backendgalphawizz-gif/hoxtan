@@ -16,6 +16,8 @@ class InvestmentGoal extends Model
         'target_amount',
         'target_date',
         'status',
+        'admin_created',
+        'target_user_ids',
     ];
 
     protected function casts(): array
@@ -25,6 +27,8 @@ class InvestmentGoal extends Model
             'current_grams' => 'decimal:4',
             'target_amount' => 'decimal:2',
             'target_date' => 'date',
+            'admin_created' => 'boolean',
+            'target_user_ids' => 'array',
         ];
     }
 

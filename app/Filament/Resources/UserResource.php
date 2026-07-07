@@ -120,6 +120,12 @@ class UserResource extends Resource
                         Forms\Components\Toggle::make('is_blocked')
                             ->label('Account Blocked')
                             ->live(),
+                        Forms\Components\Toggle::make('is_employee')
+                            ->label('Employee Account'),
+                        Forms\Components\TextInput::make('employee_code')
+                            ->label('Employee Code')
+                            ->maxLength(32)
+                            ->visible(fn (Forms\Get $get) => $get('is_employee')),
                         Forms\Components\Textarea::make('block_reason')
                             ->label('Block Reason')
                             ->visible(fn (Forms\Get $get) => $get('is_blocked'))

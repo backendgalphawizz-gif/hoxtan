@@ -27,6 +27,8 @@ class User extends Authenticatable
         'mpin',
         'role',
         'is_blocked',
+        'is_employee',
+        'employee_code',
         'is_verified',
         'kyc_status',
         'gold_holdings',
@@ -59,6 +61,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_blocked' => 'boolean',
+            'is_employee' => 'boolean',
             'is_verified' => 'boolean',
             'market_alerts' => 'boolean',
             'date_of_birth' => 'date',
@@ -88,6 +91,11 @@ class User extends Authenticatable
         return $this->hasOne(KycDetail::class);
     }
 
+    public function restriction(): HasOne
+    {
+        return $this->hasOne(UserRestriction::class);
+    }
+
     public function investments(): HasMany
     {
         return $this->hasMany(Investment::class);
@@ -96,6 +104,11 @@ class User extends Authenticatable
     public function investmentGoals(): HasMany
     {
         return $this->hasMany(InvestmentGoal::class);
+    }
+
+    public function sigPlans(): HasMany
+    {
+        return $this->hasMany(SigPlan::class);
     }
 
     public function redemptions(): HasMany

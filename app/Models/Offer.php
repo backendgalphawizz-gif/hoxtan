@@ -13,6 +13,8 @@ class Offer extends Model
         'discount_type',
         'discount_value',
         'promo_code',
+        'target_user_ids',
+        'for_all_users',
         'is_active',
         'starts_at',
         'ends_at',
@@ -23,6 +25,8 @@ class Offer extends Model
         return [
             'discount_value' => 'decimal:2',
             'is_active' => 'boolean',
+            'for_all_users' => 'boolean',
+            'target_user_ids' => 'array',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
         ];

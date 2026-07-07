@@ -10,6 +10,7 @@ class Investment extends Model
     protected $fillable = [
         'reference_id',
         'user_id',
+        'sig_plan_id',
         'metal_type',
         'type',
         'quantity_grams',
@@ -35,6 +36,11 @@ class Investment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function sigPlan(): BelongsTo
+    {
+        return $this->belongsTo(SigPlan::class);
     }
 
     protected static function booted(): void

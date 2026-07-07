@@ -45,6 +45,53 @@ class AdminRoleSeeder extends Seeder
         $permissions['users']['create'] = true;
         $permissions['kyc']['create'] = true;
 
+        foreach ($this->reportModules() as $module) {
+            $permissions[$module]['view'] = true;
+            $permissions[$module]['export'] = true;
+        }
+
+        $permissions['reports_account_controls']['edit'] = true;
+        $permissions['wallet_credit_debit']['view'] = true;
+        $permissions['wallet_credit_debit']['edit'] = true;
+
+        $permissions['sig_plans']['view'] = true;
+        $permissions['sig_plans']['create'] = true;
+        $permissions['sig_plans']['edit'] = true;
+        $permissions['sig_plans']['export'] = true;
+
         return $permissions;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function reportModules(): array
+    {
+        return [
+            'reports_hub',
+            'reports_new_users',
+            'reports_active_investors',
+            'reports_inactive_users',
+            'reports_transactions',
+            'reports_client_kyc',
+            'reports_kyc_status',
+            'reports_kyc_documents',
+            'reports_jewellery',
+            'reports_jewellery_total',
+            'reports_jewellery_inventory',
+            'reports_employees',
+            'reports_account_controls',
+            'reports_account_block',
+            'reports_wallet_restrictions',
+            'reports_wallet_credit',
+            'reports_offers_goals',
+            'reports_sig_periodic',
+            'reports_holdings',
+            'reports_buy_metal',
+            'reports_sell_withdraw',
+            'reports_old_gold',
+            'reports_all_purchases',
+            'reports_gst_file',
+        ];
     }
 }
