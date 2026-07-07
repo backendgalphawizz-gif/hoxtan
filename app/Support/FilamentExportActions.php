@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Services\FilamentImmediateExportService;
 use Filament\Actions;
+use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Tables;
 use Livewire\Component;
@@ -15,7 +16,10 @@ class FilamentExportActions
      */
     public static function headerExport(string $exporterClass, string $module): Actions\Action
     {
-        return static::makeImmediateExportAction($exporterClass, $module);
+        $action = Actions\Action::make('export');
+        static::configureImmediateExportAction($action, $exporterClass, $module);
+
+        return $action;
     }
 
     /**
@@ -23,15 +27,21 @@ class FilamentExportActions
      */
     public static function tableExport(string $exporterClass, string $module): Tables\Actions\Action
     {
-        return static::makeImmediateExportAction($exporterClass, $module);
+        $action = Tables\Actions\Action::make('export');
+        static::configureImmediateExportAction($action, $exporterClass, $module);
+
+        return $action;
     }
 
     /**
      * @param  class-string<\Filament\Actions\Exports\Exporter>  $exporterClass
      */
-    protected static function makeImmediateExportAction(string $exporterClass, string $module): Actions\Action
-    {
-        return Actions\Action::make('export')
+    protected static function configureImmediateExportAction(
+        MountableAction $action,
+        string $exporterClass,
+        string $module,
+    ): void {
+        $action
             ->label('Export')
             ->color('gray')
             ->icon('heroicon-o-arrow-down-tray')
