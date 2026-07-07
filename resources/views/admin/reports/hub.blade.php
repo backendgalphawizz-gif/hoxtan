@@ -1,115 +1,149 @@
 @php
     $groups = $this->getGroupedReports();
     $stats = $this->getReportStats();
-    $iconBgClasses = [
-        'primary' => 'bg-primary-50 text-primary-600 ring-primary-100 dark:bg-primary-500/10 dark:text-primary-400 dark:ring-primary-500/20',
-        'info' => 'bg-info-50 text-info-600 ring-info-100 dark:bg-info-500/10 dark:text-info-400 dark:ring-info-500/20',
-        'success' => 'bg-success-50 text-success-600 ring-success-100 dark:bg-success-500/10 dark:text-success-400 dark:ring-success-500/20',
-        'warning' => 'bg-warning-50 text-warning-600 ring-warning-100 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-500/20',
-        'danger' => 'bg-danger-50 text-danger-600 ring-danger-100 dark:bg-danger-500/10 dark:text-danger-400 dark:ring-danger-500/20',
-        'gray' => 'bg-gray-50 text-gray-600 ring-gray-100 dark:bg-gray-500/10 dark:text-gray-300 dark:ring-gray-500/20',
+    $accentClasses = [
+        'primary' => 'gs-reports-hub__accent-primary',
+        'info' => 'gs-reports-hub__accent-info',
+        'success' => 'gs-reports-hub__accent-success',
+        'warning' => 'gs-reports-hub__accent-warning',
+        'danger' => 'gs-reports-hub__accent-danger',
+        'gray' => 'gs-reports-hub__accent-gray',
+    ];
+    $cardAccentClasses = [
+        'primary' => 'gs-report-card--accent-primary',
+        'info' => 'gs-report-card--accent-info',
+        'success' => 'gs-report-card--accent-success',
+        'warning' => 'gs-report-card--accent-warning',
+        'danger' => 'gs-report-card--accent-danger',
+        'gray' => 'gs-report-card--accent-gray',
     ];
 @endphp
 
 <x-filament-panels::page>
     <div class="space-y-6">
         {{-- Summary --}}
-        <div class="grid gap-3 sm:grid-cols-3">
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Reports</p>
-                <p class="mt-1 text-xl font-bold text-gray-950 dark:text-white">{{ $stats['total'] }}</p>
+        <div class="gs-reports-hub__stats">
+            <div class="gs-reports-hub__stat">
+                <p class="gs-reports-hub__stat-label">Reports</p>
+                <p class="gs-reports-hub__stat-value">{{ $stats['total'] }}</p>
             </div>
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Categories</p>
-                <p class="mt-1 text-xl font-bold text-gray-950 dark:text-white">{{ $stats['categories'] }}</p>
+            <div class="gs-reports-hub__stat">
+                <p class="gs-reports-hub__stat-label">Categories</p>
+                <p class="gs-reports-hub__stat-value">{{ $stats['categories'] }}</p>
             </div>
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Download</p>
-                <p class="mt-1 text-sm font-semibold text-gray-950 dark:text-white">CSV & Excel</p>
+            <div class="gs-reports-hub__stat">
+                <p class="gs-reports-hub__stat-label">Export formats</p>
+                <p class="gs-reports-hub__stat-value" style="font-size: 0.9375rem;">CSV & Excel</p>
             </div>
         </div>
 
         {{-- Search --}}
-        <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <div class="gs-reports-hub__search">
             <x-filament::input.wrapper prefix-icon="heroicon-m-magnifying-glass">
                 <x-filament::input
                     type="search"
                     wire:model.live.debounce.300ms="search"
-                    placeholder="Search reports…"
+                    placeholder="Search reports by name or description…"
                 />
             </x-filament::input.wrapper>
         </div>
 
-        {{-- Groups --}}
+        {{-- Category sections with card grid --}}
         @forelse ($groups as $group)
             @php
                 $accent = $group['meta']['accent'] ?? 'primary';
                 $sectionIcon = $group['meta']['icon'] ?? 'heroicon-o-document-chart-bar';
-                $iconBg = $iconBgClasses[$accent] ?? $iconBgClasses['primary'];
+                $sectionAccentClass = $accentClasses[$accent] ?? $accentClasses['primary'];
+                $cardAccentClass = $cardAccentClasses[$accent] ?? $cardAccentClasses['primary'];
             @endphp
 
-            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-                <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset {{ $iconBg }}">
-                            <x-filament::icon :icon="$sectionIcon" class="h-5 w-5" />
-                        </div>
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <h2 class="text-base font-semibold text-gray-950 dark:text-white">
-                                    {{ $group['label'] }}
-                                </h2>
-                                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                    {{ count($group['reports']) }}
-                                </span>
-                            </div>
-                            @if (filled($group['meta']['description'] ?? null))
-                                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $group['meta']['description'] }}
-                                </p>
-                            @endif
-                        </div>
+            <section class="gs-reports-hub__section {{ $sectionAccentClass }}">
+                <header class="gs-reports-hub__section-header">
+                    <div class="gs-reports-hub__section-icon">
+                        <x-filament::icon :icon="$sectionIcon" class="h-5 w-5" />
                     </div>
-                </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="gs-reports-hub__section-title">{{ $group['label'] }}</h2>
+                            <span class="gs-reports-hub__section-count">{{ count($group['reports']) }}</span>
+                        </div>
+                        @if (filled($group['meta']['description'] ?? null))
+                            <p class="gs-reports-hub__section-desc">{{ $group['meta']['description'] }}</p>
+                        @endif
+                    </div>
+                </header>
 
-                <div class="grid gap-px bg-gray-100 p-px sm:grid-cols-2 lg:grid-cols-3 dark:bg-gray-800">
+                <div class="gs-reports-hub__grid">
                     @foreach ($group['reports'] as $item)
                         @php
                             $definition = $item['definition'];
                             $url = \App\Support\ReportRegistry::resolveUrl($definition);
                             $isLink = $item['is_link'] ?? false;
+                            $reportNumber = $definition['number'] ?? null;
                         @endphp
 
                         @if ($url)
-                            <a
-                                href="{{ $url }}"
-                                class="group flex gap-3 bg-white p-4 transition hover:bg-primary-50/50 dark:bg-gray-900 dark:hover:bg-primary-500/5"
-                            >
-                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gray-50 text-gray-500 ring-1 ring-gray-100 transition group-hover:bg-white group-hover:text-primary-600 group-hover:ring-primary-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:group-hover:text-primary-400">
+                            <a href="{{ $url }}" class="gs-report-card {{ $cardAccentClass }}">
+                                <div class="gs-report-card__top">
+                                    @if ($reportNumber)
+                                        <span class="gs-report-card__number">
+                                            #{{ str_pad((string) $reportNumber, 2, '0', STR_PAD_LEFT) }}
+                                        </span>
+                                    @else
+                                        <span></span>
+                                    @endif
+
+                                    <div class="gs-report-card__badges">
+                                        @if ($isLink)
+                                            <span class="gs-report-card__badge gs-report-card__badge--module">
+                                                <x-filament::icon icon="heroicon-m-link" class="h-3 w-3" />
+                                                Module
+                                            </span>
+                                        @else
+                                            <span class="gs-report-card__badge gs-report-card__badge--report">
+                                                <x-filament::icon icon="heroicon-m-table-cells" class="h-3 w-3" />
+                                                Report
+                                            </span>
+                                            <span class="gs-report-card__badge gs-report-card__badge--export">
+                                                <x-filament::icon icon="heroicon-m-arrow-down-tray" class="h-3 w-3" />
+                                                Export
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="gs-report-card__icon-wrap">
                                     <x-filament::icon
-                                        :icon="$isLink ? 'heroicon-o-arrow-top-right-on-square' : 'heroicon-o-document-text'"
-                                        class="h-4 w-4"
+                                        :icon="$isLink ? 'heroicon-o-arrow-top-right-on-square' : 'heroicon-o-document-chart-bar'"
+                                        class="h-5 w-5"
                                     />
                                 </div>
 
-                                <div class="min-w-0 flex-1">
-                                    <h3 class="text-sm font-semibold text-gray-950 group-hover:text-primary-600 dark:text-white dark:group-hover:text-primary-400">
-                                        {{ $definition['label'] }}
-                                    </h3>
-                                    <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                                        {{ $definition['description'] }}
-                                    </p>
-                                    <p class="mt-2 text-xs font-medium text-primary-600 opacity-0 transition group-hover:opacity-100 dark:text-primary-400">
-                                        {{ $isLink ? 'Open module' : 'Open report' }} →
-                                    </p>
+                                <h3 class="gs-report-card__title">{{ $definition['label'] }}</h3>
+                                <p class="gs-report-card__desc">{{ $definition['description'] }}</p>
+
+                                <div class="gs-report-card__footer">
+                                    @if (! $isLink)
+                                        <div class="gs-report-card__exports">
+                                            <span class="gs-report-card__export-tag">CSV</span>
+                                            <span class="gs-report-card__export-tag">Excel</span>
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-gray-400">Opens admin module</span>
+                                    @endif
+
+                                    <span class="gs-report-card__cta">
+                                        {{ $isLink ? 'Open module' : 'View report' }}
+                                        <x-filament::icon icon="heroicon-m-arrow-right" class="h-4 w-4" />
+                                    </span>
                                 </div>
                             </a>
                         @endif
                     @endforeach
                 </div>
-            </div>
+            </section>
         @empty
-            <div class="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center dark:border-gray-600 dark:bg-gray-900">
+            <div class="gs-reports-hub__empty">
                 <x-filament::icon icon="heroicon-o-magnifying-glass" class="mx-auto h-10 w-10 text-gray-400" />
                 <h3 class="mt-4 text-base font-semibold text-gray-950 dark:text-white">
                     @if (filled($this->search))
