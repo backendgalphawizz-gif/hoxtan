@@ -61,7 +61,23 @@ class SupportApiTest extends TestCase
         $show = $this->getJson("/api/v1/support/tickets/{$ticketId}");
 
         $show->assertOk()
-            ->assertJsonStructure(['data' => ['ticket' => ['messages']]]);
+            ->assertJsonStructure([
+                'data' => [
+                    'ticket' => [
+                        'messages',
+                        'submitted_at_display',
+                        'tracking' => [
+                            ['key', 'label', 'completed', 'current', 'completed_at'],
+                        ],
+                    ],
+                ],
+            ])
+            ->assertJsonPath('data.ticket.tracking.0.key', 'submitted')
+            ->assertJsonPath('data.ticket.tracking.0.completed', true)
+            ->assertJsonPath('data.ticket.tracking.1.key', 'under_review')
+            ->assertJsonPath('data.ticket.tracking.1.current', true)
+            ->assertJsonPath('data.ticket.tracking.4.key', 'resolved')
+            ->assertJsonPath('data.ticket.tracking.4.completed', false);
 
         $reply = $this->postJson("/api/v1/support/tickets/{$ticketId}/replies", [
             'message' => 'Please update me on the timeline.',

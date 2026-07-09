@@ -110,6 +110,10 @@ return [
             'label' => 'Jewellery Products',
             'group' => 'Jewellery Management',
         ],
+        'jewellery_orders' => [
+            'label' => 'Buy Now Orders',
+            'group' => 'Jewellery Management',
+        ],
         'offers' => [
             'label' => 'Offers Management',
             'group' => 'CMS Management',

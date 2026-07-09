@@ -20,6 +20,25 @@ return [
         'closed' => 'CLOSED',
     ],
 
+    /*
+    | Ticket status → tracking stepper for the mobile Ticket Status screen.
+    | Steps: Submitted → Under Review → Action Pending → Accepted → Resolved/Closed
+    */
+    'tracking_steps' => [
+        ['key' => 'submitted', 'label' => 'Submitted'],
+        ['key' => 'under_review', 'label' => 'Under Review'],
+        ['key' => 'action_pending', 'label' => 'Action Pending'],
+        ['key' => 'accepted', 'label' => 'Accepted'],
+        ['key' => 'resolved', 'label' => 'Resolved/Closed'],
+    ],
+
+    'status_tracking_index' => [
+        'open' => 1,      // Under Review
+        'pending' => 2,   // Action Pending
+        'resolved' => 4,  // Resolved/Closed (Accepted is passed when resolving)
+        'closed' => 4,
+    ],
+
     'filters' => [
         ['value' => 'all', 'label' => 'All'],
         ['value' => 'open', 'label' => 'Open'],

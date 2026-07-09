@@ -130,6 +130,64 @@ class MetalRateService
     }
 
     /**
+     * Current buy rates for the mobile app (active override, else live/fallback).
+     *
+     * @return array{currency: string, unit: string, fetched_at: string, rates: list<array>}
+     */
+    public function getApiRates(?string $metalType = null): array
+    {
+        $types = $metalType !== null
+            ? [$metalType]
+            : ['gold', 'silver'];
+
+        $rates = collect($types)
+            ->map(fn (string $type) => $this->buildApiRatePayload($type))
+            ->values()
+            ->all();
+
+        return [
+            'currency' => 'INR',
+            'unit' => 'gram',
+            'fetched_at' => now()->toIso8601String(),
+            'fetched_at_display' => now()->format('d M Y, h:i A'),
+            'rates' => $rates,
+            'gold' => collect($rates)->firstWhere('metal_type', 'gold'),
+            'silver' => collect($rates)->firstWhere('metal_type', 'silver'),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     metal_type: string,
+     *     label: string,
+     *     rate_per_gram: float,
+     *     currency: string,
+     *     unit: string,
+     *     source: string,
+     *     updated_at: ?string,
+     *     updated_at_display: ?string
+     * }
+     */
+    protected function buildApiRatePayload(string $metalType): array
+    {
+        $active = $this->getActiveRate($metalType);
+        $rate = $this->getCurrentRatePerGram($metalType);
+        $source = $active?->source ?? $this->getLiveRateSource($metalType);
+        $updatedAt = $active?->updated_at ?? now();
+
+        return [
+            'metal_type' => $metalType,
+            'label' => $metalType === 'gold' ? 'Gold' : 'Silver',
+            'rate_per_gram' => round((float) $rate, 2),
+            'currency' => 'INR',
+            'unit' => 'gram',
+            'source' => $source,
+            'updated_at' => $updatedAt?->toIso8601String(),
+            'updated_at_display' => $updatedAt?->format('d M Y, h:i A'),
+        ];
+    }
+
+    /**
      * @return array{gold: array, silver: array, fetched_at: string}
      */
     public function getDashboardRates(): array

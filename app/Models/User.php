@@ -156,6 +156,16 @@ class User extends Authenticatable
         return $this->hasMany(SupportTicket::class);
     }
 
+    public function jewelleryProductViews(): HasMany
+    {
+        return $this->hasMany(JewelleryProductView::class);
+    }
+
+    public function jewelleryOrders(): HasMany
+    {
+        return $this->hasMany(JewelleryOrder::class);
+    }
+
     public function isInvestor(): bool
     {
         return $this->role === 'investor' || $this->gold_holdings > 0 || $this->silver_holdings > 0;

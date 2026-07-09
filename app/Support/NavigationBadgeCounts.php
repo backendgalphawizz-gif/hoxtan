@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Investment;
+use App\Models\JewelleryOrder;
 use App\Models\KycDetail;
 use App\Models\Redemption;
 use App\Models\User;
@@ -68,6 +69,13 @@ class NavigationBadgeCounts
             ->count());
     }
 
+    public static function pendingJewelleryOrders(): int
+    {
+        return Cache::remember('nav.pending_jewellery_orders', self::TTL_SECONDS, fn (): int => JewelleryOrder::query()
+            ->where('status', 'pending')
+            ->count());
+    }
+
     public static function clearCache(): void
     {
         foreach ([
@@ -78,6 +86,7 @@ class NavigationBadgeCounts
             'nav.dispatch_queue',
             'nav.pending_buy_transactions',
             'nav.pending_sell_transactions',
+            'nav.pending_jewellery_orders',
         ] as $key) {
             Cache::forget($key);
         }

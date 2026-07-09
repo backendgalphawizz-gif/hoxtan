@@ -4,8 +4,10 @@ use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ForgotMpinController;
+use App\Http\Controllers\Api\JewelleryCheckoutController;
 use App\Http\Controllers\Api\JewelleryController;
 use App\Http\Controllers\Api\LoginController;
+use App\Http\Controllers\Api\MetalRateController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\SigController;
@@ -16,6 +18,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/app/config', [AppConfigController::class, 'index']);
     Route::get('/app/faqs', [AppConfigController::class, 'faqs']);
     Route::get('/app/pages/{slug}', [AppConfigController::class, 'page']);
+
+    Route::get('/rates', [MetalRateController::class, 'index']);
 
     Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
@@ -65,6 +69,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/addresses/{address}', [AddressController::class, 'update']);
         Route::post('/addresses/{address}/default', [AddressController::class, 'setDefault']);
         Route::delete('/addresses/{address}', [AddressController::class, 'destroy']);
+
+        Route::get('/jewellery/checkout/summary', [JewelleryCheckoutController::class, 'summary']);
+        Route::post('/jewellery/checkout/buy-now', [JewelleryCheckoutController::class, 'buyNow']);
         Route::get('/support/config', [SupportController::class, 'config']);
         Route::get('/support/tickets', [SupportController::class, 'index']);
         Route::post('/support/tickets', [SupportController::class, 'store']);

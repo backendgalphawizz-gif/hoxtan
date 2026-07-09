@@ -59,12 +59,15 @@ class AdminRoleSeeder extends Seeder
         $permissions['sig_plans']['edit'] = true;
         $permissions['sig_plans']['export'] = true;
 
-        foreach (['jewellery_categories', 'jewellery_sub_categories', 'jewellery_products'] as $module) {
+        foreach (['jewellery_categories', 'jewellery_sub_categories', 'jewellery_products', 'jewellery_orders'] as $module) {
             $permissions[$module]['view'] = true;
             $permissions[$module]['create'] = true;
             $permissions[$module]['edit'] = true;
             $permissions[$module]['delete'] = true;
         }
+
+        $permissions['jewellery_orders']['create'] = false;
+        $permissions['jewellery_orders']['delete'] = false;
 
         return $permissions;
     }

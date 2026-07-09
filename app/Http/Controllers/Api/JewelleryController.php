@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\JewelleryCategory;
 use App\Models\JewelleryProduct;
+use App\Models\JewelleryProductView;
 use App\Models\JewellerySubCategory;
+use App\Models\User;
 use App\Support\ApiResponse;
-use App\Support\JewelleryPricing;
+use App\Support\JewelleryProductPayload;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 class JewelleryController extends Controller
@@ -77,20 +81,177 @@ class JewelleryController extends Controller
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->get()
-            ->map(fn (JewelleryProduct $product) => $this->productPayload($product));
+            ->map(fn (JewelleryProduct $product) => JewelleryProductPayload::make($product));
 
         return ApiResponse::success(['products' => $products]);
     }
 
-    public function show(JewelleryProduct $product): JsonResponse
+    public function show(Request $request, JewelleryProduct $product): JsonResponse
     {
         if (! $product->is_active) {
             return ApiResponse::error('Product not found.', [], 404);
         }
 
+        $request->validate([
+            'recently_viewed_ids' => ['nullable', 'array', 'max:20'],
+            'recently_viewed_ids.*' => ['integer', 'distinct'],
+        ]);
+
         $product->load(['category', 'subCategory']);
 
-        return ApiResponse::success(['product' => $this->productPayload($product)]);
+        /** @var User|null $user */
+        $user = $request->user('sanctum');
+
+        if ($user) {
+            $this->recordProductView($user, $product);
+        }
+
+        $excludeIds = [$product->id];
+
+        $recentlyViewed = $this->recentlyViewedProducts(
+            $user,
+            $excludeIds,
+            $request->input('recently_viewed_ids', []),
+        );
+
+        $excludeIds = array_values(array_unique(array_merge(
+            $excludeIds,
+            $recentlyViewed->pluck('id')->all(),
+        )));
+
+        $similarProducts = $this->similarProducts($product, $excludeIds);
+
+        return ApiResponse::success([
+            'product' => JewelleryProductPayload::make($product),
+            'recently_viewed' => $recentlyViewed
+                ->map(fn (JewelleryProduct $item) => JewelleryProductPayload::make($item))
+                ->values()
+                ->all(),
+            'similar_products' => $similarProducts
+                ->map(fn (JewelleryProduct $item) => JewelleryProductPayload::make($item))
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    private function recordProductView(User $user, JewelleryProduct $product): void
+    {
+        JewelleryProductView::query()->updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'jewellery_product_id' => $product->id,
+            ],
+            [
+                'viewed_at' => Carbon::now(),
+            ],
+        );
+    }
+
+    /**
+     * @param  list<int>  $excludeIds
+     * @param  list<int>|mixed  $clientIds
+     * @return Collection<int, JewelleryProduct>
+     */
+    private function recentlyViewedProducts(?User $user, array $excludeIds, mixed $clientIds): Collection
+    {
+        $limit = 8;
+
+        if ($user) {
+            $productIds = JewelleryProductView::query()
+                ->where('user_id', $user->id)
+                ->whereNotIn('jewellery_product_id', $excludeIds)
+                ->orderByDesc('viewed_at')
+                ->limit($limit)
+                ->pluck('jewellery_product_id')
+                ->all();
+
+            return $this->productsByOrderedIds($productIds);
+        }
+
+        $orderedIds = collect(is_array($clientIds) ? $clientIds : [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0 && ! in_array($id, $excludeIds, true))
+            ->unique()
+            ->take($limit)
+            ->values()
+            ->all();
+
+        return $this->productsByOrderedIds($orderedIds);
+    }
+
+    /**
+     * @param  list<int>  $excludeIds
+     * @return Collection<int, JewelleryProduct>
+     */
+    private function similarProducts(JewelleryProduct $product, array $excludeIds): Collection
+    {
+        $limit = 8;
+
+        $query = JewelleryProduct::query()
+            ->with(['category', 'subCategory'])
+            ->where('is_active', true)
+            ->whereNotIn('id', $excludeIds)
+            ->where('metal_type', $product->metal_type);
+
+        if ($product->jewellery_category_id) {
+            $query->where('jewellery_category_id', $product->jewellery_category_id);
+        }
+
+        $similar = (clone $query)
+            ->when(
+                $product->jewellery_sub_category_id,
+                fn (Builder $q) => $q->where('jewellery_sub_category_id', $product->jewellery_sub_category_id)
+            )
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        if ($similar->count() >= $limit) {
+            return $similar;
+        }
+
+        $remaining = $limit - $similar->count();
+        $alreadyIds = array_merge($excludeIds, $similar->pluck('id')->all());
+
+        $fallback = JewelleryProduct::query()
+            ->with(['category', 'subCategory'])
+            ->where('is_active', true)
+            ->whereNotIn('id', $alreadyIds)
+            ->where('metal_type', $product->metal_type)
+            ->when(
+                $product->jewellery_category_id,
+                fn (Builder $q) => $q->where('jewellery_category_id', $product->jewellery_category_id)
+            )
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->limit($remaining)
+            ->get();
+
+        return $similar->concat($fallback)->values();
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return Collection<int, JewelleryProduct>
+     */
+    private function productsByOrderedIds(array $ids): Collection
+    {
+        if ($ids === []) {
+            return collect();
+        }
+
+        $products = JewelleryProduct::query()
+            ->with(['category', 'subCategory'])
+            ->where('is_active', true)
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        return collect($ids)
+            ->map(fn (int $id) => $products->get($id))
+            ->filter()
+            ->values();
     }
 
     private function categoryPayload(JewelleryCategory $category): array
@@ -104,44 +265,4 @@ class JewelleryController extends Controller
         ];
     }
 
-    private function productPayload(JewelleryProduct $product): array
-    {
-        $pricing = JewelleryPricing::calculate(
-            $product->metal_type,
-            $product->weight_grams,
-            $product->making_charge_percent,
-        );
-
-        return [
-            'id' => $product->id,
-            'sku' => $product->sku,
-            'name' => $product->name,
-            'description' => $product->description,
-            'image_url' => $product->imageUrl(),
-            'metal_type' => $product->metal_type,
-            'purity' => $product->purity,
-            'weight_grams' => $product->weight_grams !== null ? (float) $product->weight_grams : null,
-            'specification' => $product->specificationLabel(),
-            'rate_per_gram' => $pricing['rate_per_gram'],
-            'metal_value' => $pricing['metal_value'],
-            'making_charge_percent' => $product->making_charge_percent !== null
-                ? (float) $product->making_charge_percent
-                : null,
-            'making_charge_amount' => $pricing['making_charge_amount'] > 0
-                ? $pricing['making_charge_amount']
-                : null,
-            'price' => (float) $product->price,
-            'stock_status' => $product->stock_status,
-            'category' => $product->category ? [
-                'id' => $product->category->id,
-                'name' => $product->category->name,
-                'slug' => $product->category->slug,
-            ] : null,
-            'sub_category' => $product->subCategory ? [
-                'id' => $product->subCategory->id,
-                'name' => $product->subCategory->name,
-                'slug' => $product->subCategory->slug,
-            ] : null,
-        ];
-    }
 }

@@ -42,6 +42,11 @@ class AppSettingService
     return $this->getFloat('gst_rate_percent', 3);
   }
 
+  public function jewelleryDeliveryDays(): int
+  {
+    return max(1, $this->getInt('jewellery_delivery_days', 10));
+  }
+
   public function all(): array
   {
     return Cache::remember('app_settings', 300, function (): array {

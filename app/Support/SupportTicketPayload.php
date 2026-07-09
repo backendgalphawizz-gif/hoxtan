@@ -33,6 +33,8 @@ class SupportTicketPayload
         if ($detailed) {
             $ticket->loadMissing('messages');
 
+            $payload['submitted_at_display'] = $ticket->created_at?->format('M d, Y | h:i A');
+            $payload['tracking'] = self::tracking($ticket);
             $payload['messages'] = $ticket->messages
                 ->map(fn (SupportTicketMessage $message) => self::message($message))
                 ->values()
@@ -40,6 +42,48 @@ class SupportTicketPayload
         }
 
         return $payload;
+    }
+
+    /**
+     * Vertical status tracker for the Ticket Status screen.
+     *
+     * @return list<array{key: string, label: string, completed: bool, current: bool, completed_at: ?string}>
+     */
+    public static function tracking(SupportTicket $ticket): array
+    {
+        $steps = config('support.tracking_steps', []);
+        $currentIndex = (int) (config('support.status_tracking_index.'.$ticket->status) ?? 1);
+
+        return collect($steps)
+            ->values()
+            ->map(function (array $step, int $index) use ($ticket, $currentIndex): array {
+                $completed = $index <= $currentIndex;
+                $current = $index === $currentIndex;
+
+                return [
+                    'key' => $step['key'],
+                    'label' => $step['label'],
+                    'completed' => $completed,
+                    'current' => $current,
+                    'completed_at' => $completed
+                        ? self::trackingTimestamp($ticket, $step['key'])
+                        : null,
+                ];
+            })
+            ->all();
+    }
+
+    protected static function trackingTimestamp(SupportTicket $ticket, string $stepKey): ?string
+    {
+        $at = match ($stepKey) {
+            'submitted' => $ticket->created_at,
+            'under_review' => $ticket->created_at,
+            'action_pending', 'accepted' => $ticket->last_activity_at ?? $ticket->updated_at,
+            'resolved' => $ticket->resolved_at ?? $ticket->last_activity_at ?? $ticket->updated_at,
+            default => null,
+        };
+
+        return $at?->toIso8601String();
     }
 
     /**

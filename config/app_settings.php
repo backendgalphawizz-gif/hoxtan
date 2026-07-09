@@ -30,6 +30,13 @@ return [
             'description' => 'GST percentage applied on buy transactions (split equally as CGST + SGST).',
             'default' => '3',
         ],
+        'jewellery_delivery_days' => [
+            'group' => 'jewellery',
+            'label' => 'Jewellery Delivery Days',
+            'type' => 'number',
+            'description' => 'Estimated days until jewellery order delivery (from order date).',
+            'default' => '10',
+        ],
         'metals_api_gold_symbol' => [
             'group' => 'metal_rates',
             'label' => 'Metals-API Gold Symbol (India)',

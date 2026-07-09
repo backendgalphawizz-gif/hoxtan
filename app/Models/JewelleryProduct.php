@@ -76,6 +76,11 @@ class JewelleryProduct extends Model
         return $this->hasMany(JewelleryCartItem::class);
     }
 
+    public function views(): HasMany
+    {
+        return $this->hasMany(JewelleryProductView::class);
+    }
+
     public function resolvedImagePath(): ?string
     {
         $image = $this->image;
