@@ -52,6 +52,8 @@ class OrderPayload
                 ->values()
                 ->all();
             $payload['payment'] = self::payment($order->payment);
+            $payload['tracking'] = self::tracking($order);
+            $payload['tracking_details'] = self::trackingDetails($order);
         }
 
         return $payload;
@@ -106,5 +108,92 @@ class OrderPayload
     public static function statusLabel(?string $status): string
     {
         return config('account_activity.order_statuses.'.$status, Str::headline((string) $status));
+    }
+
+    /**
+     * @return list<array{key: string, label: string, completed: bool, current: bool, completed_at: ?string}>
+     */
+    public static function tracking(JewelleryOrder $order): array
+    {
+        if (in_array($order->status, ['cancelled', 'failed'], true)) {
+            return [
+                [
+                    'key' => $order->status,
+                    'label' => self::statusLabel($order->status),
+                    'completed' => true,
+                    'current' => true,
+                    'completed_at' => $order->updated_at?->toIso8601String(),
+                ],
+            ];
+        }
+
+        $steps = config('account_activity.order_tracking_steps', []);
+        $currentIndex = self::currentTrackingIndex($order);
+
+        return collect($steps)
+            ->values()
+            ->map(function (array $step, int $index) use ($order, $currentIndex): array {
+                $completed = $index <= $currentIndex;
+                $current = $index === $currentIndex;
+
+                return [
+                    'key' => $step['key'],
+                    'label' => $step['label'],
+                    'completed' => $completed,
+                    'current' => $current,
+                    'completed_at' => $completed
+                        ? self::trackingTimestamp($order, $step['key'])
+                        : null,
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * @return array{
+     *     tracking_number: ?string,
+     *     courier_name: ?string,
+     *     dispatched_at: ?string,
+     *     delivered_at: ?string,
+     *     expected_delivery_date: ?string,
+     *     expected_delivery_display: ?string
+     * }
+     */
+    public static function trackingDetails(JewelleryOrder $order): array
+    {
+        return [
+            'tracking_number' => $order->tracking_number,
+            'courier_name' => $order->courier_name,
+            'dispatched_at' => $order->dispatched_at?->toIso8601String(),
+            'delivered_at' => $order->delivered_at?->toIso8601String(),
+            'expected_delivery_date' => $order->expected_delivery_date?->toDateString(),
+            'expected_delivery_display' => $order->expected_delivery_date?->format('d F Y'),
+        ];
+    }
+
+    protected static function currentTrackingIndex(JewelleryOrder $order): int
+    {
+        if ($order->status === 'completed') {
+            return 3;
+        }
+
+        if ($order->dispatched_at || filled($order->tracking_number)) {
+            return 2;
+        }
+
+        return (int) (config('account_activity.order_status_tracking_index.'.$order->status) ?? 0);
+    }
+
+    protected static function trackingTimestamp(JewelleryOrder $order, string $stepKey): ?string
+    {
+        $at = match ($stepKey) {
+            'placed' => $order->created_at,
+            'processing' => $order->status === 'processing' ? ($order->updated_at ?? $order->created_at) : $order->created_at,
+            'shipped' => $order->dispatched_at ?? ($order->tracking_number ? $order->updated_at : null),
+            'delivered' => $order->delivered_at ?? ($order->status === 'completed' ? $order->updated_at : null),
+            default => null,
+        };
+
+        return $at?->toIso8601String();
     }
 }

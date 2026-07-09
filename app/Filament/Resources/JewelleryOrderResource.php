@@ -128,6 +128,21 @@ class JewelleryOrderResource extends Resource
                             ->dehydrated(false)
                             ->columnSpanFull(),
                     ])->columns(3),
+                Forms\Components\Section::make('Delivery Tracking')
+                    ->schema([
+                        Forms\Components\TextInput::make('tracking_number')
+                            ->label('Tracking Number')
+                            ->maxLength(100),
+                        Forms\Components\TextInput::make('courier_name')
+                            ->label('Courier Name')
+                            ->maxLength(100),
+                        Forms\Components\DateTimePicker::make('dispatched_at')
+                            ->label('Dispatched At')
+                            ->native(false),
+                        Forms\Components\DateTimePicker::make('delivered_at')
+                            ->label('Delivered At')
+                            ->native(false),
+                    ])->columns(2),
                 Forms\Components\Section::make('Payment')
                     ->schema([
                         Forms\Components\Placeholder::make('payment_reference')
@@ -213,6 +228,10 @@ class JewelleryOrderResource extends Resource
                     ->label('Delivery By')
                     ->date('d M Y')
                     ->placeholder('—'),
+                Tables\Columns\TextColumn::make('tracking_number')
+                    ->label('Tracking #')
+                    ->placeholder('—')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Ordered At')
                     ->dateTime('d M Y H:i')

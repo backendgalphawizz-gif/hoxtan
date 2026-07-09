@@ -17,6 +17,21 @@ return [
         ['value' => 'cancelled', 'label' => 'Cancelled'],
     ],
 
+    'order_tracking_steps' => [
+        ['key' => 'placed', 'label' => 'Order Placed'],
+        ['key' => 'processing', 'label' => 'Processing'],
+        ['key' => 'shipped', 'label' => 'Shipped'],
+        ['key' => 'delivered', 'label' => 'Delivered'],
+    ],
+
+    'order_status_tracking_index' => [
+        'pending' => 0,
+        'processing' => 1,
+        'completed' => 3,
+        'failed' => 0,
+        'cancelled' => 0,
+    ],
+
     'transaction_filters' => [
         ['value' => 'all', 'label' => 'All'],
         ['value' => 'buy', 'label' => 'Buy'],

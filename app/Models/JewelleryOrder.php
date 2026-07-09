@@ -26,6 +26,10 @@ class JewelleryOrder extends Model
         'shipping_phone',
         'shipping_address_type',
         'expected_delivery_date',
+        'tracking_number',
+        'courier_name',
+        'dispatched_at',
+        'delivered_at',
     ];
 
     protected function casts(): array
@@ -39,6 +43,8 @@ class JewelleryOrder extends Model
             'discount_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'expected_delivery_date' => 'date',
+            'dispatched_at' => 'datetime',
+            'delivered_at' => 'datetime',
         ];
     }
 

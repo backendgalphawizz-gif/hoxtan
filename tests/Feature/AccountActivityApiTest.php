@@ -48,7 +48,27 @@ class AccountActivityApiTest extends TestCase
         $this->getJson('/api/v1/orders/'.$order->id)
             ->assertOk()
             ->assertJsonPath('data.order.order_number_display', '#HOX12345')
-            ->assertJsonStructure(['data' => ['order' => ['items', 'payment']]]);
+            ->assertJsonStructure([
+                'data' => [
+                    'order' => [
+                        'items',
+                        'payment',
+                        'tracking' => [
+                            ['key', 'label', 'completed', 'current', 'completed_at'],
+                        ],
+                        'tracking_details' => [
+                            'tracking_number',
+                            'courier_name',
+                            'dispatched_at',
+                            'delivered_at',
+                            'expected_delivery_date',
+                            'expected_delivery_display',
+                        ],
+                    ],
+                ],
+            ])
+            ->assertJsonPath('data.order.tracking.0.key', 'placed')
+            ->assertJsonPath('data.order.tracking.1.current', true);
     }
 
     public function test_user_can_list_and_view_transactions(): void
