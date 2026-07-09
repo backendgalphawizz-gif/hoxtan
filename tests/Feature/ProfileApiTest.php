@@ -97,6 +97,61 @@ class ProfileApiTest extends TestCase
         Storage::disk('public')->assertExists($user->profile_photo);
     }
 
+    public function test_update_profile_photo_via_profile_endpoint_with_image_field(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'phone' => '9876543211',
+            'mpin' => '1234',
+            'name' => 'Alex Vance',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->post('/api/v1/profile', [
+            'image' => UploadedFile::fake()->image('avatar.jpg'),
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.image', fn ($url) => filled($url))
+            ->assertJsonPath('data.user.image_url', fn ($url) => filled($url))
+            ->assertJsonPath('data.user.profile_photo_url', fn ($url) => filled($url));
+
+        $user->refresh();
+        Storage::disk('public')->assertExists($user->profile_photo);
+    }
+
+    public function test_update_profile_photo_via_profile_endpoint_base64(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'phone' => '9876543212',
+            'mpin' => '1234',
+            'name' => 'Alex Vance',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $image = base64_encode(file_get_contents(UploadedFile::fake()->image('avatar.jpg')->path()));
+
+        $response = $this->putJson('/api/v1/profile', [
+            'image' => 'data:image/jpeg;base64,'.$image,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.image', fn ($url) => filled($url))
+            ->assertJsonPath('data.user.profile_photo_url', fn ($url) => filled($url));
+
+        $user->refresh();
+        Storage::disk('public')->assertExists($user->profile_photo);
+    }
+
     public function test_update_mpin(): void
     {
         $user = User::factory()->create([

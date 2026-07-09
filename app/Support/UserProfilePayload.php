@@ -3,13 +3,15 @@
 namespace App\Support;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Storage;
+use App\Support\AssetUrl;
 
 class UserProfilePayload
 {
     public static function make(User $user): array
     {
         $user->loadMissing(['referredBy:id,name,phone', 'kycDetail']);
+
+        $photoUrl = self::profilePhotoUrl($user->profile_photo);
 
         return [
             'id' => $user->id,
@@ -25,7 +27,9 @@ class UserProfilePayload
             'gender' => $user->gender,
             'date_of_birth' => $user->date_of_birth?->toDateString(),
             'date_of_birth_display' => $user->date_of_birth?->format('d/m/Y'),
-            'profile_photo_url' => self::profilePhotoUrl($user->profile_photo),
+            'image' => $photoUrl,
+            'image_url' => $photoUrl,
+            'profile_photo_url' => $photoUrl,
             'market_alerts' => (bool) $user->market_alerts,
             'referral_code' => $user->referral_code,
             'wallet_balance' => (float) $user->wallet_balance,
@@ -62,7 +66,7 @@ class UserProfilePayload
 
     protected static function profilePhotoUrl(?string $path): ?string
     {
-        if (blank($path) || ! Storage::disk('public')->exists($path)) {
+        if (blank($path)) {
             return null;
         }
 

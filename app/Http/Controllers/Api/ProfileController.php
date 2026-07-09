@@ -8,10 +8,10 @@ use App\Models\User;
 use App\Services\InvoiceService;
 use App\Support\ApiResponse;
 use App\Support\MpinRules;
+use App\Support\ProfilePhotoStorage;
 use App\Support\UserProfilePayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -42,9 +42,14 @@ class ProfileController extends Controller
             'gender' => ['nullable', 'string', Rule::in(['male', 'female', 'other'])],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
             'market_alerts' => ['nullable', 'boolean'],
-            'profile_photo' => ['nullable', 'image', 'max:2048'],
-            'image' => ['nullable', 'image', 'max:2048'],
-            'profile_image' => ['nullable', 'image', 'max:2048'],
+            'profile_photo' => ['nullable'],
+            'image' => ['nullable'],
+            'profile_image' => ['nullable'],
+            'avatar' => ['nullable'],
+            'photo' => ['nullable'],
+            'profile_photo_base64' => ['nullable', 'string'],
+            'profile_image_base64' => ['nullable', 'string'],
+            'image_base64' => ['nullable', 'string'],
             'nominee' => ['nullable', 'array'],
             'nominee.name' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z\s]+$/'],
             'nominee.relation' => ['nullable', 'string', 'max:50'],
@@ -69,8 +74,8 @@ class ProfileController extends Controller
             $updates['email'] = $user->phone.'@hoxtan.app';
         }
 
-        if ($photo = $this->resolveProfilePhotoFile($request)) {
-            $updates['profile_photo'] = $this->storeProfilePhoto($user, $photo);
+        if ($photoPath = ProfilePhotoStorage::storeForUser($user, $request)) {
+            $updates['profile_photo'] = $photoPath;
         }
 
         if ($request->has('nominee')) {
@@ -107,21 +112,26 @@ class ProfileController extends Controller
         $user = $request->user();
 
         $request->validate([
-            'profile_photo' => ['nullable', 'image', 'max:2048'],
-            'image' => ['nullable', 'image', 'max:2048'],
-            'profile_image' => ['nullable', 'image', 'max:2048'],
+            'profile_photo' => ['nullable'],
+            'image' => ['nullable'],
+            'profile_image' => ['nullable'],
+            'avatar' => ['nullable'],
+            'photo' => ['nullable'],
+            'profile_photo_base64' => ['nullable', 'string'],
+            'profile_image_base64' => ['nullable', 'string'],
+            'image_base64' => ['nullable', 'string'],
         ]);
 
-        $photo = $this->resolveProfilePhotoFile($request);
+        $photoPath = ProfilePhotoStorage::storeForUser($user, $request);
 
-        if (! $photo) {
+        if (! $photoPath) {
             throw ValidationException::withMessages([
-                'profile_photo' => ['Please upload a profile photo (use field name profile_photo, image, or profile_image).'],
+                'image' => ['Please upload a profile photo using the image field (multipart file or base64).'],
             ]);
         }
 
         $user->update([
-            'profile_photo' => $this->storeProfilePhoto($user, $photo),
+            'profile_photo' => $photoPath,
         ]);
 
         return ApiResponse::success([
@@ -239,25 +249,5 @@ class ProfileController extends Controller
             $invoice->invoice_number.'.html',
             ['Content-Type' => 'text/html'],
         );
-    }
-
-    protected function resolveProfilePhotoFile(Request $request): ?UploadedFile
-    {
-        foreach (['profile_photo', 'image', 'profile_image'] as $field) {
-            if ($request->hasFile($field)) {
-                return $request->file($field);
-            }
-        }
-
-        return null;
-    }
-
-    protected function storeProfilePhoto(User $user, UploadedFile $photo): string
-    {
-        if (filled($user->profile_photo)) {
-            Storage::disk('public')->delete($user->profile_photo);
-        }
-
-        return $photo->store('profile-photos', 'public');
     }
 }
