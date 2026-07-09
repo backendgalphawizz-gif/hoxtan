@@ -44,6 +44,8 @@ class OrderPayload
             'ordered_date' => $order->created_at?->format('d M Y'),
             'ordered_at_display' => $order->created_at?->format('d F Y'),
             'updated_at' => $order->updated_at?->toIso8601String(),
+            'tracking' => self::tracking($order),
+            'tracking_details' => self::trackingDetails($order),
         ];
 
         if ($detailed) {
@@ -52,8 +54,6 @@ class OrderPayload
                 ->values()
                 ->all();
             $payload['payment'] = self::payment($order->payment);
-            $payload['tracking'] = self::tracking($order);
-            $payload['tracking_details'] = self::trackingDetails($order);
         }
 
         return $payload;

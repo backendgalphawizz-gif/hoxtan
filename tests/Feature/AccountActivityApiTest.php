@@ -43,7 +43,22 @@ class AccountActivityApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.orders.0.order_number', 'HOX12345')
             ->assertJsonPath('data.orders.0.status_label', 'Processing')
-            ->assertJsonPath('data.pagination.total', 1);
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonStructure([
+                'data' => [
+                    'orders' => [
+                        [
+                            'tracking',
+                            'tracking_details' => [
+                                'tracking_number',
+                                'courier_name',
+                                'dispatched_at',
+                                'delivered_at',
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
 
         $this->getJson('/api/v1/orders/'.$order->id)
             ->assertOk()
