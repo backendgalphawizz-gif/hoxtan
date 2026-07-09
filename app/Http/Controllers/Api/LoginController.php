@@ -25,34 +25,25 @@ class LoginController extends AuthController
 
     public function sendOtp(Request $request, OtpService $otp): JsonResponse
     {
-        $mpinLength = MpinRules::length();
-
         $data = $request->validate([
             'phone' => PhoneRules::rules(),
-            'mpin' => ['nullable', 'string', "digits:{$mpinLength}", 'regex:/^\d+$/'],
-        ], array_merge(PhoneRules::messages(), MpinRules::validationMessages()));
+        ], PhoneRules::messages());
 
         $phone = PhoneRules::normalize($data['phone']);
         $user = $this->findLoginUser($phone);
 
-        $otp->markPhoneVerified($phone, 'login');
+        $result = $otp->sendLoginOtp($phone);
+        $message = $result['message'] ?? '';
+        unset($result['message']);
 
-        if (filled($data['mpin'] ?? null)) {
-            return $this->loginWithMpin($user, $phone, $data['mpin'], $otp);
-        }
-
-        return ApiResponse::success([
-            'requires_mpin' => true,
+        return ApiResponse::success(array_merge($result, [
             'phone' => $phone,
-            'mpin' => $user->readableMpin(),
-            'mpin_length' => $mpinLength,
+            'requires_otp_verification' => true,
+            'requires_mpin' => filled($user->getRawOriginal('mpin')),
+            'mpin_length' => MpinRules::length(),
             'has_mpin' => filled($user->getRawOriginal('mpin')),
-            'mpin_legacy_hashed' => $user->usesLegacyHashedMpin(),
-            'next_api' => '/api/v1/login/mpin',
-            'user' => $this->userPayload($user),
-        ], $user->usesLegacyHashedMpin()
-            ? 'Mobile number verified. Your M-PIN was saved in old format — please use Forgot M-PIN once, or ask admin to reset your M-PIN.'
-            : 'Mobile number verified.');
+            'next_api' => '/api/v1/login/verify-otp',
+        ]), $message);
     }
 
     public function resendOtp(Request $request, OtpService $otp): JsonResponse

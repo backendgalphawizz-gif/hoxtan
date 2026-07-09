@@ -8,6 +8,7 @@ use App\Models\JewelleryProduct;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\UserAddress;
+use App\Services\BlockedPincodeService;
 use App\Support\AddressPayload;
 use App\Support\JewelleryPricing;
 use App\Support\JewelleryProductPayload;
@@ -20,6 +21,7 @@ class JewelleryCheckoutService
     public function __construct(
         protected GstService $gst,
         protected AppSettingService $settings,
+        protected BlockedPincodeService $blockedPincodeService,
     ) {}
 
     /**
@@ -242,6 +244,8 @@ class JewelleryCheckoutService
                 ]);
             }
 
+            $this->blockedPincodeService->assertNotBlocked($address->pincode, 'address_id');
+
             return $address;
         }
 
@@ -254,6 +258,10 @@ class JewelleryCheckoutService
             throw ValidationException::withMessages([
                 'address_id' => ['Please add a delivery address before buying.'],
             ]);
+        }
+
+        if ($address) {
+            $this->blockedPincodeService->assertNotBlocked($address->pincode, 'address_id');
         }
 
         return $address;

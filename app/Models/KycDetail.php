@@ -11,7 +11,9 @@ class KycDetail extends Model
         'user_id',
         'full_name',
         'pan_number',
+        'pan_verification_status',
         'aadhaar_number',
+        'aadhaar_verification_status',
         'date_of_birth',
         'address',
         'city',
@@ -23,6 +25,10 @@ class KycDetail extends Model
         'ifsc_code',
         'upi_id',
         'bank_verification_status',
+        'pan_verified_at',
+        'aadhaar_verified_at',
+        'bank_submitted_at',
+        'face_submitted_at',
         'pan_document',
         'aadhaar_front',
         'aadhaar_back',
@@ -41,6 +47,10 @@ class KycDetail extends Model
             'date_of_birth' => 'date',
             'submitted_at' => 'datetime',
             'reviewed_at' => 'datetime',
+            'pan_verified_at' => 'datetime',
+            'aadhaar_verified_at' => 'datetime',
+            'bank_submitted_at' => 'datetime',
+            'face_submitted_at' => 'datetime',
         ];
     }
 

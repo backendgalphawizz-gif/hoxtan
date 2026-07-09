@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Contracts\KycVerificationProvider;
 use App\Models\Investment;
 use App\Observers\InvestmentObserver;
 use App\Policies\ExportPolicy;
+use App\Services\KycVerificationProvider\StubKycVerificationProvider;
 use App\Support\AssetUrl;
 use App\Support\FilamentAdminForm;
 use App\Support\FilamentFormat;
@@ -20,7 +22,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(KycVerificationProvider::class, function (): KycVerificationProvider {
+            return match (config('kyc.provider', 'stub')) {
+                default => new StubKycVerificationProvider,
+            };
+        });
     }
 
     public function boot(): void

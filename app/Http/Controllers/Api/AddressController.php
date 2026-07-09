@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserAddress;
+use App\Services\BlockedPincodeService;
 use App\Support\AddressPayload;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class AddressController extends Controller
 {
+    public function __construct(
+        protected BlockedPincodeService $blockedPincodeService,
+    ) {}
     public function index(Request $request): JsonResponse
     {
         $addresses = $request->user()
@@ -126,6 +130,8 @@ class AddressController extends Controller
         ]);
 
         $data['is_default'] = (bool) ($data['is_default'] ?? false);
+
+        $this->blockedPincodeService->assertNotBlocked($data['pincode']);
 
         return $data;
     }

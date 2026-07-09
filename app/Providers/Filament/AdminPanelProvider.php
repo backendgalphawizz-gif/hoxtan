@@ -72,6 +72,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('Wallet Management'),
                 NavigationGroup::make('CMS Management'),
                 NavigationGroup::make('Jewellery Management'),
+                NavigationGroup::make('Delivery Management'),
                 NavigationGroup::make('Reports'),
                 NavigationGroup::make('Notification Management'),
                 NavigationGroup::make('System'),

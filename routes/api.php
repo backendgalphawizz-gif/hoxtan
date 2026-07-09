@@ -6,13 +6,16 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ForgotMpinController;
 use App\Http\Controllers\Api\JewelleryCheckoutController;
 use App\Http\Controllers\Api\JewelleryController;
+use App\Http\Controllers\Api\KycController;
 use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\MetalRateController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\SellJewelleryController;
 use App\Http\Controllers\Api\SigController;
 use App\Http\Controllers\Api\SupportController;
+use App\Http\Controllers\Api\TransactionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -64,6 +67,25 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/invoices', [ProfileController::class, 'invoices']);
         Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
             ->name('api.invoices.download');
+
+        Route::get('/orders/config', [OrderController::class, 'config']);
+        Route::get('/orders', [OrderController::class, 'index']);
+        Route::get('/orders/{order}', [OrderController::class, 'show']);
+
+        Route::get('/transactions/config', [TransactionController::class, 'config']);
+        Route::get('/transactions', [TransactionController::class, 'index']);
+        Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])
+            ->where('transaction', '[A-Za-z0-9:_-]+');
+
+        Route::get('/kyc/config', [KycController::class, 'config']);
+        Route::get('/kyc', [KycController::class, 'show']);
+        Route::post('/kyc/pan/request-otp', [KycController::class, 'requestPanOtp']);
+        Route::post('/kyc/pan/verify-otp', [KycController::class, 'verifyPanOtp']);
+        Route::post('/kyc/aadhaar/request-otp', [KycController::class, 'requestAadhaarOtp']);
+        Route::post('/kyc/aadhaar/verify-otp', [KycController::class, 'verifyAadhaarOtp']);
+        Route::post('/kyc/face', [KycController::class, 'submitFace']);
+        Route::post('/kyc/bank', [KycController::class, 'submitBank']);
+
         Route::get('/addresses', [AddressController::class, 'index']);
         Route::post('/addresses', [AddressController::class, 'store']);
         Route::get('/addresses/{address}', [AddressController::class, 'show']);
@@ -89,6 +111,7 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/sig/config', [SigController::class, 'config']);
         Route::get('/sig', [SigController::class, 'show']);
+        Route::post('/sig/estimate', [SigController::class, 'estimate']);
         Route::get('/sig/transactions', [SigController::class, 'transactions']);
         Route::post('/sig/activate', [SigController::class, 'activate']);
         Route::post('/sig/pause', [SigController::class, 'pause']);

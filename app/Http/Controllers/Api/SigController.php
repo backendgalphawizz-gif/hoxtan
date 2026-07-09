@@ -3,73 +3,104 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SigInstallment;
 use App\Models\SigPlan;
+use App\Services\AppSettingService;
 use App\Services\MetalRateService;
 use App\Services\SigPlanService;
 use App\Support\ApiResponse;
+use App\Support\SigPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class SigController extends Controller
 {
-    public function config(): JsonResponse
+    public function config(MetalRateService $rates, AppSettingService $settings): JsonResponse
     {
+        $metalRates = $rates->getApiRates();
+
         return ApiResponse::success([
-            'frequencies' => [
-                ['value' => 'daily', 'label' => 'Daily'],
-                ['value' => 'weekly', 'label' => 'Weekly'],
-                ['value' => 'monthly', 'label' => 'Monthly'],
-            ],
-            'metal_types' => [
-                ['value' => 'gold', 'label' => 'Gold 24K 99.9% PURE'],
-                ['value' => 'silver', 'label' => 'Silver'],
-            ],
-            'preset_amounts' => [100, 500, 1000, 2000, 5000],
-            'min_amount' => 100,
+            'frequencies' => config('sig.frequencies', []),
+            'metal_types' => config('sig.metal_types', []),
+            'preset_amounts' => config('sig.preset_amounts', []),
+            'min_amount' => config('sig.min_amount', 100),
+            'gst_percent' => $settings->gstRatePercent(),
+            'gst_included' => true,
+            'gst_note' => 'GST included '.$settings->gstRatePercent().'%',
+            'rates' => $metalRates,
+            'gold_rate' => $metalRates['gold'] ?? null,
+            'silver_rate' => $metalRates['silver'] ?? null,
+            'manage_actions' => config('sig.manage_actions', []),
         ]);
     }
 
     public function show(Request $request): JsonResponse
     {
-        $plan = $this->activePlanQuery($request)->first();
+        $plan = $this->activePlanQuery($request)->with('installments')->first();
 
         return ApiResponse::success([
-            'sig' => $plan ? $this->planPayload($plan) : null,
+            'sig' => $plan ? SigPayload::plan($plan) : null,
+            'has_active_plan' => $plan !== null,
+            'can_activate' => $plan === null,
+        ]);
+    }
+
+    public function estimate(Request $request, SigPlanService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'metal_type' => ['required', Rule::in(['gold', 'silver'])],
+            'amount' => ['required', 'numeric', 'min:'.config('sig.min_amount', 100)],
+            'frequency' => ['nullable', Rule::in(['daily', 'weekly', 'monthly'])],
+        ]);
+
+        $estimate = $service->estimate((float) $data['amount'], $data['metal_type']);
+
+        if (filled($data['frequency'] ?? null)) {
+            $estimate['frequency'] = $data['frequency'];
+            $estimate['frequency_label'] = ucfirst($data['frequency']);
+        }
+
+        return ApiResponse::success([
+            'estimate' => $estimate,
         ]);
     }
 
     public function transactions(Request $request): JsonResponse
     {
+        $data = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $limit = (int) ($data['limit'] ?? 20);
         $plan = $this->activePlanQuery($request)->first();
 
-        if (! $plan) {
-            return ApiResponse::success(['transactions' => []]);
+        $query = SigInstallment::query()
+            ->where('user_id', $request->user()->id)
+            ->with('plan')
+            ->latest('processed_at')
+            ->latest('scheduled_at')
+            ->latest('id');
+
+        if ($plan) {
+            $query->where('sig_plan_id', $plan->id);
         }
 
-        $transactions = $plan->installments()
-            ->latest('scheduled_at')
-            ->limit(50)
-            ->get()
-            ->map(fn ($item) => [
-                'id' => $item->id,
-                'reference_id' => $item->reference_id,
-                'amount' => (float) $item->amount,
-                'quantity_grams' => $item->quantity_grams !== null ? (float) $item->quantity_grams : null,
-                'status' => $item->status,
-                'scheduled_at' => $item->scheduled_at?->toIso8601String(),
-                'processed_at' => $item->processed_at?->toIso8601String(),
-            ]);
+        $transactions = $query->limit($limit)->get();
 
-        return ApiResponse::success(['transactions' => $transactions]);
+        return ApiResponse::success([
+            'transactions' => SigPayload::installmentCollection($transactions),
+        ]);
     }
 
-    public function activate(Request $request, SigPlanService $service, MetalRateService $rates): JsonResponse
+    public function activate(Request $request, SigPlanService $service): JsonResponse
     {
         $data = $request->validate([
             'metal_type' => ['required', Rule::in(['gold', 'silver'])],
             'frequency' => ['required', Rule::in(['daily', 'weekly', 'monthly'])],
-            'amount' => ['required', 'numeric', 'min:100'],
+            'amount' => ['required', 'numeric', 'min:'.config('sig.min_amount', 100)],
+            'linked_bank_name' => ['nullable', 'string', 'max:100'],
+            'linked_bank_last4' => ['nullable', 'string', 'size:4'],
         ]);
 
         $existing = SigPlan::query()
@@ -78,7 +109,11 @@ class SigController extends Controller
             ->exists();
 
         if ($existing) {
-            return ApiResponse::error('You already have an active SIG plan. Manage it from your SIG screen.', 422);
+            return ApiResponse::error(
+                'You already have an active SIG plan. Manage it from your SIG screen.',
+                [],
+                422,
+            );
         }
 
         $plan = $service->activate([
@@ -86,26 +121,36 @@ class SigController extends Controller
             'metal_type' => $data['metal_type'],
             'frequency' => $data['frequency'],
             'amount' => $data['amount'],
+            'linked_bank_name' => $data['linked_bank_name'] ?? null,
+            'linked_bank_last4' => $data['linked_bank_last4'] ?? null,
         ]);
 
-        $rate = $rates->getLiveRate($data['metal_type']);
+        $plan->load('installments');
+        $estimate = $service->estimate((float) $data['amount'], $data['metal_type']);
 
         return ApiResponse::success([
-            'message' => 'SIG activated successfully.',
-            'sig' => $this->planPayload($plan->fresh(['installments'])),
-            'estimate' => $this->estimate($data['amount'], $rate),
-            'current_rate_per_gram' => $rate,
-        ]);
+            'sig' => SigPayload::plan($plan),
+            'estimate' => $estimate,
+            'activation' => [
+                'title' => 'SIG Activated!',
+                'amount' => (float) $plan->amount,
+                'amount_display' => SigPayload::amountWithFrequency($plan),
+                'message' => 'Your '.strtolower($plan->frequency).' SIG plan is now active.',
+            ],
+        ], 'SIG activated successfully.', 201);
     }
 
     public function pause(Request $request, SigPlanService $service): JsonResponse
     {
         $plan = $this->requireManageablePlan($request);
 
+        $plan = $service->pause($plan);
+
         return ApiResponse::success([
-            'message' => 'SIG paused.',
-            'sig' => $this->planPayload($service->pause($plan)),
-        ]);
+            'sig' => SigPayload::plan($plan),
+            'modal' => collect(config('sig.manage_actions', []))
+                ->firstWhere('key', 'pause')['modal'] ?? null,
+        ], 'SIG paused.');
     }
 
     public function resume(Request $request, SigPlanService $service): JsonResponse
@@ -116,20 +161,27 @@ class SigController extends Controller
             ->latest('id')
             ->firstOrFail();
 
+        $plan = $service->resume($plan);
+
         return ApiResponse::success([
-            'message' => 'SIG resumed.',
-            'sig' => $this->planPayload($service->resume($plan)),
-        ]);
+            'sig' => SigPayload::plan($plan),
+            'modal' => collect(config('sig.manage_actions', []))
+                ->firstWhere('key', 'resume')['modal'] ?? null,
+            'next_auto_debit_display' => $plan->next_debit_at?->format('d F Y'),
+        ], 'SIG resumed.');
     }
 
     public function stop(Request $request, SigPlanService $service): JsonResponse
     {
         $plan = $this->requireManageablePlan($request);
 
+        $plan = $service->stop($plan);
+
         return ApiResponse::success([
-            'message' => 'SIG stopped.',
-            'sig' => $this->planPayload($service->stop($plan)),
-        ]);
+            'sig' => SigPayload::plan($plan, includeManageActions: false),
+            'modal' => collect(config('sig.manage_actions', []))
+                ->firstWhere('key', 'stop')['modal'] ?? null,
+        ], 'SIG stopped.');
     }
 
     private function activePlanQuery(Request $request)
@@ -147,37 +199,5 @@ class SigController extends Controller
             ->whereIn('status', ['active', 'paused'])
             ->latest('id')
             ->firstOrFail();
-    }
-
-    private function planPayload(SigPlan $plan): array
-    {
-        return [
-            'id' => $plan->id,
-            'plan_number' => $plan->plan_number,
-            'title' => $plan->title_label,
-            'metal_type' => $plan->metal_type,
-            'frequency' => $plan->frequency,
-            'amount' => (float) $plan->amount,
-            'status' => $plan->status,
-            'linked_bank' => $plan->linked_bank_label,
-            'next_auto_debit_at' => $plan->next_debit_at?->toIso8601String(),
-            'total_invested' => (float) $plan->total_invested,
-            'metal_accumulated_grams' => (float) $plan->metal_accumulated_grams,
-            'completed_installments' => $plan->completed_installments,
-            'total_installments' => $plan->total_installments,
-            'progress_label' => $plan->progress_label,
-            'activated_at' => $plan->activated_at?->toIso8601String(),
-        ];
-    }
-
-    private function estimate(float $amount, float $ratePerGram): array
-    {
-        if ($ratePerGram <= 0) {
-            return ['grams' => 0];
-        }
-
-        return [
-            'grams' => round($amount / $ratePerGram, 4),
-        ];
     }
 }

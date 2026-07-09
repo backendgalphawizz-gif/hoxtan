@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\OldGoldBooking;
 use App\Models\User;
+use App\Services\BlockedPincodeService;
 use App\Services\SellJewelleryService;
 use App\Support\ApiResponse;
 use App\Support\SellJewelleryPayload;
@@ -15,6 +16,9 @@ use Illuminate\Validation\ValidationException;
 
 class SellJewelleryController extends Controller
 {
+    public function __construct(
+        protected BlockedPincodeService $blockedPincodeService,
+    ) {}
     public function config(Request $request, SellJewelleryService $service): JsonResponse
     {
         $data = $request->validate([
@@ -132,6 +136,10 @@ class SellJewelleryController extends Controller
                     'address_id' => ['Address not found.'],
                 ]);
             }
+
+            $this->blockedPincodeService->assertNotBlocked($address->pincode, 'address_id');
+        } elseif (filled($data['pincode'] ?? null)) {
+            $this->blockedPincodeService->assertNotBlocked($data['pincode']);
         }
 
         return $data;

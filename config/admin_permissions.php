@@ -177,5 +177,13 @@ return [
             'label' => 'Settings',
             'group' => 'System',
         ],
+        'drivers' => [
+            'label' => 'Drivers',
+            'group' => 'Delivery Management',
+        ],
+        'blocked_pincodes' => [
+            'label' => 'Blocked Pincodes',
+            'group' => 'Delivery Management',
+        ],
     ],
 ];

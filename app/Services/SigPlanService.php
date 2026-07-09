@@ -5,11 +5,59 @@ namespace App\Services;
 use App\Models\SigInstallment;
 use App\Models\SigPlan;
 use App\Models\User;
+use App\Services\GstService;
+use App\Services\MetalRateService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SigPlanService
 {
+    public function __construct(
+        protected MetalRateService $metalRates,
+        protected GstService $gst,
+    ) {}
+
+    /**
+     * @return array{
+     *     metal_type: string,
+     *     amount: float,
+     *     rate_per_gram: float,
+     *     rate_per_gram_display: string,
+     *     gst_percent: float,
+     *     gst_included: bool,
+     *     gst_note: string,
+     *     taxable_amount: float,
+     *     gst_amount: float,
+     *     gold_grams: float,
+     *     gold_grams_display: string
+     * }
+     */
+    public function estimate(float $amount, string $metalType): array
+    {
+        $rate = $this->metalRates->getCurrentRatePerGram($metalType);
+        $gstPercent = $this->gst->ratePercent();
+        $taxableAmount = round($amount / (1 + $this->gst->rate()), 2);
+        $gstAmount = round($amount - $taxableAmount, 2);
+        $grams = $rate > 0 ? round($taxableAmount / $rate, 4) : 0.0;
+
+        return [
+            'metal_type' => $metalType,
+            'amount' => $amount,
+            'amount_display' => '₹'.number_format($amount, 0),
+            'rate_per_gram' => round($rate, 2),
+            'rate_per_gram_display' => '₹'.number_format($rate, 0).' / gm',
+            'gst_percent' => $gstPercent,
+            'gst_included' => true,
+            'gst_note' => 'GST included '.$gstPercent.'%',
+            'taxable_amount' => $taxableAmount,
+            'gst_amount' => $gstAmount,
+            'gold_grams' => $grams,
+            'gold_grams_display' => rtrim(rtrim(number_format($grams, 3, '.', ''), '0'), '.').' g Gold',
+            'metal_grams' => $grams,
+            'metal_grams_display' => rtrim(rtrim(number_format($grams, 3, '.', ''), '0'), '.').' g '.ucfirst($metalType),
+        ];
+    }
+
     public function activate(array $data, ?int $adminId = null): SigPlan
     {
         return DB::transaction(function () use ($data, $adminId): SigPlan {
@@ -31,7 +79,19 @@ class SigPlanService
                 'created_by' => $adminId,
             ]);
 
-            return $plan->fresh(['user']);
+            if ($data['record_initial_installment'] ?? true) {
+                $estimate = $this->estimate((float) $data['amount'], $plan->metal_type);
+
+                $this->recordInstallment($plan, [
+                    'amount' => $data['amount'],
+                    'quantity_grams' => $estimate['gold_grams'],
+                    'rate_per_gram' => $estimate['rate_per_gram'],
+                    'status' => 'success',
+                    'scheduled_at' => now(),
+                ]);
+            }
+
+            return $plan->fresh(['user', 'installments']);
         });
     }
 
