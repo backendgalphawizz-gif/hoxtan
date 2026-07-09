@@ -24,6 +24,8 @@ class OrderPayload
             'order_number_display' => '#'.$order->order_number,
             'title' => $itemCount > 1 ? $itemTitle.' +'.($itemCount - 1).' more' : $itemTitle,
             'item_count' => $itemCount,
+            'image_url' => $firstItem?->product?->imageUrl(),
+            'image_urls' => $firstItem?->product?->imageUrls() ?? [],
             'status' => $order->status,
             'status_label' => self::statusLabel($order->status),
             'subtotal' => (float) $order->subtotal,
@@ -46,13 +48,13 @@ class OrderPayload
             'updated_at' => $order->updated_at?->toIso8601String(),
             'tracking' => self::tracking($order),
             'tracking_details' => self::trackingDetails($order),
+            'items' => $order->items
+                ->map(fn (JewelleryOrderItem $item) => self::item($item))
+                ->values()
+                ->all(),
         ];
 
         if ($detailed) {
-            $payload['items'] = $order->items
-                ->map(fn (JewelleryOrderItem $item) => self::item($item))
-                ->values()
-                ->all();
             $payload['payment'] = self::payment($order->payment);
         }
 

@@ -29,6 +29,7 @@ class JewelleryProductPayload
             'name' => $product->name,
             'description' => $product->description,
             'image_url' => $product->imageUrl(),
+            'image_urls' => $product->imageUrls(),
             'metal_type' => $product->metal_type,
             'purity' => $product->purity,
             'weight_grams' => $product->weight_grams !== null ? (float) $product->weight_grams : null,

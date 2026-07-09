@@ -106,12 +106,18 @@ class JewelleryProductResource extends Resource
                             ->live(debounce: 400)
                             ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
                         Forms\Components\FileUpload::make('image')
+                            ->label('Images')
                             ->image()
+                            ->multiple()
+                            ->minFiles(1)
+                            ->maxFiles(5)
+                            ->reorderable()
                             ->disk('public')
                             ->directory('jewellery/products')
                             ->visibility('public')
                             ->required()
                             ->maxSize(4096)
+                            ->helperText('Upload up to 5 product images. The first image is used as the cover.')
                             ->columnSpanFull(),
                         Forms\Components\Textarea::make('description')
                             ->rows(3)
@@ -170,6 +176,7 @@ class JewelleryProductResource extends Resource
                     ->label('Image')
                     ->disk('public')
                     ->visibility('public')
+                    ->getStateUsing(fn (JewelleryProduct $record): ?string => $record->resolvedImagePath())
                     ->square()
                     ->size(56)
                     ->checkFileExistence(false),

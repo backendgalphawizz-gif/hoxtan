@@ -48,6 +48,11 @@ class AccountActivityApiTest extends TestCase
                 'data' => [
                     'orders' => [
                         [
+                            'image_url',
+                            'image_urls',
+                            'items' => [
+                                ['product' => ['image_url', 'image_urls']],
+                            ],
                             'tracking',
                             'tracking_details' => [
                                 'tracking_number',

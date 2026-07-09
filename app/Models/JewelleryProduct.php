@@ -34,6 +34,7 @@ class JewelleryProduct extends Model
             'making_charge_percent' => 'decimal:2',
             'weight_grams' => 'decimal:3',
             'is_active' => 'boolean',
+            'image' => 'array',
         ];
     }
 
@@ -83,18 +84,38 @@ class JewelleryProduct extends Model
 
     public function resolvedImagePath(): ?string
     {
+        return $this->resolvedImagePaths()[0] ?? null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function resolvedImagePaths(): array
+    {
         $image = $this->image;
 
         if (is_array($image)) {
-            return $image[0] ?? null;
+            return array_values(array_filter($image, fn ($path) => filled($path)));
         }
 
-        return is_string($image) ? $image : null;
+        return filled($image) && is_string($image) ? [$image] : [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function imageUrls(): array
+    {
+        return collect($this->resolvedImagePaths())
+            ->map(fn (string $path) => FilamentFormat::storageUrl($path))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function imageUrl(): ?string
     {
-        return FilamentFormat::storageUrl($this->resolvedImagePath());
+        return $this->imageUrls()[0] ?? null;
     }
 
     public function specificationLabel(): string
