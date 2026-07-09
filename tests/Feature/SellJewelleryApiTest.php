@@ -75,7 +75,6 @@ class SellJewelleryApiTest extends TestCase
             'state' => 'Maharashtra',
             'pincode' => '400001',
             'phone' => '9876543211',
-            'id_proof' => UploadedFile::fake()->image('aadhar.jpg'),
             'selfie' => UploadedFile::fake()->image('selfie.jpg'),
             'purchase_receipt' => UploadedFile::fake()->image('receipt.jpg'),
         ]);
@@ -109,7 +108,50 @@ class SellJewelleryApiTest extends TestCase
         $show->assertOk()
             ->assertJsonPath('data.request.tracking.0.key', 'pending')
             ->assertJsonPath('data.request.tracking.0.current', true)
-            ->assertJsonPath('data.request.documents.0.uploaded', true);
+            ->assertJsonPath('data.request.documents.1.uploaded', true);
+    }
+
+    public function test_id_proof_required_only_when_jewellery_is_in_someone_elses_name(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'phone' => '9876543212',
+            'mpin' => '1234',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $basePayload = [
+            'metal_type' => 'gold',
+            'weight_grams' => 8,
+            'purity' => '22K',
+            'sell_location' => 'at_home',
+            'confirmed' => true,
+            'full_name' => 'Test User',
+            'address_line' => '12 MG Road',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'pincode' => '400001',
+            'phone' => '9876543212',
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'purchase_receipt' => UploadedFile::fake()->image('receipt.jpg'),
+        ];
+
+        $this->post('/api/v1/sell-jewellery/requests', array_merge($basePayload, [
+            'identity_owner' => 'own_name',
+        ]))->assertCreated();
+
+        $this->post('/api/v1/sell-jewellery/requests', array_merge($basePayload, [
+            'identity_owner' => 'someone_else',
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['id_proof']);
+
+        $this->post('/api/v1/sell-jewellery/requests', array_merge($basePayload, [
+            'identity_owner' => 'someone_else',
+            'id_proof' => UploadedFile::fake()->image('aadhar.jpg'),
+        ]))->assertCreated();
     }
 
     public function test_recent_sold_returns_completed_bookings(): void

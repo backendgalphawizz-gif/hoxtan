@@ -33,7 +33,11 @@ return [
     ],
 
     'document_types' => [
-        'id_proof' => ['label' => 'ID Proof', 'required' => true],
+        'id_proof' => [
+            'label' => 'Aadhaar card / PAN card / Other',
+            'required' => false,
+            'required_for_identity_owner' => 'someone_else',
+        ],
         'selfie' => ['label' => 'Selfie (Account Holder)', 'required' => true],
         'purchase_receipt' => ['label' => 'Purchase Receipt', 'required_for' => 'at_home'],
         'bank_receipt' => ['label' => 'Bank Receipt', 'required_for' => 'at_bank'],

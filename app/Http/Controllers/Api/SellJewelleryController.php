@@ -66,7 +66,7 @@ class SellJewelleryController extends Controller
         /** @var User $user */
         $user = $request->user();
         $data = $this->validatedRequest($request);
-        $files = $this->validatedDocuments($request, $data['sell_location']);
+        $files = $this->validatedDocuments($request, $data['sell_location'], $data['identity_owner']);
 
         $booking = $service->createRequest($user, $data, $files);
 
@@ -148,10 +148,16 @@ class SellJewelleryController extends Controller
     /**
      * @return array<string, \Illuminate\Http\UploadedFile>
      */
-    protected function validatedDocuments(Request $request, string $sellLocation): array
+    protected function validatedDocuments(Request $request, string $sellLocation, string $identityOwner): array
     {
         $rules = [
-            'id_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'id_proof' => [
+                Rule::requiredIf($identityOwner === 'someone_else'),
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:5120',
+            ],
             'selfie' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
             'purchase_receipt' => [Rule::requiredIf($sellLocation === 'at_home'), 'nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'bank_receipt' => [Rule::requiredIf($sellLocation === 'at_bank'), 'nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],

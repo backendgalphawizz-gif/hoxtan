@@ -105,24 +105,16 @@ class JewelleryProductResource extends Resource
                             ->suffix('g')
                             ->live(debounce: 400)
                             ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
-                        Forms\Components\FileUpload::make('image')
-                            ->label('Images')
-                            ->image()
-                            ->multiple()
-                            ->minFiles(1)
-                            ->maxFiles(5)
-                            ->reorderable()
-                            ->disk('public')
-                            ->directory('jewellery/products')
-                            ->visibility('public')
-                            ->required()
-                            ->maxSize(4096)
-                            ->helperText('Upload up to 5 product images. The first image is used as the cover.')
-                            ->columnSpanFull(),
                         Forms\Components\Textarea::make('description')
                             ->rows(3)
                             ->columnSpanFull(),
                     ])->columns(2),
+
+                Forms\Components\Section::make('Product Images')
+                    ->description('Upload up to 5 images. Drag to reorder — the first image is the cover shown in the app.')
+                    ->schema([
+                        static::productImagesField(),
+                    ]),
 
                 Forms\Components\Section::make('Pricing & Visibility')
                     ->schema([
@@ -226,6 +218,35 @@ class JewelleryProductResource extends Resource
             'create' => Pages\CreateJewelleryProduct::route('/create'),
             'edit' => Pages\EditJewelleryProduct::route('/{record}/edit'),
         ];
+    }
+
+    protected static function productImagesField(): Forms\Components\FileUpload
+    {
+        return Forms\Components\FileUpload::make('image')
+            ->label('Images')
+            ->image()
+            ->multiple()
+            ->minFiles(1)
+            ->maxFiles(5)
+            ->reorderable()
+            ->appendFiles()
+            ->panelLayout('grid')
+            ->panelAspectRatio('1:1')
+            ->imagePreviewHeight('9rem')
+            ->itemPanelAspectRatio(1)
+            ->removeUploadedFileButtonPosition('right top')
+            ->uploadButtonPosition('center')
+            ->uploadProgressIndicatorPosition('center')
+            ->loadingIndicatorPosition('center')
+            ->placeholder('Drag & drop images here, or click to browse')
+            ->disk('public')
+            ->directory('jewellery/products')
+            ->visibility('public')
+            ->required()
+            ->maxSize(4096)
+            ->extraAttributes(['class' => 'gs-product-images-upload'])
+            ->extraFieldWrapperAttributes(['class' => 'gs-product-images-field'])
+            ->columnSpanFull();
     }
 
     protected static function syncSellingPrice(Set $set, Get $get): void

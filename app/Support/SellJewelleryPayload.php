@@ -84,7 +84,9 @@ class SellJewelleryPayload
                     'label' => $meta['label'],
                     'uploaded' => filled($path),
                     'url' => AssetUrl::publicStorage($path),
+                    'required' => (bool) ($meta['required'] ?? false),
                     'required_for' => $meta['required_for'] ?? null,
+                    'required_for_identity_owner' => $meta['required_for_identity_owner'] ?? null,
                 ];
             })
             ->values()
