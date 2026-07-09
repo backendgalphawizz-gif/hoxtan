@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DeployArtisanController;
 use App\Http\Controllers\EmergencyAdminSetupController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\WebsitePageController;
@@ -24,3 +25,7 @@ foreach (config('app_content.website_pages', []) as $websitePage) {
 
 Route::get('/setup-admin/{token}', EmergencyAdminSetupController::class)
     ->name('admin.emergency-setup');
+
+Route::get('/deploy/{command}', [DeployArtisanController::class, 'run'])
+    ->where('command', 'migrate|optimize-clear|storage-link')
+    ->name('deploy.artisan');
