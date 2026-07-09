@@ -346,7 +346,12 @@ class DummyDataSeeder extends Seeder
         ]);
         StaticPage::updateOrCreate(['slug' => 'about-us'], [
             'title' => 'About Us',
-            'content' => '<h2>About Gold & Silver</h2><p>India\'s trusted digital precious metals platform.</p>',
+            'content' => '<h2>About HOXTAN</h2><p>HOXTAN is India\'s trusted digital precious metals platform — empowering investors to buy, sell, and grow wealth in gold and silver with complete transparency.</p><p>From live market rates and SIG auto-invest to premium hallmarked jewellery, we combine institutional-grade security with a seamless mobile experience.</p>',
+            'is_published' => true,
+        ]);
+        StaticPage::updateOrCreate(['slug' => 'team'], [
+            'title' => 'Our Team',
+            'content' => '<h2>Leadership Team</h2><p>Meet the people building India\'s most trusted digital bullion platform.</p><h3>Founder &amp; CEO</h3><p>Visionary leader with 15+ years in fintech and precious metals trading.</p><h3>Chief Technology Officer</h3><p>Architecting secure, scalable infrastructure for millions of transactions.</p><h3>Head of Compliance</h3><p>Ensuring full regulatory compliance across KYC, AML, and vault operations.</p>',
             'is_published' => true,
         ]);
 

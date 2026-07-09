@@ -34,8 +34,11 @@ class OldGoldBookingReport extends BaseReportPage
             ->filters([
                 SelectFilter::make('status')->options([
                     'pending' => 'Pending',
-                    'processing' => 'Processing',
+                    'accepted' => 'Accepted',
+                    'pickup_scheduling' => 'Pickup Scheduling',
+                    'picked_up' => 'Picked Up',
                     'completed' => 'Completed',
+                    'processing' => 'Processing (legacy)',
                     'failed' => 'Failed',
                     'cancelled' => 'Cancelled',
                 ]),

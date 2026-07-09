@@ -3,6 +3,16 @@
 return [
     'app_name' => 'HOXTAN',
 
+    /*
+    | Website pages managed from Admin → CMS → Static Pages.
+    | Slug must match the static page record to appear on the website.
+    */
+    'website_pages' => [
+        ['key' => 'about', 'slug' => 'about-us', 'label' => 'About Us'],
+        ['key' => 'terms', 'slug' => 'terms-and-conditions', 'label' => 'Terms & Conditions'],
+        ['key' => 'privacy', 'slug' => 'privacy-policy', 'label' => 'Privacy Policy'],
+    ],
+
     'faqs_screen' => [
         'title' => 'FAQs',
         'headline' => 'How may we assist you?',

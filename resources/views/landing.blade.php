@@ -1,45 +1,6 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="{{ $appName }} — Buy digital gold & silver, invest with SIG, shop premium jewellery. Secure vault, live rates, instant trading.">
-    <title>{{ $appName }} — Gold · Silver · Jewellery</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/landing.css') }}">
-</head>
-<body>
+@extends('layouts.website', ['isHome' => true])
 
-    <div class="ambient" aria-hidden="true">
-        <div class="orb orb--gold"></div>
-        <div class="orb orb--silver"></div>
-        <div class="orb orb--accent"></div>
-    </div>
-    <div class="particles" aria-hidden="true"></div>
-
-    {{-- Navigation --}}
-    <nav class="nav">
-        <div class="container nav__inner">
-            <a href="#" class="brand">
-                <div class="brand__icon">H</div>
-                <div>
-                    <div class="brand__name">{{ $appName }}</div>
-                    <div class="brand__tag">Gold · Silver · Jewellery</div>
-                </div>
-            </a>
-            <ul class="nav__links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#rates">Live Rates</a></li>
-                <li><a href="#how">How It Works</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-            <a href="#download" class="btn btn--gold" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;">Get the App</a>
-            <button class="nav__toggle" aria-label="Menu">☰</button>
-        </div>
-    </nav>
-
+@section('content')
     {{-- Hero --}}
     <section class="hero">
         <div class="container hero__grid">
@@ -203,57 +164,4 @@
             </div>
         </div>
     </section>
-
-    {{-- Footer --}}
-    <footer class="footer" id="contact">
-        <div class="container">
-            <div class="footer__grid">
-                <div class="footer__about">
-                    <a href="#" class="brand">
-                        <div class="brand__icon">H</div>
-                        <div>
-                            <div class="brand__name">{{ $appName }}</div>
-                            <div class="brand__tag">Gold · Silver · Jewellery</div>
-                        </div>
-                    </a>
-                    <p>India's premium digital bullion platform. Buy, sell, invest, and shop with complete transparency and elite-grade security.</p>
-                    <div class="social">
-                        @foreach ($socialLinks as $social)
-                            <a href="{{ $social['url'] }}" class="social__link" target="_blank" rel="noopener noreferrer" aria-label="{{ $social['name'] }}">
-                                @include('landing.partials.social-icon', ['icon' => $social['icon']])
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-                <div>
-                    <h4 class="footer__heading">Platform</h4>
-                    <ul class="footer__links">
-                        <li><a href="#features">Digital Gold</a></li>
-                        <li><a href="#features">SIG Invest</a></li>
-                        <li><a href="#features">Jewellery</a></li>
-                        <li><a href="#rates">Live Rates</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="footer__heading">Support</h4>
-                    <ul class="footer__links">
-                        @if ($supportEmail)
-                            <li><a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a></li>
-                        @endif
-                        @if ($supportPhone)
-                            <li><a href="tel:{{ $supportPhone }}">+91 {{ $supportPhone }}</a></li>
-                        @endif
-                        <li><a href="/admin">Admin Portal</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer__bottom">
-                <span>&copy; {{ date('Y') }} {{ $appName }}. All rights reserved.</span>
-                <span>Allocated · Segregated · Insured</span>
-            </div>
-        </div>
-    </footer>
-
-    <script src="{{ asset('js/landing.js') }}"></script>
-</body>
-</html>
+@endsection

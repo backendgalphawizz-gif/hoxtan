@@ -1,0 +1,138 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\OldGoldBooking;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class SellJewelleryApiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_estimate_submit_and_track_sell_request(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'phone' => '9876543211',
+            'mpin' => '1234',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $config = $this->getJson('/api/v1/sell-jewellery/config');
+
+        $config->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'data' => [
+                    'metal_types',
+                    'purities',
+                    'identity_owners',
+                    'sell_locations',
+                    'document_types',
+                    'status_filters',
+                    'rates' => ['gold', 'silver'],
+                ],
+            ]);
+
+        $estimate = $this->postJson('/api/v1/sell-jewellery/estimate', [
+            'metal_type' => 'gold',
+            'weight_grams' => 10,
+            'purity' => '22K',
+        ]);
+
+        $estimate->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.estimate.metal_type', 'gold')
+            ->assertJsonPath('data.estimate.purity', '22K')
+            ->assertJsonStructure([
+                'data' => [
+                    'estimate' => [
+                        'weight_grams',
+                        'rate_per_gram',
+                        'estimated_value',
+                        'estimated_value_display',
+                    ],
+                ],
+            ]);
+
+        $create = $this->post('/api/v1/sell-jewellery/requests', [
+            'metal_type' => 'gold',
+            'weight_grams' => 10,
+            'purity' => '22K',
+            'identity_owner' => 'own_name',
+            'sell_location' => 'at_home',
+            'confirmed' => true,
+            'full_name' => 'Test User',
+            'address_line' => '12 MG Road',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'pincode' => '400001',
+            'phone' => '9876543211',
+            'id_proof' => UploadedFile::fake()->image('aadhar.jpg'),
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'purchase_receipt' => UploadedFile::fake()->image('receipt.jpg'),
+        ]);
+
+        $create->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.request.status', 'pending')
+            ->assertJsonPath('data.request.metal_type', 'gold')
+            ->assertJsonStructure([
+                'data' => [
+                    'request' => [
+                        'booking_number_display',
+                        'documents',
+                        'tracking' => [
+                            ['key', 'label', 'completed', 'current', 'completed_at'],
+                        ],
+                    ],
+                ],
+            ]);
+
+        $requestId = $create->json('data.request.id');
+
+        $list = $this->getJson('/api/v1/sell-jewellery/requests?status=pending');
+
+        $list->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.requests.0.id', $requestId);
+
+        $show = $this->getJson("/api/v1/sell-jewellery/requests/{$requestId}");
+
+        $show->assertOk()
+            ->assertJsonPath('data.request.tracking.0.key', 'pending')
+            ->assertJsonPath('data.request.tracking.0.current', true)
+            ->assertJsonPath('data.request.documents.0.uploaded', true);
+    }
+
+    public function test_recent_sold_returns_completed_bookings(): void
+    {
+        $user = User::factory()->create();
+
+        Sanctum::actingAs($user);
+
+        OldGoldBooking::query()->create([
+            'booking_number' => 'SELL12345',
+            'user_id' => $user->id,
+            'metal_type' => 'gold',
+            'purity' => '24K',
+            'estimated_weight_grams' => 5,
+            'quoted_amount' => 35000,
+            'status' => 'completed',
+            'pickup_address' => 'Test Address',
+        ]);
+
+        $response = $this->getJson('/api/v1/sell-jewellery/recent');
+
+        $response->assertOk()
+            ->assertJsonPath('data.recently_sold.0.booking_number', 'SELL12345')
+            ->assertJsonPath('data.recently_sold.0.status', 'completed');
+    }
+}

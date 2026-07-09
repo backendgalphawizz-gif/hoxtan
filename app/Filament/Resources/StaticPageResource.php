@@ -36,10 +36,29 @@ class StaticPageResource extends Resource
 
     public static function form(Form $form): Form
     {
+        $websitePresets = collect(config('app_content.website_pages', []))
+            ->mapWithKeys(fn (array $page) => [$page['slug'] => $page['label']])
+            ->all();
+
         return $form
             ->schema([
                 Forms\Components\Section::make('Page Details')
+                    ->description('Website pages use fixed slugs: about-us, team, terms-and-conditions, privacy-policy.')
                     ->schema([
+                        Forms\Components\Select::make('website_preset')
+                            ->label('Website Page Type')
+                            ->options(['' => 'Custom page'] + $websitePresets)
+                            ->live()
+                            ->afterStateUpdated(function (Forms\Set $set, ?string $state) use ($websitePresets): void {
+                                if (blank($state)) {
+                                    return;
+                                }
+
+                                $set('slug', $state);
+                                $set('title', $websitePresets[$state] ?? str($state)->headline()->toString());
+                            })
+                            ->dehydrated(false)
+                            ->visible(fn ($livewire) => $livewire instanceof Pages\CreateStaticPage),
                         Forms\Components\TextInput::make('title')
                             ->required()
                             ->maxLength(255)
@@ -54,7 +73,7 @@ class StaticPageResource extends Resource
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->alphaDash()
-                            ->helperText('Auto-generated from title. You can customize if needed.'),
+                            ->helperText('Use about-us, team, terms-and-conditions, or privacy-policy for website pages.'),
                         Forms\Components\Toggle::make('is_published')
                             ->label('Published')
                             ->default(false),

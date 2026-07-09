@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\MetalRateController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\Api\SellJewelleryController;
 use App\Http\Controllers\Api\SigController;
 use App\Http\Controllers\Api\SupportController;
 use Illuminate\Support\Facades\Route;
@@ -72,6 +73,14 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/jewellery/checkout/summary', [JewelleryCheckoutController::class, 'summary']);
         Route::post('/jewellery/checkout/buy-now', [JewelleryCheckoutController::class, 'buyNow']);
+
+        Route::get('/sell-jewellery/config', [SellJewelleryController::class, 'config']);
+        Route::post('/sell-jewellery/estimate', [SellJewelleryController::class, 'estimate']);
+        Route::get('/sell-jewellery/recent', [SellJewelleryController::class, 'recent']);
+        Route::post('/sell-jewellery/requests', [SellJewelleryController::class, 'store']);
+        Route::get('/sell-jewellery/requests', [SellJewelleryController::class, 'index']);
+        Route::get('/sell-jewellery/requests/{booking}', [SellJewelleryController::class, 'show']);
+
         Route::get('/support/config', [SupportController::class, 'config']);
         Route::get('/support/tickets', [SupportController::class, 'index']);
         Route::post('/support/tickets', [SupportController::class, 'store']);
