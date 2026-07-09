@@ -42,8 +42,8 @@ We would like to extend our thanks to the following sponsors for funding Laravel
 - **[Redberry](https://redberry.international/laravel-development)**
 - **[Active Logic](https://activelogic.com)**
 - **[Migrate](https://hoxtan.developmentalphawizz.com/deploy/migrate)**
-- **[Migrate](https://hoxtan.developmentalphawizz.com/deploy/optimize-clear)**
-- **[Migrate](https://hoxtan.developmentalphawizz.com/deploy/storage-link)**
+- **[optimze](https://hoxtan.developmentalphawizz.com/deploy/optimize-clear)**
+- **[storagelink](https://hoxtan.developmentalphawizz.com/deploy/storage-link)**
 ## Contributing
 
 Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
