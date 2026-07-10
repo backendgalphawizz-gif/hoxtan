@@ -6,6 +6,7 @@ use App\Models\Driver;
 use App\Models\JewelleryOrder;
 use App\Models\OldGoldBooking;
 use App\Support\DriverTaskPayload;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
