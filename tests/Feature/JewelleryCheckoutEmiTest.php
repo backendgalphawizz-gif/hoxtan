@@ -220,6 +220,51 @@ class JewelleryCheckoutEmiTest extends TestCase
         ]);
     }
 
+    public function test_buy_now_with_full_payment_does_not_error(): void
+    {
+        $user = User::factory()->create(['phone' => '9876543227', 'mpin' => '1234']);
+        Sanctum::actingAs($user);
+
+        $address = UserAddress::query()->create([
+            'user_id' => $user->id,
+            'address_type' => 'home',
+            'is_default' => true,
+            'full_name' => 'Test User',
+            'address_line' => 'MG Road',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'pincode' => '400001',
+            'phone' => '9876543227',
+        ]);
+
+        $product = JewelleryProduct::query()->create([
+            'name' => 'Gold Ring',
+            'metal_type' => 'gold',
+            'purity' => '22K',
+            'weight_grams' => 10,
+            'price' => 100000,
+            'stock_status' => 'in_stock',
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/v1/jewellery/checkout/buy-now', [
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'address_id' => $address->id,
+            'payment_type' => 'full',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.order.payment_type', 'full')
+            ->assertJsonPath('data.order.emi.tenure_months', null);
+
+        $this->assertDatabaseHas('jewellery_orders', [
+            'user_id' => $user->id,
+            'payment_mode' => 'full',
+            'jewellery_emi_plan_id' => null,
+            'emi_tenure' => null,
+        ]);
+    }
+
     public function test_tenure_and_total_emi_cost_are_required_when_payment_type_is_emi_without_plan(): void
     {
         $user = User::factory()->create(['phone' => '9876543222', 'mpin' => '1234']);

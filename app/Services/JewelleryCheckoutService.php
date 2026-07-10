@@ -97,9 +97,10 @@ class JewelleryCheckoutService
         $emiSelection = $paymentType === 'emi'
             ? $this->emi->resolveForCheckout($breakup['total'], $emiPlanId, $tenure, $totalEmiCost)
             : null;
+        $emiFields = $this->emiOrderFields($emiSelection);
 
         /** @var JewelleryOrder $order */
-        $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery, $paymentType, $emiSelection): JewelleryOrder {
+        $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery, $paymentType, $emiFields): JewelleryOrder {
             $order = JewelleryOrder::query()->create([
                 'order_number' => $this->generateOrderNumber(),
                 'user_id' => $user->id,
@@ -112,10 +113,10 @@ class JewelleryCheckoutService
                 'discount_amount' => $breakup['discount_amount'],
                 'total_amount' => $breakup['total'],
                 'payment_mode' => $paymentType,
-                'jewellery_emi_plan_id' => $emiSelection['plan']?->id,
-                'emi_tenure' => $emiSelection['tenure_months'] ?? null,
-                'total_emi_cost' => $emiSelection['total_emi_cost'] ?? null,
-                'monthly_emi_amount' => $emiSelection['monthly_emi_amount'] ?? null,
+                'jewellery_emi_plan_id' => $emiFields['jewellery_emi_plan_id'],
+                'emi_tenure' => $emiFields['emi_tenure'],
+                'total_emi_cost' => $emiFields['total_emi_cost'],
+                'monthly_emi_amount' => $emiFields['monthly_emi_amount'],
                 'status' => 'pending',
                 'shipping_address' => AddressPayload::make($address)['full_address'],
                 'shipping_name' => $address->full_name,
@@ -150,9 +151,9 @@ class JewelleryCheckoutService
 
         $emi = $this->emiContext(
             $breakup['total'],
-            $emiSelection['plan']?->id ?? $emiPlanId,
-            $emiSelection['tenure_months'] ?? $tenure,
-            $emiSelection['total_emi_cost'] ?? $totalEmiCost,
+            $emiFields['jewellery_emi_plan_id'] ?? $emiPlanId,
+            $emiFields['emi_tenure'] ?? $tenure,
+            $emiFields['total_emi_cost'] ?? $totalEmiCost,
         );
 
         return [
@@ -358,6 +359,34 @@ class JewelleryCheckoutService
         return [
             'options' => $options,
             'selected' => $selected,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $emiSelection
+     * @return array{
+     *     jewellery_emi_plan_id: ?int,
+     *     emi_tenure: ?int,
+     *     total_emi_cost: ?float,
+     *     monthly_emi_amount: ?float
+     * }
+     */
+    protected function emiOrderFields(?array $emiSelection): array
+    {
+        if ($emiSelection === null) {
+            return [
+                'jewellery_emi_plan_id' => null,
+                'emi_tenure' => null,
+                'total_emi_cost' => null,
+                'monthly_emi_amount' => null,
+            ];
+        }
+
+        return [
+            'jewellery_emi_plan_id' => $emiSelection['plan']?->id,
+            'emi_tenure' => $emiSelection['tenure_months'] ?? null,
+            'total_emi_cost' => $emiSelection['total_emi_cost'] ?? null,
+            'monthly_emi_amount' => $emiSelection['monthly_emi_amount'] ?? null,
         ];
     }
 
