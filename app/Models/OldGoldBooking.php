@@ -101,14 +101,20 @@ class OldGoldBooking extends Model
     }
 
     /**
-     * Driver pickup routes accept either the numeric id or booking_number (e.g. SELL96309).
+     * Driver and customer APIs accept numeric id or booking_number (e.g. SELL96309).
      */
-    public function resolveRouteBinding($value, $field = null): ?static
+    public function resolveRouteBindingQuery($query, $value, $field = null)
     {
-        if (ctype_digit((string) $value)) {
-            return static::query()->whereKey($value)->first();
+        if ($field !== null) {
+            return parent::resolveRouteBindingQuery($query, $value, $field);
         }
 
-        return static::query()->where('booking_number', $value)->first();
+        $identifier = ltrim((string) $value, '#');
+
+        if (ctype_digit($identifier)) {
+            return $query->whereKey($identifier);
+        }
+
+        return $query->where('booking_number', $identifier);
     }
 }

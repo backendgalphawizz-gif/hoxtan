@@ -84,6 +84,37 @@ class AppConfigApiTest extends TestCase
         $this->get('/delete-account')->assertOk()->assertSee('Delete Your Account');
     }
 
+    public function test_embed_pages_show_content_without_header_or_footer(): void
+    {
+        StaticPage::query()->create([
+            'title' => 'Privacy Policy',
+            'slug' => 'privacy-policy',
+            'content' => '<h2>Introduction</h2><p>Privacy content only.</p>',
+            'is_published' => true,
+        ]);
+
+        StaticPage::query()->create([
+            'title' => 'Delete Your Account',
+            'slug' => 'delete-account',
+            'content' => '<h2>Delete your account</h2><p>Delete account instructions only.</p>',
+            'is_published' => true,
+        ]);
+
+        $this->get('/embed/privacy-policy')
+            ->assertOk()
+            ->assertSee('Introduction')
+            ->assertSee('Privacy content only.')
+            ->assertDontSee('Get the App')
+            ->assertDontSee('All rights reserved');
+
+        $this->get('/embed/delete-account')
+            ->assertOk()
+            ->assertSee('Delete your account')
+            ->assertSee('Delete account instructions only.')
+            ->assertDontSee('Get the App')
+            ->assertDontSee('All rights reserved');
+    }
+
     public function test_faqs_endpoint_supports_search_and_category_filter(): void
     {
         Faq::query()->create([

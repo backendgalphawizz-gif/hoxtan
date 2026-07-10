@@ -236,6 +236,10 @@ class DriverTaskPayload
             ? 'driver/tasks/deliveries/'.$id
             : 'driver/tasks/pickups/'.$id;
 
+        $detailApiPath = $taskType === 'delivery'
+            ? '/api/v1/driver/tasks/deliveries/'.$id
+            : '/api/v1/driver/tasks/pickups/'.$id;
+
         return [
             'id' => $id,
             'task_type' => $taskType,
@@ -244,6 +248,7 @@ class DriverTaskPayload
             'order_id' => $orderId,
             'pickup_id' => $pickupId,
             'detail_path' => $detailPath,
+            'detail_api_path' => $detailApiPath,
             'reference_id' => $referenceId,
             'reference_display' => $referenceDisplay,
             'scheduled_at' => $scheduled?->toIso8601String(),

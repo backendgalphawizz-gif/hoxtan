@@ -25,6 +25,8 @@ return [
     'play_store' => [
         'privacy_policy_url' => '/privacy-policy',
         'delete_account_url' => '/delete-account',
+        'privacy_policy_embed_url' => '/embed/privacy-policy',
+        'delete_account_embed_url' => '/embed/delete-account',
     ],
 
     'faqs_screen' => [

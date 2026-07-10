@@ -128,6 +128,7 @@ class AppConfigPayload
             'title' => $page?->title ?? ($config['title'] ?? 'Privacy Policy'),
             'content' => $page?->content,
             'url' => url(config('app_content.play_store.privacy_policy_url', '/privacy-policy')),
+            'embed_url' => url(config('app_content.play_store.privacy_policy_embed_url', '/embed/privacy-policy')),
             'privacy_support_email' => $settings->get('support_email', $config['privacy_support_email'] ?? 'privacy@hoxtan.com'),
             'updated_at' => $page?->updated_at?->toIso8601String(),
         ]);
@@ -141,13 +142,19 @@ class AppConfigPayload
             'title' => $page?->title ?? ($config['title'] ?? 'Delete Your Account'),
             'content' => $page?->content,
             'url' => url(config('app_content.play_store.delete_account_url', '/delete-account')),
+            'embed_url' => url(config('app_content.play_store.delete_account_embed_url', '/embed/delete-account')),
             'support_email' => $settings->get('support_email', $config['support_email'] ?? 'support@hoxtandigigold.com'),
             'updated_at' => $page?->updated_at?->toIso8601String(),
         ]);
     }
 
     /**
-     * @return array{privacy_policy_url: string, delete_account_url: string}
+     * @return array{
+     *     privacy_policy_url: string,
+     *     delete_account_url: string,
+     *     privacy_policy_embed_url: string,
+     *     delete_account_embed_url: string
+     * }
      */
     public static function playStoreUrls(): array
     {
@@ -156,6 +163,8 @@ class AppConfigPayload
         return [
             'privacy_policy_url' => url($playStore['privacy_policy_url'] ?? '/privacy-policy'),
             'delete_account_url' => url($playStore['delete_account_url'] ?? '/delete-account'),
+            'privacy_policy_embed_url' => url($playStore['privacy_policy_embed_url'] ?? '/embed/privacy-policy'),
+            'delete_account_embed_url' => url($playStore['delete_account_embed_url'] ?? '/embed/delete-account'),
         ];
     }
 }

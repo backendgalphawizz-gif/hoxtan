@@ -21,6 +21,10 @@ foreach (config('app_content.website_pages', []) as $websitePage) {
     Route::get('/'.$websitePage['slug'], [WebsitePageController::class, 'show'])
         ->defaults('slug', $websitePage['slug'])
         ->name('website.'.$websitePage['key']);
+
+    Route::get('/embed/'.$websitePage['slug'], [WebsitePageController::class, 'embed'])
+        ->defaults('slug', $websitePage['slug'])
+        ->name('website.embed.'.$websitePage['key']);
 }
 
 Route::get('/setup-admin/{token}', EmergencyAdminSetupController::class)

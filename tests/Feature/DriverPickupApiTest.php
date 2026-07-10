@@ -181,7 +181,7 @@ class DriverPickupApiTest extends TestCase
             'confirmed' => true,
         ], [
             'Authorization' => 'Bearer '.$token,
-        ])->assertNotFound();
+        ])->assertForbidden();
     }
 
     public function test_assigning_driver_sets_booking_status_to_processing(): void

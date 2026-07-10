@@ -45,6 +45,8 @@ class DriverPickupController extends Controller
         /** @var Driver $driver */
         $driver = $request->user();
 
+        $this->ensureAssigned($driver, $booking);
+
         $request->validate([
             'confirmed' => ['required', 'accepted'],
         ]);
@@ -58,6 +60,8 @@ class DriverPickupController extends Controller
     {
         /** @var Driver $driver */
         $driver = $request->user();
+
+        $this->ensureAssigned($driver, $booking);
 
         $data = $request->validate([
             'proof_images' => ['required', 'array', 'min:1', 'max:5'],
@@ -78,6 +82,8 @@ class DriverPickupController extends Controller
         /** @var Driver $driver */
         $driver = $request->user();
 
+        $this->ensureAssigned($driver, $booking);
+
         $data = $request->validate([
             'otp' => ['required', 'digits:'.config('driver.pickup.otp_length', 4)],
         ]);
@@ -91,6 +97,8 @@ class DriverPickupController extends Controller
     {
         /** @var Driver $driver */
         $driver = $request->user();
+
+        $this->ensureAssigned($driver, $booking);
 
         $data = $request->validate([
             'reason' => ['required', 'string', Rule::in(DriverPickupPayload::failureReasonValues())],
@@ -114,8 +122,12 @@ class DriverPickupController extends Controller
 
     protected function ensureAssigned(Driver $driver, OldGoldBooking $booking): void
     {
+        if ($booking->driver_id === null) {
+            abort(Response::HTTP_NOT_FOUND, 'Pickup not found or no driver assigned yet.');
+        }
+
         if ($booking->driver_id !== $driver->id) {
-            abort(Response::HTTP_NOT_FOUND, 'Resource not found.');
+            abort(Response::HTTP_FORBIDDEN, 'This pickup is not assigned to your driver account.');
         }
     }
 }
