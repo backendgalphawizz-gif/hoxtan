@@ -176,6 +176,11 @@ class JewelleryOrderResource extends Resource
                             ->dehydrated(false)
                             ->native(false)
                             ->visible(fn (Forms\Get $get): bool => filled($get('driver_id'))),
+                        Forms\Components\TextInput::make('delivery_otp')
+                            ->label('Delivery OTP')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->placeholder('—'),
                         Forms\Components\TextInput::make('tracking_number')
                             ->label('Tracking Number')
                             ->maxLength(100)

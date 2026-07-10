@@ -125,14 +125,6 @@ class DriverPickupPayload
             ];
         }
 
-        if (filled($booking->driver_accepted_at)) {
-            return [
-                'key' => 'accepted',
-                'label' => $statuses['accepted']['label'] ?? 'Accepted',
-                'color' => $statuses['accepted']['color'] ?? 'warning',
-            ];
-        }
-
         return [
             'key' => 'processing',
             'label' => $statuses['processing']['label'] ?? 'Processing',
@@ -160,10 +152,6 @@ class DriverPickupPayload
 
         return match ($statusKey) {
             'processing' => [
-                self::action('accept_pickup', 'Accept Pickup', $booking, 'accept'),
-                self::action('unable_to_pickup', 'Unable to pickup', $booking, 'unable-to-pickup'),
-            ],
-            'accepted' => [
                 self::action('verify_customer', 'Verify Customer & Jewellery', $booking, 'verify-customer'),
                 self::action('unable_to_pickup', 'Unable to pickup', $booking, 'unable-to-pickup'),
             ],

@@ -87,7 +87,6 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/tasks/deliveries/{order}/unable-to-deliver', [DriverDeliveryController::class, 'markUnableToDeliver']);
             Route::get('/pickups/config', [DriverPickupController::class, 'config']);
             Route::get('/tasks/pickups/{booking}', [DriverPickupController::class, 'show']);
-            Route::post('/tasks/pickups/{booking}/accept', [DriverPickupController::class, 'accept']);
             Route::post('/tasks/pickups/{booking}/verify-customer', [DriverPickupController::class, 'verifyCustomer']);
             Route::post('/tasks/pickups/{booking}/upload-proof', [DriverPickupController::class, 'uploadProof']);
             Route::post('/tasks/pickups/{booking}/verify-otp', [DriverPickupController::class, 'verifyOtp']);

@@ -64,7 +64,6 @@ return [
         ],
         'statuses' => [
             'processing' => ['label' => 'Processing', 'color' => 'muted'],
-            'accepted' => ['label' => 'Accepted', 'color' => 'warning'],
             'verified' => ['label' => 'Verified', 'color' => 'primary'],
             'proof_uploaded' => ['label' => 'Proof Uploaded', 'color' => 'info'],
             'collected' => ['label' => 'Collected', 'color' => 'success'],

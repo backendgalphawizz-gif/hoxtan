@@ -40,16 +40,6 @@ class DriverPickupController extends Controller
         ]);
     }
 
-    public function accept(Request $request, OldGoldBooking $booking): JsonResponse
-    {
-        /** @var Driver $driver */
-        $driver = $request->user();
-
-        $booking = $this->pickupService->acceptPickup($driver, $booking);
-
-        return ApiResponse::success($this->pickupResponse($booking), 'Pickup accepted successfully.');
-    }
-
     public function verifyCustomer(Request $request, OldGoldBooking $booking): JsonResponse
     {
         /** @var Driver $driver */

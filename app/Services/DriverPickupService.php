@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class DriverPickupService
 {
-    public function acceptPickup(Driver $driver, OldGoldBooking $booking): OldGoldBooking
+    public function verifyCustomer(Driver $driver, OldGoldBooking $booking): OldGoldBooking
     {
         $this->ensureAssigned($driver, $booking);
         $this->ensureActivePickup($booking);
@@ -20,34 +20,7 @@ class DriverPickupService
 
         if ($status['key'] !== 'processing') {
             throw ValidationException::withMessages([
-                'pickup' => ['This pickup has already been accepted or can no longer be accepted.'],
-            ]);
-        }
-
-        $updates = [
-            'driver_accepted_at' => now(),
-        ];
-
-        if (in_array($booking->status, ['processing', 'pending', 'pickup_scheduling'], true)) {
-            $updates['status'] = 'accepted';
-            $updates['accepted_at'] = $booking->accepted_at ?? now();
-        }
-
-        $booking->update($updates);
-
-        return $booking->fresh('user');
-    }
-
-    public function verifyCustomer(Driver $driver, OldGoldBooking $booking): OldGoldBooking
-    {
-        $this->ensureAssigned($driver, $booking);
-        $this->ensureActivePickup($booking);
-
-        $status = DriverPickupPayload::resolveStatus($booking);
-
-        if ($status['key'] !== 'accepted') {
-            throw ValidationException::withMessages([
-                'pickup' => ['Customer verification is only available after accepting the pickup.'],
+                'pickup' => ['Customer verification is only available for assigned pickups that are in progress.'],
             ]);
         }
 
@@ -121,7 +94,7 @@ class DriverPickupService
 
         $status = DriverPickupPayload::resolveStatus($booking);
 
-        if (! in_array($status['key'], ['processing', 'accepted', 'verified', 'proof_uploaded'], true)) {
+        if (! in_array($status['key'], ['processing', 'verified', 'proof_uploaded'], true)) {
             throw ValidationException::withMessages([
                 'pickup' => ['This pickup can no longer be marked as undeliverable.'],
             ]);

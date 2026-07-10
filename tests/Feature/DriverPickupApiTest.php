@@ -29,7 +29,6 @@ class DriverPickupApiTest extends TestCase
                     'failure_reasons' => [['value', 'label']],
                     'statuses' => [
                         'processing' => ['label', 'color'],
-                        'accepted' => ['label', 'color'],
                         'verified' => ['label', 'color'],
                         'proof_uploaded' => ['label', 'color'],
                         'collected' => ['label', 'color'],
@@ -55,6 +54,7 @@ class DriverPickupApiTest extends TestCase
             ->assertJsonPath('data.pickup.customer.name', 'Alexander Vance')
             ->assertJsonPath('data.pickup.customer.phone_display', '+91 9834522802')
             ->assertJsonPath('data.pickup.sell_from.label', 'At Home')
+            ->assertJsonPath('data.pickup.available_actions.0.key', 'verify_customer')
             ->assertJsonCount(2, 'data.pickup.available_actions')
             ->assertJsonMissingPath('data.pickup.delivery_otp');
     }
@@ -68,13 +68,6 @@ class DriverPickupApiTest extends TestCase
         $booking = $this->createAssignedPickup($driver, [
             'delivery_otp' => '4321',
         ]);
-
-        $this->postJson('/api/v1/driver/tasks/pickups/'.$booking->id.'/accept', [], [
-            'Authorization' => 'Bearer '.$token,
-        ])
-            ->assertOk()
-            ->assertJsonPath('data.pickup.driver_pickup_status', 'accepted')
-            ->assertJsonPath('message', 'Pickup accepted successfully.');
 
         $this->postJson('/api/v1/driver/tasks/pickups/'.$booking->id.'/verify-customer', [
             'confirmed' => true,
@@ -108,7 +101,6 @@ class DriverPickupApiTest extends TestCase
         $booking->refresh();
         $this->assertSame('picked_up', $booking->status);
         $this->assertNotNull($booking->picked_up_at);
-        $this->assertNotNull($booking->driver_accepted_at);
         $this->assertNotNull($booking->customer_verified_at);
         $this->assertCount(2, $booking->pickup_proof_images);
     }
@@ -118,7 +110,6 @@ class DriverPickupApiTest extends TestCase
         $token = $this->driverAuthToken(['phone' => '9876543603']);
         $driver = Driver::query()->where('phone', '9876543603')->firstOrFail();
         $booking = $this->createAssignedPickup($driver, [
-            'driver_accepted_at' => now(),
             'customer_verified_at' => now(),
             'pickup_proof_images' => ['pickup-proofs/test.jpg'],
             'delivery_otp' => '1111',
@@ -163,7 +154,9 @@ class DriverPickupApiTest extends TestCase
         ]);
         $booking = $this->createAssignedPickup($otherDriver);
 
-        $this->postJson('/api/v1/driver/tasks/pickups/'.$booking->id.'/accept', [], [
+        $this->postJson('/api/v1/driver/tasks/pickups/'.$booking->id.'/verify-customer', [
+            'confirmed' => true,
+        ], [
             'Authorization' => 'Bearer '.$token,
         ])->assertNotFound();
     }

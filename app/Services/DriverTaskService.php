@@ -390,11 +390,15 @@ class DriverTaskService
                 ->map(fn (JewelleryOrder $order) => DriverTaskPayload::fromDelivery($order));
         }
 
-        if ($type !== 'delivery' && ($type === 'pickup' || $status === 'all')) {
+        if ($type !== 'delivery' && $type !== 'order' && $type !== 'orders') {
             $pickupQuery = $this->assignedPickupsQuery($driver)
                 ->with('user');
 
             $this->applyPickupSearch($pickupQuery, $search);
+
+            if ($status !== 'all') {
+                $this->applyPickupDeliveriesSectionStatusFilter($pickupQuery, $status);
+            }
 
             $pickups = $pickupQuery
                 ->get()
@@ -473,6 +477,42 @@ class DriverTaskService
             'cancelled' => $query->where(function (Builder $builder): void {
                 $builder
                     ->whereNotNull('delivery_failure_reason')
+                    ->orWhereIn('status', ['cancelled', 'failed']);
+            }),
+            default => null,
+        };
+    }
+
+    /**
+     * @param  Relation<OldGoldBooking, Driver>  $query
+     */
+    protected function applyPickupDeliveriesSectionStatusFilter(Relation $query, string $status): void
+    {
+        match ($status) {
+            'new' => $query
+                ->where('status', 'processing')
+                ->whereNull('picked_up_at')
+                ->whereNull('pickup_failure_reason'),
+            'accepted' => $query
+                ->whereNull('picked_up_at')
+                ->whereNull('pickup_failure_reason')
+                ->whereNotIn('status', ['cancelled', 'failed', 'completed', 'picked_up']),
+            'picked_up' => $query
+                ->where(function (Builder $builder): void {
+                    $builder
+                        ->where('status', 'picked_up')
+                        ->orWhereNotNull('picked_up_at');
+                })
+                ->whereNull('pickup_failure_reason')
+                ->whereNotIn('status', ['cancelled', 'failed', 'completed']),
+            'delivered' => $query->where(function (Builder $builder): void {
+                $builder
+                    ->where('status', 'completed')
+                    ->orWhereNotNull('completed_at');
+            }),
+            'cancelled' => $query->where(function (Builder $builder): void {
+                $builder
+                    ->whereNotNull('pickup_failure_reason')
                     ->orWhereIn('status', ['cancelled', 'failed']);
             }),
             default => null,
