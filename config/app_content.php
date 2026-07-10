@@ -16,6 +16,10 @@ return [
         ['key' => 'about', 'slug' => 'about-us', 'label' => 'About Us'],
         ['key' => 'terms', 'slug' => 'terms-and-conditions', 'label' => 'Terms & Conditions'],
         ['key' => 'privacy', 'slug' => 'privacy-policy', 'label' => 'Privacy Policy'],
+        ['key' => 'user_terms', 'slug' => 'user-terms-and-conditions', 'label' => 'User Terms & Conditions'],
+        ['key' => 'user_privacy', 'slug' => 'user-privacy-policy', 'label' => 'User Privacy Policy'],
+        ['key' => 'driver_terms', 'slug' => 'driver-terms-and-conditions', 'label' => 'Driver Terms & Conditions'],
+        ['key' => 'driver_privacy', 'slug' => 'driver-privacy-policy', 'label' => 'Driver Privacy Policy'],
         ['key' => 'delete_account', 'slug' => 'delete-account', 'label' => 'Delete Account'],
     ],
 
@@ -27,6 +31,62 @@ return [
         'delete_account_url' => '/delete-account',
         'privacy_policy_embed_url' => '/embed/privacy-policy',
         'delete_account_embed_url' => '/embed/delete-account',
+    ],
+
+    'user_play_store' => [
+        'privacy_policy_url' => '/user-privacy-policy',
+        'terms_url' => '/user-terms-and-conditions',
+        'privacy_policy_embed_url' => '/embed/user-privacy-policy',
+        'terms_embed_url' => '/embed/user-terms-and-conditions',
+    ],
+
+    'driver_play_store' => [
+        'privacy_policy_url' => '/driver-privacy-policy',
+        'terms_url' => '/driver-terms-and-conditions',
+        'privacy_policy_embed_url' => '/embed/driver-privacy-policy',
+        'terms_embed_url' => '/embed/driver-terms-and-conditions',
+    ],
+
+    /*
+    | Legal pages for user app (CMS slugs). Falls back to legacy slugs when needed.
+    */
+    'user_privacy' => [
+        'slug' => 'user-privacy-policy',
+        'fallback_slug' => 'privacy-policy',
+        'title' => 'Privacy Policy',
+        'url_path' => '/user-privacy-policy',
+        'embed_url_path' => '/embed/user-privacy-policy',
+        'tagline' => 'Your trust is our most valuable asset.',
+        'privacy_support_email' => 'privacy@hoxtan.com',
+    ],
+
+    'user_terms' => [
+        'slug' => 'user-terms-and-conditions',
+        'fallback_slug' => 'terms-and-conditions',
+        'title' => 'Terms & Conditions',
+        'url_path' => '/user-terms-and-conditions',
+        'embed_url_path' => '/embed/user-terms-and-conditions',
+        'version' => 'V.4.02',
+        'acceptance_label' => 'I have read and agree to the Terms & Conditions.',
+        'accept_button_label' => 'Accept & Continue',
+    ],
+
+    'driver_privacy' => [
+        'slug' => 'driver-privacy-policy',
+        'title' => 'Driver Privacy Policy',
+        'url_path' => '/driver-privacy-policy',
+        'embed_url_path' => '/embed/driver-privacy-policy',
+        'tagline' => 'How we protect driver data on the HOXTAN Driver app.',
+    ],
+
+    'driver_terms' => [
+        'slug' => 'driver-terms-and-conditions',
+        'title' => 'Driver Terms & Conditions',
+        'url_path' => '/driver-terms-and-conditions',
+        'embed_url_path' => '/embed/driver-terms-and-conditions',
+        'version' => 'V.1.0',
+        'acceptance_label' => 'I have read and agree to the Driver Terms & Conditions.',
+        'accept_button_label' => 'Accept & Continue',
     ],
 
     'faqs_screen' => [
@@ -143,6 +203,8 @@ return [
     'delete_account' => [
         'slug' => 'delete-account',
         'title' => 'Delete Your Account',
+        'url_path' => '/delete-account',
+        'embed_url_path' => '/embed/delete-account',
         'support_email' => 'support@hoxtandigigold.com',
         'steps' => [
             'Open the app and sign in.',

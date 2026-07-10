@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\Faq;
-use App\Models\StaticPage;
 use App\Services\AppSettingService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -17,21 +16,6 @@ class AppConfigPayload
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
-
-        $termsPage = StaticPage::query()
-            ->where('slug', config('app_content.terms.slug', 'terms-and-conditions'))
-            ->where('is_published', true)
-            ->first();
-
-        $privacyPage = StaticPage::query()
-            ->where('slug', config('app_content.privacy.slug', 'privacy-policy'))
-            ->where('is_published', true)
-            ->first();
-
-        $deleteAccountPage = StaticPage::query()
-            ->where('slug', config('app_content.delete_account.slug', 'delete-account'))
-            ->where('is_published', true)
-            ->first();
 
         return [
             'app' => [
@@ -50,9 +34,9 @@ class AppConfigPayload
                 'status_filters' => config('support.filters', []),
                 'customer_care' => self::customerCare($settings),
             ],
-            'terms' => self::terms($termsPage),
-            'privacy' => self::privacy($privacyPage, $settings),
-            'delete_account' => self::deleteAccount($deleteAccountPage, $settings),
+            'terms' => self::userTerms($settings),
+            'privacy' => self::userPrivacy($settings),
+            'delete_account' => self::deleteAccount($settings),
         ];
     }
 
@@ -109,43 +93,25 @@ class AppConfigPayload
         ];
     }
 
-    protected static function terms(?StaticPage $page): array
+    protected static function userTerms(AppSettingService $settings): array
     {
-        $config = config('app_content.terms', []);
-
-        return array_merge($config, [
-            'title' => $page?->title ?? ($config['title'] ?? 'Terms & Conditions'),
-            'content' => $page?->content,
-            'updated_at' => $page?->updated_at?->toIso8601String(),
-        ]);
+        return array_merge(
+            config('app_content.terms', []),
+            LegalPagePayload::make('user_terms', $settings),
+        );
     }
 
-    protected static function privacy(?StaticPage $page, AppSettingService $settings): array
+    protected static function userPrivacy(AppSettingService $settings): array
     {
-        $config = config('app_content.privacy', []);
-
-        return array_merge($config, [
-            'title' => $page?->title ?? ($config['title'] ?? 'Privacy Policy'),
-            'content' => $page?->content,
-            'url' => url(config('app_content.play_store.privacy_policy_url', '/privacy-policy')),
-            'embed_url' => url(config('app_content.play_store.privacy_policy_embed_url', '/embed/privacy-policy')),
-            'privacy_support_email' => $settings->get('support_email', $config['privacy_support_email'] ?? 'privacy@hoxtan.com'),
-            'updated_at' => $page?->updated_at?->toIso8601String(),
-        ]);
+        return array_merge(
+            config('app_content.privacy', []),
+            LegalPagePayload::make('user_privacy', $settings),
+        );
     }
 
-    protected static function deleteAccount(?StaticPage $page, AppSettingService $settings): array
+    protected static function deleteAccount(AppSettingService $settings): array
     {
-        $config = config('app_content.delete_account', []);
-
-        return array_merge($config, [
-            'title' => $page?->title ?? ($config['title'] ?? 'Delete Your Account'),
-            'content' => $page?->content,
-            'url' => url(config('app_content.play_store.delete_account_url', '/delete-account')),
-            'embed_url' => url(config('app_content.play_store.delete_account_embed_url', '/embed/delete-account')),
-            'support_email' => $settings->get('support_email', $config['support_email'] ?? 'support@hoxtandigigold.com'),
-            'updated_at' => $page?->updated_at?->toIso8601String(),
-        ]);
+        return LegalPagePayload::make('delete_account', $settings);
     }
 
     /**
@@ -153,17 +119,22 @@ class AppConfigPayload
      *     privacy_policy_url: string,
      *     delete_account_url: string,
      *     privacy_policy_embed_url: string,
-     *     delete_account_embed_url: string
+     *     delete_account_embed_url: string,
+     *     terms_url: string,
+     *     terms_embed_url: string
      * }
      */
     public static function playStoreUrls(): array
     {
         $playStore = config('app_content.play_store', []);
+        $userPlayStore = config('app_content.user_play_store', []);
 
         return [
-            'privacy_policy_url' => url($playStore['privacy_policy_url'] ?? '/privacy-policy'),
+            'privacy_policy_url' => url($userPlayStore['privacy_policy_url'] ?? $playStore['privacy_policy_url'] ?? '/user-privacy-policy'),
+            'terms_url' => url($userPlayStore['terms_url'] ?? '/user-terms-and-conditions'),
             'delete_account_url' => url($playStore['delete_account_url'] ?? '/delete-account'),
-            'privacy_policy_embed_url' => url($playStore['privacy_policy_embed_url'] ?? '/embed/privacy-policy'),
+            'privacy_policy_embed_url' => url($userPlayStore['privacy_policy_embed_url'] ?? $playStore['privacy_policy_embed_url'] ?? '/embed/user-privacy-policy'),
+            'terms_embed_url' => url($userPlayStore['terms_embed_url'] ?? '/embed/user-terms-and-conditions'),
             'delete_account_embed_url' => url($playStore['delete_account_embed_url'] ?? '/embed/delete-account'),
         ];
     }

@@ -73,12 +73,24 @@ class AppConfigController extends Controller
             'updated_at' => $page->updated_at?->toIso8601String(),
         ];
 
-        if ($slug === config('app_content.terms.slug')) {
+        if ($slug === config('app_content.terms.slug')
+            || $slug === config('app_content.user_terms.slug')
+            || $slug === config('app_content.user_terms.fallback_slug')) {
             $payload = array_merge(config('app_content.terms', []), $payload);
         }
 
-        if ($slug === config('app_content.privacy.slug')) {
+        if ($slug === config('app_content.privacy.slug')
+            || $slug === config('app_content.user_privacy.slug')
+            || $slug === config('app_content.user_privacy.fallback_slug')) {
             $payload = array_merge(config('app_content.privacy', []), $payload);
+        }
+
+        if ($slug === config('app_content.driver_terms.slug')) {
+            $payload = array_merge(config('app_content.driver_terms', []), $payload);
+        }
+
+        if ($slug === config('app_content.driver_privacy.slug')) {
+            $payload = array_merge(config('app_content.driver_privacy', []), $payload);
         }
 
         if ($slug === config('app_content.delete_account.slug')) {

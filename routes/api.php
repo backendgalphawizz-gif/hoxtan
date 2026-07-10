@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Driver\DriverAppConfigController;
 use App\Http\Controllers\Api\Driver\DriverAuthController;
 use App\Http\Controllers\Api\Driver\DriverDeliveriesController;
 use App\Http\Controllers\Api\Driver\DriverDeliveryController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\JewelleryCheckoutController;
 use App\Http\Controllers\Api\JewelleryController;
 use App\Http\Controllers\Api\KycController;
 use App\Http\Controllers\Api\LoginController;
+use App\Http\Controllers\Api\MetalPurchaseController;
 use App\Http\Controllers\Api\MetalRateController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProfileController;
@@ -64,6 +66,7 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/forgot-mpin/set-mpin', [ForgotMpinController::class, 'setMpin']);
 
     Route::prefix('driver')->group(function (): void {
+        Route::get('/app/config', [DriverAppConfigController::class, 'index']);
         Route::get('/login/config', [DriverAuthController::class, 'config']);
         Route::post('/login/send-otp', [DriverAuthController::class, 'sendOtp']);
         Route::post('/login/resend-otp', [DriverAuthController::class, 'resendOtp']);
@@ -86,11 +89,16 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/tasks/deliveries/{order}/verify-delivery', [DriverDeliveryController::class, 'verifyDelivery']);
             Route::post('/tasks/deliveries/{order}/unable-to-deliver', [DriverDeliveryController::class, 'markUnableToDeliver']);
             Route::get('/pickups/config', [DriverPickupController::class, 'config']);
-            Route::get('/tasks/pickups/{booking}', [DriverPickupController::class, 'show']);
-            Route::post('/tasks/pickups/{booking}/verify-customer', [DriverPickupController::class, 'verifyCustomer']);
-            Route::post('/tasks/pickups/{booking}/upload-proof', [DriverPickupController::class, 'uploadProof']);
-            Route::post('/tasks/pickups/{booking}/verify-otp', [DriverPickupController::class, 'verifyOtp']);
-            Route::post('/tasks/pickups/{booking}/unable-to-pickup', [DriverPickupController::class, 'markUnableToPickup']);
+            Route::get('/tasks/pickups/{booking}', [DriverPickupController::class, 'show'])
+                ->where('booking', '[A-Za-z0-9#_-]+');
+            Route::post('/tasks/pickups/{booking}/verify-customer', [DriverPickupController::class, 'verifyCustomer'])
+                ->where('booking', '[A-Za-z0-9#_-]+');
+            Route::post('/tasks/pickups/{booking}/upload-proof', [DriverPickupController::class, 'uploadProof'])
+                ->where('booking', '[A-Za-z0-9#_-]+');
+            Route::post('/tasks/pickups/{booking}/verify-otp', [DriverPickupController::class, 'verifyOtp'])
+                ->where('booking', '[A-Za-z0-9#_-]+');
+            Route::post('/tasks/pickups/{booking}/unable-to-pickup', [DriverPickupController::class, 'markUnableToPickup'])
+                ->where('booking', '[A-Za-z0-9#_-]+');
         });
     });
 
@@ -157,6 +165,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/sig/pause', [SigController::class, 'pause']);
         Route::post('/sig/resume', [SigController::class, 'resume']);
         Route::post('/sig/stop', [SigController::class, 'stop']);
+
+        Route::get('/buy-metal/config', [MetalPurchaseController::class, 'config']);
+        Route::post('/buy-metal/estimate', [MetalPurchaseController::class, 'estimate']);
+        Route::post('/buy-metal/purchase', [MetalPurchaseController::class, 'purchase']);
 
         Route::get('/goals/config', [GoalController::class, 'config']);
         Route::get('/goals', [GoalController::class, 'index']);

@@ -42,24 +42,71 @@ class AppConfigApiTest extends TestCase
             'is_published' => true,
         ]);
 
+        StaticPage::query()->create([
+            'title' => 'User Privacy Policy',
+            'slug' => 'user-privacy-policy',
+            'content' => '<p>User privacy content</p>',
+            'is_published' => true,
+        ]);
+
+        StaticPage::query()->create([
+            'title' => 'User Terms & Conditions',
+            'slug' => 'user-terms-and-conditions',
+            'content' => '<p>User terms content</p>',
+            'is_published' => true,
+        ]);
+
         $response = $this->getJson('/api/v1/app/config');
 
         $response->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.privacy.slug', 'user-privacy-policy')
+            ->assertJsonPath('data.terms.slug', 'user-terms-and-conditions')
             ->assertJsonPath('data.faqs_screen.headline', 'How may we assist you?')
             ->assertJsonPath('data.terms.version', 'V.4.02')
             ->assertJsonPath('data.privacy.tagline', 'Your trust is our most valuable asset.')
             ->assertJsonStructure([
                 'data' => [
                     'app',
-                    'play_store' => ['privacy_policy_url', 'delete_account_url'],
+                    'play_store' => ['privacy_policy_url', 'delete_account_url', 'terms_url'],
                     'faq_categories',
                     'faqs',
                     'concierge',
                     'support',
-                    'terms' => ['sections', 'agreement_summary'],
-                    'privacy' => ['sections', 'url'],
+                    'terms' => ['sections', 'agreement_summary', 'url', 'slug'],
+                    'privacy' => ['sections', 'url', 'slug'],
                     'delete_account' => ['url', 'steps'],
+                ],
+            ]);
+    }
+
+    public function test_driver_app_config_returns_driver_privacy_and_terms(): void
+    {
+        StaticPage::query()->create([
+            'title' => 'Driver Privacy Policy',
+            'slug' => 'driver-privacy-policy',
+            'content' => '<p>Driver privacy content</p>',
+            'is_published' => true,
+        ]);
+
+        StaticPage::query()->create([
+            'title' => 'Driver Terms & Conditions',
+            'slug' => 'driver-terms-and-conditions',
+            'content' => '<p>Driver terms content</p>',
+            'is_published' => true,
+        ]);
+
+        $this->getJson('/api/v1/driver/app/config')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.privacy.slug', 'driver-privacy-policy')
+            ->assertJsonPath('data.terms.slug', 'driver-terms-and-conditions')
+            ->assertJsonStructure([
+                'data' => [
+                    'app',
+                    'privacy' => ['title', 'content', 'url', 'embed_url'],
+                    'terms' => ['title', 'content', 'url', 'embed_url'],
+                    'play_store',
                 ],
             ]);
     }

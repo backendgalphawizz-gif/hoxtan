@@ -43,7 +43,7 @@ class StaticPageResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Page Details')
-                    ->description('Website pages use fixed slugs: about-us, team, terms-and-conditions, privacy-policy, delete-account.')
+                    ->description('Use fixed slugs for website/app legal pages. User app: user-privacy-policy, user-terms-and-conditions. Driver app: driver-privacy-policy, driver-terms-and-conditions.')
                     ->schema([
                         Forms\Components\Select::make('website_preset')
                             ->label('Website Page Type')
@@ -73,7 +73,7 @@ class StaticPageResource extends Resource
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->alphaDash()
-                            ->helperText('Use about-us, team, terms-and-conditions, privacy-policy, or delete-account for website pages.'),
+                            ->helperText('Examples: user-privacy-policy, user-terms-and-conditions, driver-privacy-policy, driver-terms-and-conditions, privacy-policy, terms-and-conditions, delete-account.'),
                         Forms\Components\Toggle::make('is_published')
                             ->label('Published')
                             ->default(false),
@@ -94,6 +94,20 @@ class StaticPageResource extends Resource
                 Tables\Columns\TextColumn::make('slug')
                     ->searchable()
                     ->copyable(),
+                Tables\Columns\TextColumn::make('audience')
+                    ->label('App')
+                    ->badge()
+                    ->getStateUsing(fn (StaticPage $record): string => match (true) {
+                        str_starts_with($record->slug, 'driver-') => 'Driver',
+                        str_starts_with($record->slug, 'user-') => 'User',
+                        in_array($record->slug, ['privacy-policy', 'terms-and-conditions', 'delete-account'], true) => 'User',
+                        default => 'Website',
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'Driver' => 'info',
+                        'User' => 'success',
+                        default => 'gray',
+                    }),
                 Tables\Columns\IconColumn::make('is_published')
                     ->boolean()
                     ->label('Published'),

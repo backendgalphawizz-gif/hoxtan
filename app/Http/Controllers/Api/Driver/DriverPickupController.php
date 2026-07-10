@@ -25,13 +25,11 @@ class DriverPickupController extends Controller
         return ApiResponse::success(DriverPickupPayload::config());
     }
 
-    public function show(Request $request, OldGoldBooking $booking): JsonResponse
+    public function show(Request $request, string $booking): JsonResponse
     {
         /** @var Driver $driver */
         $driver = $request->user();
-
-        $this->ensureAssigned($driver, $booking);
-
+        $booking = $this->resolvePickupForDriver($driver, $booking);
         $booking->load('user');
 
         return ApiResponse::success([
@@ -40,12 +38,11 @@ class DriverPickupController extends Controller
         ]);
     }
 
-    public function verifyCustomer(Request $request, OldGoldBooking $booking): JsonResponse
+    public function verifyCustomer(Request $request, string $booking): JsonResponse
     {
         /** @var Driver $driver */
         $driver = $request->user();
-
-        $this->ensureAssigned($driver, $booking);
+        $booking = $this->resolvePickupForDriver($driver, $booking);
 
         $request->validate([
             'confirmed' => ['required', 'accepted'],
@@ -56,12 +53,11 @@ class DriverPickupController extends Controller
         return ApiResponse::success($this->pickupResponse($booking), 'Customer and jewellery verified.');
     }
 
-    public function uploadProof(Request $request, OldGoldBooking $booking): JsonResponse
+    public function uploadProof(Request $request, string $booking): JsonResponse
     {
         /** @var Driver $driver */
         $driver = $request->user();
-
-        $this->ensureAssigned($driver, $booking);
+        $booking = $this->resolvePickupForDriver($driver, $booking);
 
         $data = $request->validate([
             'proof_images' => ['required', 'array', 'min:1', 'max:5'],
@@ -77,12 +73,11 @@ class DriverPickupController extends Controller
         return ApiResponse::success($this->pickupResponse($booking), 'Photo proof uploaded successfully.');
     }
 
-    public function verifyOtp(Request $request, OldGoldBooking $booking): JsonResponse
+    public function verifyOtp(Request $request, string $booking): JsonResponse
     {
         /** @var Driver $driver */
         $driver = $request->user();
-
-        $this->ensureAssigned($driver, $booking);
+        $booking = $this->resolvePickupForDriver($driver, $booking);
 
         $data = $request->validate([
             'otp' => ['required', 'digits:'.config('driver.pickup.otp_length', 4)],
@@ -93,12 +88,11 @@ class DriverPickupController extends Controller
         return ApiResponse::success($this->pickupResponse($booking), 'Jewellery collected successfully.');
     }
 
-    public function markUnableToPickup(Request $request, OldGoldBooking $booking): JsonResponse
+    public function markUnableToPickup(Request $request, string $booking): JsonResponse
     {
         /** @var Driver $driver */
         $driver = $request->user();
-
-        $this->ensureAssigned($driver, $booking);
+        $booking = $this->resolvePickupForDriver($driver, $booking);
 
         $data = $request->validate([
             'reason' => ['required', 'string', Rule::in(DriverPickupPayload::failureReasonValues())],
@@ -120,14 +114,42 @@ class DriverPickupController extends Controller
         ];
     }
 
-    protected function ensureAssigned(Driver $driver, OldGoldBooking $booking): void
+    protected function resolvePickupForDriver(Driver $driver, string $identifier): OldGoldBooking
     {
-        if ($booking->driver_id === null) {
-            abort(Response::HTTP_NOT_FOUND, 'Pickup not found or no driver assigned yet.');
+        $identifier = ltrim(trim($identifier), '#');
+
+        if ($identifier === '') {
+            abort(Response::HTTP_NOT_FOUND, 'Pickup identifier is required.');
         }
 
-        if ($booking->driver_id !== $driver->id) {
-            abort(Response::HTTP_FORBIDDEN, 'This pickup is not assigned to your driver account.');
+        $assignedBooking = OldGoldBooking::query()
+            ->where('driver_id', $driver->id)
+            ->where(function ($query) use ($identifier): void {
+                if (ctype_digit($identifier)) {
+                    $query->whereKey((int) $identifier);
+                } else {
+                    $query->where('booking_number', $identifier);
+                }
+            })
+            ->first();
+
+        if ($assignedBooking) {
+            return $assignedBooking;
         }
+
+        $booking = OldGoldBooking::query()
+            ->when(ctype_digit($identifier), fn ($query) => $query->whereKey((int) $identifier))
+            ->when(! ctype_digit($identifier), fn ($query) => $query->where('booking_number', $identifier))
+            ->first();
+
+        if ($booking === null) {
+            abort(Response::HTTP_NOT_FOUND, 'Pickup not found. Use pickup_id from GET /api/v1/driver/tasks?type=pickup.');
+        }
+
+        if ($booking->driver_id === null) {
+            abort(Response::HTTP_NOT_FOUND, 'No driver assigned to this pickup yet. Ask admin to assign a driver first.');
+        }
+
+        abort(Response::HTTP_FORBIDDEN, 'This pickup is assigned to another driver account.');
     }
 }

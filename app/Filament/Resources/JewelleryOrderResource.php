@@ -350,13 +350,17 @@ class JewelleryOrderResource extends Resource
                     ])
                     ->action(function (JewelleryOrderListing $record, array $data): void {
                         if ($record->isSell()) {
-                            OldGoldBooking::query()
-                                ->whereKey($record->source_id)
-                                ->update(['driver_id' => $data['driver_id']]);
+                            $booking = OldGoldBooking::query()->find($record->source_id);
+
+                            if ($booking) {
+                                $booking->update(['driver_id' => $data['driver_id']]);
+                            }
                         } else {
-                            JewelleryOrder::query()
-                                ->whereKey($record->source_id)
-                                ->update(['driver_id' => $data['driver_id']]);
+                            $order = JewelleryOrder::query()->find($record->source_id);
+
+                            if ($order) {
+                                $order->update(['driver_id' => $data['driver_id']]);
+                            }
                         }
 
                         Notification::make()

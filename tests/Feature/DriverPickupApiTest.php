@@ -181,7 +181,32 @@ class DriverPickupApiTest extends TestCase
             'confirmed' => true,
         ], [
             'Authorization' => 'Bearer '.$token,
-        ])->assertForbidden();
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'This pickup is assigned to another driver account.');
+    }
+
+    public function test_pickup_detail_returns_helpful_message_when_driver_not_assigned(): void
+    {
+        $token = $this->driverAuthToken(['phone' => '9876543612']);
+        $user = User::factory()->create();
+
+        $booking = OldGoldBooking::query()->create([
+            'booking_number' => 'SELL40401',
+            'user_id' => $user->id,
+            'metal_type' => 'gold',
+            'purity' => '22K',
+            'quoted_amount' => 50000,
+            'status' => 'accepted',
+            'pickup_address' => 'Test address',
+            'driver_id' => null,
+        ]);
+
+        $this->getJson('/api/v1/driver/tasks/pickups/'.$booking->booking_number, [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertNotFound()
+            ->assertJsonPath('message', 'No driver assigned to this pickup yet. Ask admin to assign a driver first.');
     }
 
     public function test_assigning_driver_sets_booking_status_to_processing(): void
