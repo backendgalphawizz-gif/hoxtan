@@ -68,6 +68,58 @@ class JewelleryEmiService
         ];
     }
 
+    /**
+     * @return array{
+     *     plan: ?JewelleryEmiPlan,
+     *     tenure_months: int,
+     *     interest_rate_percent: float,
+     *     total_emi_cost: float,
+     *     monthly_emi_amount: float
+     * }
+     */
+    public function resolveForCheckout(
+        float $orderTotal,
+        ?int $emiPlanId = null,
+        ?int $tenure = null,
+        ?float $totalEmiCost = null,
+    ): array {
+        if ($emiPlanId !== null) {
+            return $this->resolveSelection($emiPlanId, $orderTotal);
+        }
+
+        if ($tenure === null || $totalEmiCost === null) {
+            throw ValidationException::withMessages([
+                'tenure' => ['Tenure is required for EMI checkout.'],
+                'total_emi_cost' => ['Total EMI cost is required for EMI checkout.'],
+            ]);
+        }
+
+        return $this->resolveDirect($tenure, $totalEmiCost);
+    }
+
+    /**
+     * @return array{
+     *     plan: null,
+     *     tenure_months: int,
+     *     interest_rate_percent: float,
+     *     total_emi_cost: float,
+     *     monthly_emi_amount: float
+     * }
+     */
+    public function resolveDirect(int $tenure, float $totalEmiCost): array
+    {
+        $tenureMonths = max(1, $tenure);
+        $total = round($totalEmiCost, 2);
+
+        return [
+            'plan' => null,
+            'tenure_months' => $tenureMonths,
+            'interest_rate_percent' => 0,
+            'total_emi_cost' => $total,
+            'monthly_emi_amount' => round($total / $tenureMonths, 2),
+        ];
+    }
+
     public function isEligible(JewelleryEmiPlan $plan, float $orderTotal): bool
     {
         if ($plan->min_order_amount === null) {

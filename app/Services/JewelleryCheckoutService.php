@@ -38,13 +38,20 @@ class JewelleryCheckoutService
      *     order_date_display: string
      * }
      */
-    public function summary(User $user, int $productId, int $quantity = 1, ?int $addressId = null, ?int $emiPlanId = null): array
-    {
+    public function summary(
+        User $user,
+        int $productId,
+        int $quantity = 1,
+        ?int $addressId = null,
+        ?int $emiPlanId = null,
+        ?int $tenure = null,
+        ?float $totalEmiCost = null,
+    ): array {
         $product = $this->resolveProduct($productId);
         $address = $this->resolveAddress($user, $addressId);
         $breakup = $this->priceBreakup($product, $quantity);
         $delivery = $this->expectedDelivery();
-        $emi = $this->emiContext($breakup['total'], $emiPlanId);
+        $emi = $this->emiContext($breakup['total'], $emiPlanId, $tenure, $totalEmiCost);
 
         return [
             'product' => JewelleryProductPayload::make($product),
@@ -54,7 +61,7 @@ class JewelleryCheckoutService
             'expected_delivery' => $delivery,
             'order_date' => now()->toDateString(),
             'order_date_display' => now()->format('d F Y'),
-            'payment_modes' => [
+            'payment_types' => [
                 ['key' => 'full', 'label' => 'Pay in Full'],
                 ['key' => 'emi', 'label' => 'EMI'],
             ],
@@ -78,19 +85,21 @@ class JewelleryCheckoutService
         int $productId,
         int $quantity = 1,
         ?int $addressId = null,
-        string $paymentMode = 'full',
+        string $paymentType = 'full',
         ?int $emiPlanId = null,
+        ?int $tenure = null,
+        ?float $totalEmiCost = null,
     ): array {
         $product = $this->resolveProduct($productId);
         $address = $this->resolveAddress($user, $addressId, required: true);
         $breakup = $this->priceBreakup($product, $quantity);
         $delivery = $this->expectedDelivery();
-        $emiSelection = $paymentMode === 'emi'
-            ? $this->emi->resolveSelection((int) $emiPlanId, $breakup['total'])
+        $emiSelection = $paymentType === 'emi'
+            ? $this->emi->resolveForCheckout($breakup['total'], $emiPlanId, $tenure, $totalEmiCost)
             : null;
 
         /** @var JewelleryOrder $order */
-        $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery, $paymentMode, $emiSelection): JewelleryOrder {
+        $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery, $paymentType, $emiSelection): JewelleryOrder {
             $order = JewelleryOrder::query()->create([
                 'order_number' => $this->generateOrderNumber(),
                 'user_id' => $user->id,
@@ -102,8 +111,8 @@ class JewelleryCheckoutService
                 'gst_amount' => $breakup['gst_amount'],
                 'discount_amount' => $breakup['discount_amount'],
                 'total_amount' => $breakup['total'],
-                'payment_mode' => $paymentMode,
-                'jewellery_emi_plan_id' => $emiSelection['plan']->id ?? null,
+                'payment_mode' => $paymentType,
+                'jewellery_emi_plan_id' => $emiSelection['plan']?->id,
                 'emi_tenure' => $emiSelection['tenure_months'] ?? null,
                 'total_emi_cost' => $emiSelection['total_emi_cost'] ?? null,
                 'monthly_emi_amount' => $emiSelection['monthly_emi_amount'] ?? null,
@@ -141,7 +150,9 @@ class JewelleryCheckoutService
 
         $emi = $this->emiContext(
             $breakup['total'],
-            $emiSelection !== null ? $emiSelection['plan']->id : $emiPlanId,
+            $emiSelection['plan']?->id ?? $emiPlanId,
+            $emiSelection['tenure_months'] ?? $tenure,
+            $emiSelection['total_emi_cost'] ?? $totalEmiCost,
         );
 
         return [
@@ -152,7 +163,7 @@ class JewelleryCheckoutService
             'expected_delivery' => $delivery,
             'order_date' => $order->created_at?->toDateString() ?? now()->toDateString(),
             'order_date_display' => ($order->created_at ?? now())->format('d F Y'),
-            'payment_modes' => [
+            'payment_types' => [
                 ['key' => 'full', 'label' => 'Pay in Full'],
                 ['key' => 'emi', 'label' => 'EMI'],
             ],
@@ -320,14 +331,28 @@ class JewelleryCheckoutService
      *     selected: ?array<string, mixed>
      * }
      */
-    protected function emiContext(float $orderTotal, ?int $emiPlanId = null): array
-    {
+    protected function emiContext(
+        float $orderTotal,
+        ?int $emiPlanId = null,
+        ?int $tenure = null,
+        ?float $totalEmiCost = null,
+    ): array {
         $options = $this->emi->optionsForAmount($orderTotal);
 
         $selected = null;
 
         if ($emiPlanId !== null) {
             $selected = collect($options)->firstWhere('id', $emiPlanId);
+        } elseif ($tenure !== null && $totalEmiCost !== null) {
+            $direct = $this->emi->resolveDirect($tenure, $totalEmiCost);
+            $selected = [
+                'tenure_months' => $direct['tenure_months'],
+                'tenure_label' => $direct['tenure_months'].' month'.($direct['tenure_months'] === 1 ? '' : 's'),
+                'total_emi_cost' => $direct['total_emi_cost'],
+                'total_emi_cost_display' => '₹'.number_format($direct['total_emi_cost'], 2),
+                'monthly_emi_amount' => $direct['monthly_emi_amount'],
+                'monthly_emi_amount_display' => '₹'.number_format($direct['monthly_emi_amount'], 2),
+            ];
         }
 
         return [
@@ -343,7 +368,7 @@ class JewelleryCheckoutService
             'order_number' => $order->order_number,
             'order_number_display' => '#'.$order->order_number,
             'status' => $order->status,
-            'payment_mode' => $order->payment_mode,
+            'payment_type' => $order->payment_mode,
             'subtotal' => (float) $order->subtotal,
             'metal_value' => (float) $order->metal_value,
             'making_charge_amount' => (float) $order->making_charge_amount,

@@ -563,8 +563,10 @@ class JewelleryOrderResource extends Resource
     {
         return Forms\Components\Select::make('driver_id')
             ->label('Assigned Driver')
-            ->options(function (?OldGoldBooking $record) use ($includeDriverId): array {
-                return Driver::assignmentOptions($includeDriverId ?? $record?->driver_id);
+            ->options(function (?OldGoldBooking $record, Forms\Get $get) use ($includeDriverId): array {
+                return Driver::assignmentOptions(
+                    $includeDriverId ?? $record?->driver_id ?? $get('driver_id'),
+                );
             })
             ->placeholder('Select a driver')
             ->nullable()

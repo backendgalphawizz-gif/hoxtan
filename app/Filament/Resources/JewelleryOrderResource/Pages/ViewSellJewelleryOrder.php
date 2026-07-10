@@ -19,6 +19,8 @@ class ViewSellJewelleryOrder extends ViewRecord
             ->findOrFail($record);
 
         $this->authorizeAccess();
+
+        $this->fillForm();
     }
 
     public function getRecord(): OldGoldBooking

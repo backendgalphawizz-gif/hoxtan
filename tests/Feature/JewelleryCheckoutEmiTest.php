@@ -57,7 +57,7 @@ class JewelleryCheckoutEmiTest extends TestCase
             ->assertOk()
             ->assertJsonStructure([
                 'data' => [
-                    'payment_modes',
+                    'payment_types',
                     'emi' => [
                         'options' => [
                             ['id', 'tenure_months', 'total_emi_cost', 'monthly_emi_amount'],
@@ -70,7 +70,46 @@ class JewelleryCheckoutEmiTest extends TestCase
             ->assertJsonPath('data.emi.selected.tenure_months', 6);
     }
 
-    public function test_buy_now_with_emi_stores_tenure_and_total_emi_cost(): void
+    public function test_checkout_summary_accepts_tenure_and_total_emi_cost(): void
+    {
+        $user = User::factory()->create(['phone' => '9876543225', 'mpin' => '1234']);
+        Sanctum::actingAs($user);
+
+        $address = UserAddress::query()->create([
+            'user_id' => $user->id,
+            'address_type' => 'home',
+            'is_default' => true,
+            'full_name' => 'Test User',
+            'address_line' => 'MG Road',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'pincode' => '400001',
+            'phone' => '9876543225',
+        ]);
+
+        $product = JewelleryProduct::query()->create([
+            'name' => 'Gold Ring',
+            'metal_type' => 'gold',
+            'purity' => '22K',
+            'weight_grams' => 10,
+            'price' => 100000,
+            'stock_status' => 'in_stock',
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/v1/jewellery/checkout/summary?'.http_build_query([
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'address_id' => $address->id,
+            'tenure' => 6,
+            'total_emi_cost' => 166966.56,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.emi.selected.tenure_months', 6)
+            ->assertJsonPath('data.emi.selected.total_emi_cost', 166966.56);
+    }
+
+    public function test_buy_now_with_emi_plan_stores_tenure_and_total_emi_cost(): void
     {
         $user = User::factory()->create(['phone' => '9876543221', 'mpin' => '1234']);
         Sanctum::actingAs($user);
@@ -106,12 +145,12 @@ class JewelleryCheckoutEmiTest extends TestCase
         $response = $this->postJson('/api/v1/jewellery/checkout/buy-now', [
             'product_id' => $product->id,
             'quantity' => 1,
-            'payment_mode' => 'emi',
+            'payment_type' => 'emi',
             'emi_plan_id' => $plan->id,
         ]);
 
         $response->assertCreated()
-            ->assertJsonPath('data.order.payment_mode', 'emi')
+            ->assertJsonPath('data.order.payment_type', 'emi')
             ->assertJsonPath('data.order.emi.tenure_months', 6);
 
         $totalAmount = (float) $response->json('data.order.total_amount');
@@ -131,7 +170,57 @@ class JewelleryCheckoutEmiTest extends TestCase
         ]);
     }
 
-    public function test_emi_plan_id_is_required_when_payment_mode_is_emi(): void
+    public function test_buy_now_with_tenure_and_total_emi_cost_without_plan(): void
+    {
+        $user = User::factory()->create(['phone' => '9876543226', 'mpin' => '1234']);
+        Sanctum::actingAs($user);
+
+        UserAddress::query()->create([
+            'user_id' => $user->id,
+            'address_type' => 'home',
+            'is_default' => true,
+            'full_name' => 'Test User',
+            'address_line' => 'MG Road',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'pincode' => '400001',
+            'phone' => '9876543226',
+        ]);
+
+        $product = JewelleryProduct::query()->create([
+            'name' => 'Gold Chain',
+            'metal_type' => 'gold',
+            'purity' => '22K',
+            'weight_grams' => 8,
+            'price' => 80000,
+            'stock_status' => 'in_stock',
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/v1/jewellery/checkout/buy-now', [
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'payment_type' => 'emi',
+            'tenure' => 6,
+            'total_emi_cost' => 166966.56,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.order.payment_type', 'emi')
+            ->assertJsonPath('data.order.emi.tenure_months', 6)
+            ->assertJsonPath('data.order.emi.total_emi_cost', 166966.56)
+            ->assertJsonPath('data.order.emi.monthly_emi_amount', 27827.76);
+
+        $this->assertDatabaseHas('jewellery_orders', [
+            'user_id' => $user->id,
+            'payment_mode' => 'emi',
+            'jewellery_emi_plan_id' => null,
+            'emi_tenure' => 6,
+            'total_emi_cost' => 166966.56,
+            'monthly_emi_amount' => 27827.76,
+        ]);
+    }
+
+    public function test_tenure_and_total_emi_cost_are_required_when_payment_type_is_emi_without_plan(): void
     {
         $user = User::factory()->create(['phone' => '9876543222', 'mpin' => '1234']);
         Sanctum::actingAs($user);
@@ -160,8 +249,8 @@ class JewelleryCheckoutEmiTest extends TestCase
 
         $this->postJson('/api/v1/jewellery/checkout/buy-now', [
             'product_id' => $product->id,
-            'payment_mode' => 'emi',
+            'payment_type' => 'emi',
         ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['emi_plan_id']);
+            ->assertJsonValidationErrors(['tenure', 'total_emi_cost']);
     }
 }
