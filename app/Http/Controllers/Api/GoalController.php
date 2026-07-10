@@ -96,7 +96,7 @@ class GoalController extends Controller
         return $request->validate([
             'title' => ['required', 'string', 'max:100'],
             'monthly_contribution' => [
-                'required',
+                'nullable',
                 'numeric',
                 'min:'.config('goals.min_monthly_contribution', 100),
             ],

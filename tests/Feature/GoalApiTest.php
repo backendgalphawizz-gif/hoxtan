@@ -66,6 +66,42 @@ class GoalApiTest extends TestCase
             ->assertJsonStructure(['data' => ['goal', 'portfolio']]);
     }
 
+    public function test_monthly_contribution_is_optional_on_create_and_update(): void
+    {
+        $user = User::factory()->create(['phone' => '9876543214', 'mpin' => '1234']);
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/goals', [
+            'title' => 'Wedding Fund',
+            'target_amount' => 150000,
+            'target_date' => now()->addYear()->toDateString(),
+            'metal_type' => 'gold',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.goal.monthly_contribution', null);
+
+        $goal = InvestmentGoal::query()->where('user_id', $user->id)->firstOrFail();
+
+        $this->putJson('/api/v1/goals/'.$goal->id, [
+            'title' => 'Wedding Fund',
+            'target_amount' => 160000,
+            'target_date' => now()->addYears(2)->toDateString(),
+            'metal_type' => 'gold',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.goal.monthly_contribution', null);
+
+        $this->putJson('/api/v1/goals/'.$goal->id, [
+            'title' => 'Wedding Fund',
+            'monthly_contribution' => 3000,
+            'target_amount' => 160000,
+            'target_date' => now()->addYears(2)->toDateString(),
+            'metal_type' => 'gold',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.goal.monthly_contribution', 3000.0);
+    }
+
     public function test_user_can_update_and_delete_goal(): void
     {
         $user = User::factory()->create(['phone' => '9876543211', 'mpin' => '1234']);

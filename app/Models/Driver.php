@@ -77,7 +77,16 @@ class Driver extends Model
      */
     public static function assignableQuery(?int $includeDriverId = null): Builder
     {
-        return static::query()
+        return static::applyAssignableConstraint(static::query(), $includeDriverId);
+    }
+
+    /**
+     * @param  Builder<Driver>  $query
+     * @return Builder<Driver>
+     */
+    public static function applyAssignableConstraint(Builder $query, ?int $includeDriverId = null): Builder
+    {
+        return $query
             ->where(function (Builder $query) use ($includeDriverId): void {
                 $query->where('is_active', true);
 

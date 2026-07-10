@@ -132,12 +132,8 @@ class JewelleryOrderResource extends Resource
                     ])->columns(3),
                 Forms\Components\Section::make('Delivery Tracking')
                     ->schema([
-                        Forms\Components\Select::make('driver_id')
-                            ->label('Assigned Driver')
-                            ->options(fn (?JewelleryOrder $record): array => Driver::assignmentOptions($record?->driver_id))
-                            ->searchable()
-                            ->preload()
-                            ->nullable()
+                        static::driverAssignmentSelect()
+                            ->placeholder('Select a driver')
                             ->helperText('Only active drivers are listed. Online/offline status is shown for reference.'),
                         Forms\Components\DateTimePicker::make('driver_assigned_at')
                             ->label('Driver Assigned At')
@@ -285,13 +281,10 @@ class JewelleryOrderResource extends Resource
                     ->color('info')
                     ->tooltip('Assign Driver')
                     ->visible(fn (JewelleryOrder $record): bool => in_array($record->status, ['pending', 'processing'], true))
-                    ->form([
-                        Forms\Components\Select::make('driver_id')
+                    ->form(fn (JewelleryOrder $record): array => [
+                        static::driverAssignmentSelect($record->driver_id)
                             ->label('Driver')
-                            ->options(fn (JewelleryOrder $record): array => Driver::assignmentOptions($record->driver_id))
-                            ->searchable()
-                            ->required()
-                            ->default(fn (JewelleryOrder $record): ?int => $record->driver_id),
+                            ->required(),
                     ])
                     ->action(function (JewelleryOrder $record, array $data): void {
                         $record->update([
@@ -331,5 +324,40 @@ class JewelleryOrderResource extends Resource
     public static function getNavigationBadgeColor(): ?string
     {
         return 'warning';
+    }
+
+    public static function driverAssignmentSelect(?int $includeDriverId = null): Forms\Components\Select
+    {
+        return Forms\Components\Select::make('driver_id')
+            ->label('Assigned Driver')
+            ->relationship(
+                name: 'driver',
+                titleAttribute: 'name',
+                modifyQueryUsing: fn (Builder $query): Builder => Driver::applyAssignableConstraint(
+                    $query,
+                    $includeDriverId,
+                ),
+            )
+            ->getOptionLabelFromRecordUsing(fn (Driver $record): string => Driver::assignmentOptionLabel($record))
+            ->searchable(['name', 'phone'])
+            ->preload()
+            ->nullable()
+            ->disabled(false)
+            ->live()
+            ->afterStateUpdated(function (?int $state, JewelleryOrder $record, Forms\Set $set, $livewire): void {
+                if (! $livewire instanceof Pages\ViewJewelleryOrder) {
+                    return;
+                }
+
+                $record->update(['driver_id' => $state]);
+                $record->refresh();
+
+                $set('driver_assigned_at', $record->driver_assigned_at);
+
+                Notification::make()
+                    ->title(filled($state) ? 'Driver assigned to order' : 'Driver unassigned from order')
+                    ->success()
+                    ->send();
+            });
     }
 }

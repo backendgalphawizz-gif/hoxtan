@@ -122,7 +122,9 @@ class InvestmentGoalService
             'title' => $data['title'],
             'metal_type' => $metalType,
             'target_amount' => $targetAmount,
-            'monthly_contribution' => (float) $data['monthly_contribution'],
+            'monthly_contribution' => isset($data['monthly_contribution'])
+                ? (float) $data['monthly_contribution']
+                : null,
             'target_grams' => $targetGrams,
             'current_grams' => 0,
             'target_date' => $data['target_date'],
@@ -155,9 +157,13 @@ class InvestmentGoalService
             'title' => $data['title'],
             'metal_type' => $metalType,
             'target_amount' => $targetAmount,
-            'monthly_contribution' => (float) $data['monthly_contribution'],
             'target_grams' => $targetGrams,
             'target_date' => $data['target_date'],
+            ...array_key_exists('monthly_contribution', $data)
+                ? ['monthly_contribution' => $data['monthly_contribution'] !== null
+                    ? (float) $data['monthly_contribution']
+                    : null]
+                : [],
         ]);
 
         $this->syncUserGoals($goal->user);
