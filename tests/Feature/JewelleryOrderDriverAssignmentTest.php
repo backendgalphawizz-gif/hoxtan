@@ -12,6 +12,46 @@ class JewelleryOrderDriverAssignmentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_active_driver_appears_in_assignment_options(): void
+    {
+        $activeDriver = Driver::query()->create([
+            'name' => 'Active Driver',
+            'phone' => '9876543212',
+            'primary_residence' => 'Mumbai',
+            'vehicle_type' => 'bike',
+            'is_active' => true,
+            'is_online' => true,
+        ]);
+
+        Driver::query()->create([
+            'name' => 'Inactive Driver',
+            'phone' => '9876543213',
+            'primary_residence' => 'Mumbai',
+            'vehicle_type' => 'bike',
+            'is_active' => false,
+            'is_online' => false,
+        ]);
+
+        $options = Driver::assignmentOptions();
+
+        $this->assertArrayHasKey($activeDriver->id, $options);
+        $this->assertCount(1, $options);
+        $this->assertStringContainsString('Online', $options[$activeDriver->id]);
+    }
+
+    public function test_new_driver_defaults_to_active_and_online(): void
+    {
+        $driver = Driver::query()->create([
+            'name' => 'Default Driver',
+            'phone' => '9876543214',
+            'primary_residence' => 'Mumbai',
+            'vehicle_type' => 'bike',
+        ]);
+
+        $this->assertTrue($driver->is_active);
+        $this->assertTrue($driver->is_online);
+    }
+
     public function test_assigning_driver_sets_assigned_timestamp(): void
     {
         $user = User::factory()->create();

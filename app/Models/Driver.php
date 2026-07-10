@@ -43,6 +43,16 @@ class Driver extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (Driver $driver): void {
+            if ($driver->is_active === null) {
+                $driver->is_active = true;
+            }
+
+            if ($driver->is_online === null) {
+                $driver->is_online = true;
+            }
+        });
+
         static::saving(function (Driver $driver): void {
             foreach (['phone', 'emergency_no'] as $field) {
                 if (filled($driver->{$field})) {

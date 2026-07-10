@@ -61,7 +61,12 @@ class DriverResource extends Resource
                             ->maxLength(30),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
-                            ->default(true),
+                            ->default(true)
+                            ->helperText('Only active drivers appear in order assignment lists.'),
+                        Forms\Components\Toggle::make('is_online')
+                            ->label('Online')
+                            ->default(true)
+                            ->helperText('Shows availability in assignment lists. Drivers can change this from the app.'),
                         Forms\Components\Textarea::make('notes')
                             ->rows(3)
                             ->columnSpanFull(),
@@ -133,6 +138,9 @@ class DriverResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
                     ->label('Active'),
+                Tables\Columns\IconColumn::make('is_online')
+                    ->boolean()
+                    ->label('Online'),
                 Tables\Columns\TextColumn::make('updated_at')
                     ->dateTime('d M Y')
                     ->sortable(),
