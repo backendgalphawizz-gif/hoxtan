@@ -1711,12 +1711,17 @@ body,
     background: #f9fafb !important;
     border: 1px dashed #d1d5db !important;
     border-radius: 0.75rem !important;
+    aspect-ratio: auto !important;
+    min-height: 7rem !important;
+    max-height: 8rem !important;
+    height: 8rem !important;
 }
 
 .gs-product-images-upload .filepond--drop-label {
     color: var(--gs-text-muted) !important;
     font-size: 0.875rem !important;
-    min-height: 7rem !important;
+    min-height: 0 !important;
+    height: 100% !important;
 }
 
 .gs-product-images-upload .filepond--list-scroller {

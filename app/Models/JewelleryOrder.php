@@ -14,6 +14,7 @@ class JewelleryOrder extends Model
         'user_address_id',
         'driver_id',
         'driver_assigned_at',
+        'picked_up_at',
         'payment_id',
         'subtotal',
         'metal_value',
@@ -38,6 +39,8 @@ class JewelleryOrder extends Model
         'courier_name',
         'dispatched_at',
         'delivered_at',
+        'delivery_failure_reason',
+        'delivery_proof_image',
     ];
 
     protected function casts(): array
@@ -55,6 +58,7 @@ class JewelleryOrder extends Model
             'emi_tenure' => 'integer',
             'expected_delivery_date' => 'date',
             'driver_assigned_at' => 'datetime',
+            'picked_up_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'delivered_at' => 'datetime',
         ];
@@ -67,7 +71,17 @@ class JewelleryOrder extends Model
                 return;
             }
 
-            $order->driver_assigned_at = $order->driver_id ? now() : null;
+            if ($order->driver_id) {
+                $order->driver_assigned_at = now();
+
+                if ($order->status === 'pending') {
+                    $order->status = 'processing';
+                }
+
+                return;
+            }
+
+            $order->driver_assigned_at = null;
         });
     }
 

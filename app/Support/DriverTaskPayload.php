@@ -19,8 +19,9 @@ class DriverTaskPayload
         $weightGrams = $product?->weight_grams;
         $purity = $product?->purity;
         $scheduledAt = $order->driver_assigned_at ?? $order->expected_delivery_date ?? $order->created_at;
+        $driverStatus = DriverDeliveryPayload::resolveStatus($order);
 
-        return self::base(
+        return array_merge(self::base(
             id: $order->id,
             taskType: 'delivery',
             taskTypeLabel: 'Assigned Order',
@@ -41,7 +42,11 @@ class DriverTaskPayload
             statusLabel: OrderPayload::statusLabel($order->status),
             isPending: self::isDeliveryPending($order),
             isCompleted: self::isDeliveryCompleted($order),
-        );
+        ), [
+            'driver_delivery_status' => $driverStatus['key'],
+            'driver_delivery_status_label' => $driverStatus['label'],
+            'driver_delivery_status_color' => $driverStatus['color'],
+        ]);
     }
 
     public static function fromPickup(OldGoldBooking $booking): array
@@ -87,6 +92,78 @@ class DriverTaskPayload
         return $tasks
             ->map(fn (array $task): array => collect($task)->except(['sort_at'])->all())
             ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $task
+     * @return array<string, mixed>
+     */
+    public static function forDeliveriesSection(array $task): array
+    {
+        $task = collect($task)->except(['sort_at'])->all();
+
+        $weightGrams = $task['weight_grams'] ?? null;
+        $purity = $task['purity'] ?? null;
+        $specParts = [];
+
+        if ($weightGrams !== null) {
+            $specParts[] = 'Estimated Weight: '.rtrim(rtrim(number_format((float) $weightGrams, 3, '.', ''), '0'), '.').' gm';
+        }
+
+        if (filled($purity)) {
+            $specParts[] = 'Purity: '.$purity;
+        }
+
+        $isDelivery = ($task['task_type'] ?? '') === 'delivery';
+
+        if ($isDelivery) {
+            $statusKey = (string) ($task['driver_delivery_status'] ?? 'accepted');
+            $statuses = config('driver.delivery.statuses', []);
+
+            $statusTag = [
+                'key' => $statusKey,
+                'label' => $task['driver_delivery_status_label'] ?? ($statuses[$statusKey]['label'] ?? ''),
+                'color' => $task['driver_delivery_status_color'] ?? ($statuses[$statusKey]['color'] ?? 'muted'),
+            ];
+            $displayIdLabel = 'Order ID';
+        } else {
+            $statusTag = [
+                'key' => 'pickup',
+                'label' => (string) ($task['task_type_label'] ?? 'Jewellery Pickup'),
+                'color' => 'warning',
+            ];
+            $displayIdLabel = 'Sell ID';
+        }
+
+        return array_merge($task, [
+            'display_id' => $task['reference_display'] ?? null,
+            'display_id_label' => $displayIdLabel,
+            'status_tag' => $statusTag,
+            'product_name' => $task['title'] ?? null,
+            'product_image_url' => $task['image_url'] ?? null,
+            'product_details' => [
+                'weight_grams' => $weightGrams !== null ? (float) $weightGrams : null,
+                'purity' => $purity,
+                'display' => $specParts !== [] ? implode(' | ', $specParts) : ($task['specification_display'] ?? null),
+            ],
+            'customer' => [
+                'name' => $task['customer_name'] ?? null,
+            ],
+            'location' => [
+                'type' => $task['location_label'] ?? null,
+                'address' => $task['location_address'] ?? null,
+            ],
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function deliveriesSectionStatusValues(): array
+    {
+        return collect(config('driver.deliveries.filters', []))
+            ->pluck('value')
             ->all();
     }
 

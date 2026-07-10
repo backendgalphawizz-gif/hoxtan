@@ -214,7 +214,6 @@ class JewelleryProductResource extends Resource
             ->reorderable()
             ->appendFiles()
             ->panelLayout('grid')
-            ->panelAspectRatio('1:1')
             ->imagePreviewHeight('9rem')
             ->itemPanelAspectRatio(1)
             ->removeUploadedFileButtonPosition('right top')

@@ -122,6 +122,73 @@ class DriverTaskService
     }
 
     /**
+     * @param  array{
+     *     type?: string,
+     *     status?: string,
+     *     search?: string,
+     *     page?: int,
+     *     per_page?: int
+     * }  $filters
+     * @return array{
+     *     tabs: array{all: int, orders: int, pickups: int},
+     *     tasks: list<array<string, mixed>>,
+     *     pagination: array{
+     *         current_page: int,
+     *         per_page: int,
+     *         total: int,
+     *         last_page: int,
+     *         has_more: bool,
+     *         showing: int
+     *     }
+     * }
+     */
+    public function deliveriesSection(Driver $driver, array $filters): array
+    {
+        $type = $this->normalizeDeliveriesType($filters['type'] ?? 'all');
+        $status = $filters['status'] ?? 'all';
+        $search = trim((string) ($filters['search'] ?? ''));
+        $perPage = (int) ($filters['per_page'] ?? config('driver.deliveries.per_page', 10));
+        $page = (int) ($filters['page'] ?? 1);
+
+        $tasks = $this->deliveriesSectionCollection($driver, $type, $status, $search);
+        $total = $tasks->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, $page), $lastPage);
+        $offset = ($page - 1) * $perPage;
+        $slice = $tasks->slice($offset, $perPage)->values();
+
+        return [
+            'tabs' => $this->deliveryTabCounts($driver),
+            'tasks' => $slice
+                ->map(fn (array $task): array => DriverTaskPayload::forDeliveriesSection($task))
+                ->all(),
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+                'has_more' => $page < $lastPage,
+                'showing' => $slice->count(),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{all: int, orders: int, pickups: int}
+     */
+    public function deliveryTabCounts(Driver $driver): array
+    {
+        $orders = (clone $this->assignedDeliveriesQuery($driver))->count();
+        $pickups = (clone $this->assignedPickupsQuery($driver))->count();
+
+        return [
+            'all' => $orders + $pickups,
+            'orders' => $orders,
+            'pickups' => $pickups,
+        ];
+    }
+
+    /**
      * @return array{
      *     tasks: list<array<string, mixed>>,
      *     pagination: array{
@@ -296,6 +363,119 @@ class DriverTaskService
             'completed' => DriverTaskPayload::isPickupCompleted($booking),
             'pending' => DriverTaskPayload::isPickupPending($booking),
             default => true,
+        };
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function deliveriesSectionCollection(
+        Driver $driver,
+        string $type,
+        string $status,
+        string $search,
+    ): Collection {
+        $deliveries = collect();
+        $pickups = collect();
+
+        if ($type !== 'pickup') {
+            $deliveryQuery = $this->assignedDeliveriesQuery($driver)
+                ->with(['items.product', 'user']);
+
+            $this->applyDeliverySearch($deliveryQuery, $search);
+            $this->applyDeliveriesSectionStatusFilter($deliveryQuery, $status);
+
+            $deliveries = $deliveryQuery
+                ->get()
+                ->map(fn (JewelleryOrder $order) => DriverTaskPayload::fromDelivery($order));
+        }
+
+        if ($type !== 'delivery' && ($type === 'pickup' || $status === 'all')) {
+            $pickupQuery = $this->assignedPickupsQuery($driver)
+                ->with('user');
+
+            $this->applyPickupSearch($pickupQuery, $search);
+
+            $pickups = $pickupQuery
+                ->get()
+                ->map(fn (OldGoldBooking $booking) => DriverTaskPayload::fromPickup($booking));
+        }
+
+        return $deliveries
+            ->concat($pickups)
+            ->sortByDesc('sort_at')
+            ->values();
+    }
+
+    protected function normalizeDeliveriesType(string $type): string
+    {
+        return match ($type) {
+            'order', 'orders' => 'delivery',
+            default => $type,
+        };
+    }
+
+    /**
+     * @param  Relation<JewelleryOrder, Driver>  $query
+     */
+    protected function applyDeliverySearch(Relation $query, string $search): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
+
+        $query->where('order_number', 'like', $term);
+    }
+
+    /**
+     * @param  Relation<OldGoldBooking, Driver>  $query
+     */
+    protected function applyPickupSearch(Relation $query, string $search): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $normalized = ltrim($search, '#');
+        $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $normalized).'%';
+
+        $query->where('booking_number', 'like', $term);
+    }
+
+    /**
+     * @param  Relation<JewelleryOrder, Driver>  $query
+     */
+    protected function applyDeliveriesSectionStatusFilter(Relation $query, string $status): void
+    {
+        match ($status) {
+            'new' => $query
+                ->where('status', 'processing')
+                ->whereNull('picked_up_at')
+                ->whereNull('delivered_at')
+                ->whereNull('delivery_failure_reason'),
+            'accepted' => $query
+                ->whereNull('picked_up_at')
+                ->whereNull('delivered_at')
+                ->whereNull('delivery_failure_reason')
+                ->whereNotIn('status', ['cancelled', 'failed', 'completed']),
+            'picked_up' => $query
+                ->whereNotNull('picked_up_at')
+                ->whereNull('delivered_at')
+                ->whereNull('delivery_failure_reason')
+                ->whereNotIn('status', ['cancelled', 'failed', 'completed']),
+            'delivered' => $query->where(function (Builder $builder): void {
+                $builder
+                    ->where('status', 'completed')
+                    ->orWhereNotNull('delivered_at');
+            }),
+            'cancelled' => $query->where(function (Builder $builder): void {
+                $builder
+                    ->whereNotNull('delivery_failure_reason')
+                    ->orWhereIn('status', ['cancelled', 'failed']);
+            }),
+            default => null,
         };
     }
 }

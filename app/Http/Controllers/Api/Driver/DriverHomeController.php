@@ -4,13 +4,11 @@ namespace App\Http\Controllers\Api\Driver;
 
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
-use App\Models\JewelleryOrder;
 use App\Models\OldGoldBooking;
 use App\Services\DriverTaskService;
 use App\Support\ApiResponse;
 use App\Support\DriverPayload;
 use App\Support\DriverTaskPayload;
-use App\Support\OrderPayload;
 use App\Support\SellJewelleryPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,21 +76,6 @@ class DriverHomeController extends Controller
         ]);
     }
 
-    public function showDelivery(Request $request, JewelleryOrder $order): JsonResponse
-    {
-        /** @var Driver $driver */
-        $driver = $request->user();
-
-        $this->ensureDeliveryAssignedToDriver($driver, $order);
-
-        $order->load(['items.product', 'payment', 'user']);
-
-        return ApiResponse::success([
-            'task' => DriverTaskPayload::fromDelivery($order),
-            'order' => OrderPayload::make($order, detailed: true, includeDeliveryOtp: false),
-        ]);
-    }
-
     public function showPickup(Request $request, OldGoldBooking $booking): JsonResponse
     {
         /** @var Driver $driver */
@@ -106,13 +89,6 @@ class DriverHomeController extends Controller
             'task' => DriverTaskPayload::fromPickup($booking),
             'pickup' => SellJewelleryPayload::make($booking, detailed: true, includeDeliveryOtp: false),
         ]);
-    }
-
-    protected function ensureDeliveryAssignedToDriver(Driver $driver, JewelleryOrder $order): void
-    {
-        if ($order->driver_id !== $driver->id || $order->status === 'cart') {
-            abort(Response::HTTP_NOT_FOUND, 'Resource not found.');
-        }
     }
 
     protected function ensurePickupAssignedToDriver(Driver $driver, OldGoldBooking $booking): void

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\Driver\DriverAuthController;
+use App\Http\Controllers\Api\Driver\DriverDeliveriesController;
+use App\Http\Controllers\Api\Driver\DriverDeliveryController;
 use App\Http\Controllers\Api\Driver\DriverHomeController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\AppConfigController;
@@ -75,7 +77,12 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/home', [DriverHomeController::class, 'home']);
             Route::get('/statistics', [DriverHomeController::class, 'statistics']);
             Route::get('/tasks', [DriverHomeController::class, 'tasks']);
-            Route::get('/tasks/deliveries/{order}', [DriverHomeController::class, 'showDelivery']);
+            Route::get('/deliveries', [DriverDeliveriesController::class, 'index']);
+            Route::get('/deliveries/config', [DriverDeliveryController::class, 'config']);
+            Route::get('/tasks/deliveries/{order}', [DriverDeliveryController::class, 'show']);
+            Route::post('/tasks/deliveries/{order}/picked-up', [DriverDeliveryController::class, 'markPickedUp']);
+            Route::post('/tasks/deliveries/{order}/verify-delivery', [DriverDeliveryController::class, 'verifyDelivery']);
+            Route::post('/tasks/deliveries/{order}/unable-to-deliver', [DriverDeliveryController::class, 'markUnableToDeliver']);
             Route::get('/tasks/pickups/{booking}', [DriverHomeController::class, 'showPickup']);
         });
     });

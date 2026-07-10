@@ -224,7 +224,7 @@ class DriverHomeApiTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('data.task.reference_id', 'PR-30001')
-            ->assertJsonPath('data.order.order_number', 'PR-30001');
+            ->assertJsonPath('data.delivery.order_number', 'PR-30001');
 
         $this->getJson('/api/v1/driver/tasks/pickups/'.$booking->id, [
             'Authorization' => 'Bearer '.$token,
