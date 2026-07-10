@@ -165,11 +165,6 @@ class JewelleryProductResource extends Resource
                             ->disabled()
                             ->dehydrated()
                             ->helperText('Auto-calculated from weight × current rate + making charge.'),
-                        Forms\Components\TextInput::make('sort_order')
-                            ->numeric()
-                            ->minValue(0)
-                            ->default(0)
-                            ->required(),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Show in App')
                             ->default(true),
