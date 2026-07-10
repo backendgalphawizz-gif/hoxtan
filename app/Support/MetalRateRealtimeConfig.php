@@ -27,15 +27,16 @@ class MetalRateRealtimeConfig
             return $payload;
         }
 
-        $options = is_array($connection['options'] ?? null) ? $connection['options'] : [];
+        $client = config('reverb.client', []);
+        $scheme = is_array($client) ? ($client['scheme'] ?? 'https') : 'https';
 
         return array_merge($payload, [
             'key' => $key,
-            'host' => self::normalizeHost($options['host'] ?? null),
-            'port' => isset($options['port']) ? (int) $options['port'] : null,
-            'scheme' => $options['scheme'] ?? 'https',
-            'use_tls' => (bool) ($options['useTLS'] ?? ($options['scheme'] ?? 'https') === 'https'),
-            'cluster' => $options['cluster'] ?? null,
+            'host' => self::normalizeHost(is_array($client) ? ($client['host'] ?? null) : null),
+            'port' => is_array($client) && isset($client['port']) ? (int) $client['port'] : null,
+            'scheme' => $scheme,
+            'use_tls' => $scheme === 'https',
+            'cluster' => null,
         ]);
     }
 

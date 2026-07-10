@@ -133,7 +133,6 @@ class JewelleryOrderResource extends Resource
                 Forms\Components\Section::make('Delivery Tracking')
                     ->schema([
                         static::driverAssignmentSelect()
-                            ->placeholder('Select a driver')
                             ->helperText('Only active drivers are listed. Online/offline status is shown for reference.'),
                         Forms\Components\DateTimePicker::make('driver_assigned_at')
                             ->label('Driver Assigned At')
@@ -143,16 +142,20 @@ class JewelleryOrderResource extends Resource
                             ->visible(fn (Forms\Get $get): bool => filled($get('driver_id'))),
                         Forms\Components\TextInput::make('tracking_number')
                             ->label('Tracking Number')
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->disabled(fn (string $operation): bool => $operation === 'view'),
                         Forms\Components\TextInput::make('courier_name')
                             ->label('Courier Name')
-                            ->maxLength(100),
+                            ->maxLength(100)
+                            ->disabled(fn (string $operation): bool => $operation === 'view'),
                         Forms\Components\DateTimePicker::make('dispatched_at')
                             ->label('Dispatched At')
-                            ->native(false),
+                            ->native(false)
+                            ->disabled(fn (string $operation): bool => $operation === 'view'),
                         Forms\Components\DateTimePicker::make('delivered_at')
                             ->label('Delivered At')
-                            ->native(false),
+                            ->native(false)
+                            ->disabled(fn (string $operation): bool => $operation === 'view'),
                     ])->columns(2),
                 Forms\Components\Section::make('Payment')
                     ->schema([
@@ -330,19 +333,11 @@ class JewelleryOrderResource extends Resource
     {
         return Forms\Components\Select::make('driver_id')
             ->label('Assigned Driver')
-            ->relationship(
-                name: 'driver',
-                titleAttribute: 'name',
-                modifyQueryUsing: fn (Builder $query): Builder => Driver::applyAssignableConstraint(
-                    $query,
-                    $includeDriverId,
-                ),
-            )
-            ->getOptionLabelFromRecordUsing(fn (Driver $record): string => Driver::assignmentOptionLabel($record))
-            ->searchable(['name', 'phone'])
-            ->preload()
+            ->options(function (?JewelleryOrder $record) use ($includeDriverId): array {
+                return Driver::assignmentOptions($includeDriverId ?? $record?->driver_id);
+            })
+            ->placeholder('Select a driver')
             ->nullable()
-            ->disabled(false)
             ->live()
             ->afterStateUpdated(function (?int $state, JewelleryOrder $record, Forms\Set $set, $livewire): void {
                 if (! $livewire instanceof Pages\ViewJewelleryOrder) {

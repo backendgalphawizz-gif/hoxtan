@@ -17,6 +17,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Reverb Client (mobile / browser WebSocket connections)
+    |--------------------------------------------------------------------------
+    |
+    | Public host, port, and scheme returned by the API for Flutter and other
+    | clients. Server-side broadcasts use REVERB_BROADCAST_* in broadcasting.php.
+    |
+    */
+
+    'client' => [
+        'host' => env('REVERB_HOST'),
+        'port' => env('REVERB_PORT', 443),
+        'scheme' => env('REVERB_SCHEME', 'https'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Reverb Servers
     |--------------------------------------------------------------------------
     |
