@@ -99,23 +99,30 @@
                 <p class="section__desc">From digital bullion to premium jewellery — one secure platform for India's smartest investors.</p>
             </div>
             <div class="features">
-                @foreach ([
-                    ['icon' => '💰', 'title' => 'Buy Gold & Silver', 'text' => 'Purchase digital gold and silver at live market rates with transparent GST pricing and instant confirmation.'],
-                    ['icon' => '📈', 'title' => 'SIG Auto-Invest', 'text' => 'Set up Systematic Investment in Gold — daily, weekly, or monthly — and grow your holdings automatically.'],
-                    ['icon' => '💎', 'title' => 'Premium Jewellery', 'text' => 'Shop hallmarked gold & silver jewellery with live pricing, making charges, and doorstep delivery.'],
-                    ['icon' => '🔒', 'title' => 'Secure Vault', 'text' => 'Your holdings are stored in allocated, segregated vaults with 256-bit encryption and full insurance.'],
-                    ['icon' => '🔄', 'title' => 'Instant Sell & Redeem', 'text' => 'Sell your digital gold or silver anytime at live rates, or redeem physical bullion to your doorstep.'],
-                    ['icon' => '✅', 'title' => 'KYC Verified', 'text' => 'Complete Aadhaar, PAN, and face verification for a fully compliant and secure trading experience.'],
-                ] as $feature)
-                    <article class="feature reveal">
+                @foreach (config('app_content.landing_features', []) as $index => $feature)
+                    <button type="button" class="feature reveal" data-feature-index="{{ $index }}" aria-haspopup="dialog">
                         <div class="feature__icon">{{ $feature['icon'] }}</div>
                         <h3 class="feature__title">{{ $feature['title'] }}</h3>
                         <p class="feature__text">{{ $feature['text'] }}</p>
-                    </article>
+                        <span class="feature__more">Learn more →</span>
+                    </button>
                 @endforeach
             </div>
         </div>
     </section>
+
+    <script type="application/json" id="landing-features-data">@json(config('app_content.landing_features', []))</script>
+
+    <div class="feature-modal" id="featureModal" hidden aria-hidden="true">
+        <div class="feature-modal__backdrop" data-feature-modal-close></div>
+        <div class="feature-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="featureModalTitle">
+            <button type="button" class="feature-modal__close" data-feature-modal-close aria-label="Close">&times;</button>
+            <div class="feature-modal__icon" id="featureModalIcon"></div>
+            <h3 class="feature-modal__title" id="featureModalTitle"></h3>
+            <p class="feature-modal__summary" id="featureModalSummary"></p>
+            <ul class="feature-modal__list" id="featureModalList"></ul>
+        </div>
+    </div>
 
     {{-- How it works --}}
     <section class="section" id="how" style="background: rgba(16,19,28,0.5);">

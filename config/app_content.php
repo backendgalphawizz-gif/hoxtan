@@ -123,4 +123,79 @@ return [
             'description' => 'For inquiries regarding your data or to exercise your rights, contact our privacy desk.',
         ],
     ],
+
+    'landing_features' => [
+        [
+            'icon' => '💰',
+            'title' => 'Buy Gold & Silver',
+            'text' => 'Purchase digital gold and silver at live market rates with transparent GST pricing and instant confirmation.',
+            'details' => [
+                'Buy 24K gold and 999 fine silver at real-time market-linked rates.',
+                'Transparent GST breakdown shown before every purchase.',
+                'Instant digital allocation — no waiting for settlement.',
+                'Start with small amounts and build holdings over time.',
+                'Download purchase invoices anytime from your account.',
+            ],
+        ],
+        [
+            'icon' => '📈',
+            'title' => 'SIG Auto-Invest',
+            'text' => 'Set up Systematic Investment in Gold — daily, weekly, or monthly — and grow your holdings automatically.',
+            'details' => [
+                'Choose daily, weekly, or monthly investment frequency.',
+                'Fixed amount auto-invested at prevailing gold rates.',
+                'Pause, resume, or stop your plan anytime from the app.',
+                'Track every installment and accumulated grams in one place.',
+                'Ideal for long-term wealth building without timing the market.',
+            ],
+        ],
+        [
+            'icon' => '💎',
+            'title' => 'Premium Jewellery',
+            'text' => 'Shop hallmarked gold & silver jewellery with live pricing, making charges, and doorstep delivery.',
+            'details' => [
+                'Browse hallmarked gold and silver jewellery collections.',
+                'Live metal rates plus transparent making charge breakdown.',
+                'Secure checkout with saved delivery addresses.',
+                'Order tracking from confirmation to doorstep delivery.',
+                'Quality craftsmanship backed by verified purity standards.',
+            ],
+        ],
+        [
+            'icon' => '🔒',
+            'title' => 'Secure Vault',
+            'text' => 'Your holdings are stored in allocated, segregated vaults with 256-bit encryption and full insurance.',
+            'details' => [
+                'Allocated and segregated storage for your digital holdings.',
+                '256-bit encryption protects your account and transactions.',
+                'Insurance coverage on stored precious metal assets.',
+                'Regular audits and compliance with industry standards.',
+                'Peace of mind knowing your wealth is physically secured.',
+            ],
+        ],
+        [
+            'icon' => '🔄',
+            'title' => 'Instant Sell & Redeem',
+            'text' => 'Sell your digital gold or silver anytime at live rates, or redeem physical bullion to your doorstep.',
+            'details' => [
+                'Sell digital gold or silver instantly at live market rates.',
+                'Proceeds credited to your wallet without lengthy delays.',
+                'Redeem physical bullion with doorstep delivery options.',
+                'Real-time rate lock at the time of your transaction.',
+                'Full transaction history available in My Orders.',
+            ],
+        ],
+        [
+            'icon' => '✅',
+            'title' => 'KYC Verified',
+            'text' => 'Complete Aadhaar, PAN, and face verification for a fully compliant and secure trading experience.',
+            'details' => [
+                'Quick Aadhaar and PAN verification via secure OTP flow.',
+                'Face match verification for added account security.',
+                'Bank account linking for seamless withdrawals.',
+                'Fully compliant with regulatory KYC requirements.',
+                'Verified accounts unlock the complete platform experience.',
+            ],
+        ],
+    ],
 ];
