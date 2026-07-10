@@ -52,7 +52,11 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => '<link rel="preconnect" href="https://fonts.bunny.net">'
                     .'<link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet">'
-                    .'<link rel="stylesheet" href="'.asset('css/admin-theme.css').'?v=21">',
+                    .'<link rel="stylesheet" href="'.asset('css/admin-theme.css').'?v=28">',
+            )
+            ->renderHook(
+                PanelsRenderHook::SCRIPTS_AFTER,
+                fn (): string => '<script src="'.asset('js/admin-product-images.js').'?v=1" defer></script>',
             )
             ->authGuard('admin')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')

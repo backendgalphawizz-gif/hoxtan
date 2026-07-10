@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Events\MetalRatesUpdated;
 use App\Models\MetalRate;
+use App\Support\MetalRateRealtimeConfig;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -199,28 +200,17 @@ class MetalRateService
 
     public function broadcastCurrentRates(): void
     {
-        if (! $this->realtimeBroadcastingEnabled()) {
+        if (! MetalRateRealtimeConfig::isEnabled()) {
             return;
         }
 
-        MetalRatesUpdated::dispatch($this->getApiRates());
-    }
-
-    protected function realtimeBroadcastingEnabled(): bool
-    {
-        $driver = (string) config('broadcasting.default', 'null');
-
-        if (! in_array($driver, ['reverb', 'pusher', 'log'], true)) {
-            return false;
+        try {
+            MetalRatesUpdated::dispatch($this->getApiRates());
+        } catch (\Throwable $exception) {
+            Log::warning('Metal rate broadcast skipped.', [
+                'message' => $exception->getMessage(),
+            ]);
         }
-
-        if ($driver === 'log') {
-            return true;
-        }
-
-        $connection = config("broadcasting.connections.{$driver}", []);
-
-        return is_array($connection) && filled($connection['key'] ?? null);
     }
 
     /**

@@ -41,6 +41,8 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Export::class, ExportPolicy::class);
 
+        $this->guardMisconfiguredBroadcastConnection();
+
         $this->app->booted(function (): void {
             app(Router::class)->middlewareGroup('filament.actions', [
                 'web',
@@ -73,5 +75,20 @@ class AppServiceProvider extends ServiceProvider
                 fn ($state) => FilamentFormat::number($state, $decimals)
             );
         });
+    }
+
+    protected function guardMisconfiguredBroadcastConnection(): void
+    {
+        $driver = (string) config('broadcasting.default', 'null');
+
+        if (! in_array($driver, ['pusher', 'reverb'], true)) {
+            return;
+        }
+
+        $connection = config("broadcasting.connections.{$driver}", []);
+
+        if (! is_array($connection) || ! filled($connection['key'] ?? null)) {
+            Config::set('broadcasting.default', 'null');
+        }
     }
 }

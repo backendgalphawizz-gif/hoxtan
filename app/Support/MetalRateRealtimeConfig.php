@@ -9,10 +9,10 @@ class MetalRateRealtimeConfig
      */
     public static function make(): array
     {
+        $enabled = self::isEnabled();
         $driver = (string) config('broadcasting.default', 'null');
         $connection = config("broadcasting.connections.{$driver}", []);
         $key = is_array($connection) ? ($connection['key'] ?? null) : null;
-        $enabled = in_array($driver, ['reverb', 'pusher'], true) && filled($key);
 
         $payload = [
             'enabled' => $enabled,
@@ -38,6 +38,23 @@ class MetalRateRealtimeConfig
             'use_tls' => $scheme === 'https',
             'cluster' => null,
         ]);
+    }
+
+    public static function isEnabled(): bool
+    {
+        $driver = (string) config('broadcasting.default', 'null');
+
+        if (! in_array($driver, ['reverb', 'pusher', 'log'], true)) {
+            return false;
+        }
+
+        if ($driver === 'log') {
+            return true;
+        }
+
+        $connection = config("broadcasting.connections.{$driver}", []);
+
+        return is_array($connection) && filled($connection['key'] ?? null);
     }
 
     protected static function normalizeHost(?string $host): ?string

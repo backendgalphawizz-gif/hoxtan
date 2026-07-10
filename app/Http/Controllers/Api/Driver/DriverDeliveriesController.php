@@ -42,7 +42,11 @@ class DriverDeliveriesController extends Controller
             ->map(fn (array $tab): array => [
                 'value' => $tab['value'],
                 'label' => $tab['label'],
-                'count' => $result['tabs'][$tab['value'] === 'order' ? 'orders' : $tab['value']] ?? 0,
+                'count' => $result['tabs'][match ($tab['value']) {
+                    'order' => 'orders',
+                    'pickup' => 'pickups',
+                    default => $tab['value'],
+                }] ?? 0,
             ])
             ->values()
             ->all();

@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Support\MetalRateRealtimeConfig;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -16,6 +17,11 @@ class MetalRatesUpdated implements ShouldBroadcastNow
      * @param  array<string, mixed>  $rates
      */
     public function __construct(public array $rates) {}
+
+    public function broadcastWhen(): bool
+    {
+        return MetalRateRealtimeConfig::isEnabled();
+    }
 
     /**
      * @return array<int, Channel>

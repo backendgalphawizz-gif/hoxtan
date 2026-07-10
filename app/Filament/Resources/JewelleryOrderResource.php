@@ -6,9 +6,12 @@ use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\JewelleryOrderResource\Pages;
 use App\Models\Driver;
 use App\Models\JewelleryOrder;
+use App\Models\JewelleryOrderListing;
+use App\Models\OldGoldBooking;
 use App\Support\FilamentDateFilters;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
+use App\Support\SellJewelleryPayload;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -232,7 +235,12 @@ class JewelleryOrderResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('order_number')
+                Tables\Columns\TextColumn::make('listing_type')
+                    ->label('Type')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => $state === 'sell' ? 'Sell' : 'Buy')
+                    ->color(fn (string $state): string => $state === 'sell' ? 'info' : 'success'),
+                Tables\Columns\TextColumn::make('reference_number')
                     ->label('Order #')
                     ->searchable()
                     ->copyable()
@@ -246,64 +254,43 @@ class JewelleryOrderResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('product_summary')
                     ->label('Product')
-                    ->getStateUsing(fn (JewelleryOrder $record): string => $record->items
-                        ->map(fn ($item) => ($item->product?->name ?? 'Product').' × '.$item->quantity)
-                        ->implode(', ') ?: '—')
+                    ->getStateUsing(fn (JewelleryOrderListing $record): string => $record->productSummary())
                     ->wrap(),
                 Tables\Columns\BadgeColumn::make('status')
+                    ->formatStateUsing(function (?string $state, JewelleryOrderListing $record): string {
+                        return $record->isSell()
+                            ? SellJewelleryPayload::statusLabel($state)
+                            : ucfirst((string) $state);
+                    })
                     ->colors([
                         'warning' => 'pending',
-                        'info' => 'processing',
-                        'success' => 'completed',
+                        'info' => fn ($state) => in_array($state, ['processing', 'accepted', 'pickup_scheduling'], true),
+                        'success' => fn ($state) => in_array($state, ['completed', 'picked_up'], true),
                         'danger' => fn ($state) => in_array($state, ['failed', 'cancelled'], true),
                         'gray' => 'cart',
                     ]),
-                Tables\Columns\BadgeColumn::make('payment.status')
-                    ->label('Payment')
-                    ->colors([
-                        'warning' => 'pending',
-                        'info' => 'processing',
-                        'success' => 'completed',
-                        'danger' => 'failed',
-                        'gray' => 'refunded',
-                    ]),
-                Tables\Columns\TextColumn::make('total_amount')
+                Tables\Columns\TextColumn::make('amount')
                     ->label('Total')
                     ->inr()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('payment_mode')
                     ->label('Payment')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => $state === 'emi' ? 'EMI' : 'Full')
-                    ->color(fn (?string $state): string => $state === 'emi' ? 'info' : 'gray'),
-                Tables\Columns\TextColumn::make('emi_tenure')
-                    ->label('EMI Tenure')
-                    ->formatStateUsing(fn (?int $state, JewelleryOrder $record): ?string => $record->payment_mode === 'emi' && $state
-                        ? $state.' mo'
-                        : null)
-                    ->placeholder('—')
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('total_emi_cost')
-                    ->label('Total EMI Cost')
-                    ->inr()
-                    ->placeholder('—')
-                    ->toggleable(),
+                    ->formatStateUsing(fn (?string $state): ?string => match ($state) {
+                        'emi' => 'EMI',
+                        'full' => 'Full',
+                        default => null,
+                    })
+                    ->color(fn (?string $state): string => $state === 'emi' ? 'info' : 'gray')
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('driver.name')
                     ->label('Driver')
-                    ->description(fn (JewelleryOrder $record): ?string => $record->driver
+                    ->description(fn (JewelleryOrderListing $record): ?string => $record->driver
                         ? '+91 '.$record->driver->phone
                         : null)
                     ->placeholder('Unassigned')
                     ->searchable()
                     ->sortable()
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('expected_delivery_date')
-                    ->label('Delivery By')
-                    ->date('d M Y')
-                    ->placeholder('—'),
-                Tables\Columns\TextColumn::make('tracking_number')
-                    ->label('Tracking #')
-                    ->placeholder('—')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Ordered At')
@@ -311,10 +298,19 @@ class JewelleryOrderResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('listing_type')
+                    ->label('Type')
+                    ->options([
+                        'buy' => 'Buy',
+                        'sell' => 'Sell',
+                    ]),
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'pending' => 'Pending',
                         'processing' => 'Processing',
+                        'accepted' => 'Accepted',
+                        'pickup_scheduling' => 'Pickup Scheduling',
+                        'picked_up' => 'Picked Up',
                         'completed' => 'Completed',
                         'failed' => 'Failed',
                         'cancelled' => 'Cancelled',
@@ -327,32 +323,46 @@ class JewelleryOrderResource extends Resource
                 FilamentDateFilters::tableFilter('ordered_date', 'created_at', 'Order Date'),
             ])
             ->actions([
-                FilamentTableActions::view(),
-                FilamentTableActions::edit(),
+                FilamentTableActions::view()
+                    ->url(fn (JewelleryOrderListing $record): string => $record->isSell()
+                        ? static::getUrl('view-sell', ['record' => $record->source_id])
+                        : static::getUrl('view', ['record' => $record->source_id])),
+                FilamentTableActions::edit()
+                    ->url(fn (JewelleryOrderListing $record): string => $record->isSell()
+                        ? static::getUrl('edit-sell', ['record' => $record->source_id])
+                        : static::getUrl('edit', ['record' => $record->source_id])),
                 FilamentTableActions::make('assign_driver')
                     ->icon('heroicon-o-user-plus')
                     ->color('info')
                     ->tooltip('Assign Driver')
-                    ->visible(fn (JewelleryOrder $record): bool => in_array($record->status, ['pending', 'processing'], true))
-                    ->form(fn (JewelleryOrder $record): array => [
-                        static::driverAssignmentSelect($record->driver_id)
+                    ->visible(fn (JewelleryOrderListing $record): bool => ! in_array($record->status, ['completed', 'cancelled', 'failed'], true))
+                    ->form(fn (JewelleryOrderListing $record): array => [
+                        ($record->isSell()
+                            ? static::sellDriverAssignmentSelect($record->driver_id)
+                            : static::driverAssignmentSelect($record->driver_id))
                             ->label('Driver')
                             ->required(),
                     ])
-                    ->action(function (JewelleryOrder $record, array $data): void {
-                        $record->update([
-                            'driver_id' => $data['driver_id'],
-                        ]);
+                    ->action(function (JewelleryOrderListing $record, array $data): void {
+                        if ($record->isSell()) {
+                            OldGoldBooking::query()
+                                ->whereKey($record->source_id)
+                                ->update(['driver_id' => $data['driver_id']]);
+                        } else {
+                            JewelleryOrder::query()
+                                ->whereKey($record->source_id)
+                                ->update(['driver_id' => $data['driver_id']]);
+                        }
 
                         Notification::make()
-                            ->title('Driver assigned to order')
+                            ->title('Driver assigned')
                             ->success()
                             ->send();
                     }),
             ])
             ->defaultSort('created_at', 'desc')
-            ->emptyStateHeading('No buy now orders yet')
-            ->emptyStateDescription('Orders from the mobile Buy Now API will appear here.');
+            ->emptyStateHeading('No jewellery orders yet')
+            ->emptyStateDescription('Buy Now and Sell Jewellery requests from the mobile app will appear here.');
     }
 
     public static function getPages(): array
@@ -360,7 +370,9 @@ class JewelleryOrderResource extends Resource
         return [
             'index' => Pages\ListJewelleryOrders::route('/'),
             'view' => Pages\ViewJewelleryOrder::route('/{record}'),
+            'view-sell' => Pages\ViewSellJewelleryOrder::route('/sell/{record}'),
             'edit' => Pages\EditJewelleryOrder::route('/{record}/edit'),
+            'edit-sell' => Pages\EditSellJewelleryOrder::route('/sell/{record}/edit'),
         ];
     }
 
@@ -377,6 +389,142 @@ class JewelleryOrderResource extends Resource
     public static function getNavigationBadgeColor(): ?string
     {
         return 'warning';
+    }
+
+    public static function sellForm(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\Section::make('Sell Request Details')
+                    ->schema([
+                        Forms\Components\TextInput::make('booking_number')
+                            ->label('Request #')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\Select::make('user_id')
+                            ->relationship('user', 'name')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('item_name')
+                            ->label('Item')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
+                        Forms\Components\Select::make('status')
+                            ->options(config('sell_jewellery.statuses', []))
+                            ->required(),
+                        Forms\Components\Textarea::make('admin_notes')
+                            ->label('Admin Notes')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])->columns(2),
+                Forms\Components\Section::make('Metal & Valuation')
+                    ->schema([
+                        Forms\Components\TextInput::make('metal_type')
+                            ->label('Metal Type')
+                            ->formatStateUsing(fn (?string $state): string => SellJewelleryPayload::metalLabel($state))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('purity')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('estimated_weight_grams')
+                            ->label('Weight (g)')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('rate_per_gram')
+                            ->label('Rate / g')
+                            ->prefix('₹')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('quoted_amount')
+                            ->label('Estimated Value')
+                            ->prefix('₹')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('final_amount')
+                            ->label('Final Amount')
+                            ->prefix('₹')
+                            ->numeric()
+                            ->minValue(0)
+                            ->step(0.01),
+                    ])->columns(3),
+                Forms\Components\Section::make('Customer & Pickup')
+                    ->schema([
+                        Forms\Components\TextInput::make('identity_owner')
+                            ->label('Identity Owner')
+                            ->formatStateUsing(fn (?string $state): string => SellJewelleryPayload::identityOwnerLabel($state))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('sell_location')
+                            ->label('Sell Location')
+                            ->formatStateUsing(fn (?string $state): string => SellJewelleryPayload::sellLocationLabel($state))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('pickup_name')
+                            ->label('Contact Name')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('pickup_phone')
+                            ->label('Contact Phone')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\Textarea::make('pickup_address')
+                            ->label('Pickup Address')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
+                    ])->columns(2),
+                Forms\Components\Section::make('Pickup Scheduling')
+                    ->schema([
+                        static::sellDriverAssignmentSelect(),
+                        Forms\Components\DateTimePicker::make('driver_assigned_at')
+                            ->label('Driver Assigned At')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->native(false)
+                            ->visible(fn (Forms\Get $get): bool => filled($get('driver_id'))),
+                        Forms\Components\DateTimePicker::make('pickup_scheduled_at')
+                            ->label('Pickup Scheduled At')
+                            ->native(false),
+                        Forms\Components\DateTimePicker::make('accepted_at')
+                            ->label('Accepted At')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->native(false),
+                        Forms\Components\DateTimePicker::make('picked_up_at')
+                            ->label('Picked Up At')
+                            ->native(false),
+                        Forms\Components\DateTimePicker::make('completed_at')
+                            ->label('Completed At')
+                            ->native(false),
+                        Forms\Components\TextInput::make('delivery_otp')
+                            ->label('Delivery OTP')
+                            ->disabled()
+                            ->dehydrated(false),
+                    ])->columns(2),
+                Forms\Components\Section::make('Uploaded Documents')
+                    ->schema([
+                        Forms\Components\Placeholder::make('documents_list')
+                            ->label('')
+                            ->content(function (?OldGoldBooking $record): string {
+                                if (! $record) {
+                                    return '—';
+                                }
+
+                                return collect(SellJewelleryPayload::documents($record))
+                                    ->map(function (array $doc): string {
+                                        if (! $doc['uploaded'] || blank($doc['url'])) {
+                                            return $doc['label'].': Not uploaded';
+                                        }
+
+                                        return $doc['label'].': '.$doc['url'];
+                                    })
+                                    ->implode("\n") ?: '—';
+                            })
+                            ->columnSpanFull(),
+                    ]),
+            ]);
     }
 
     public static function driverAssignmentSelect(?int $includeDriverId = null): Forms\Components\Select
@@ -401,6 +549,33 @@ class JewelleryOrderResource extends Resource
 
                 Notification::make()
                     ->title(filled($state) ? 'Driver assigned to order' : 'Driver unassigned from order')
+                    ->success()
+                    ->send();
+            });
+    }
+
+    public static function sellDriverAssignmentSelect(?int $includeDriverId = null): Forms\Components\Select
+    {
+        return Forms\Components\Select::make('driver_id')
+            ->label('Assigned Driver')
+            ->options(function (?OldGoldBooking $record) use ($includeDriverId): array {
+                return Driver::assignmentOptions($includeDriverId ?? $record?->driver_id);
+            })
+            ->placeholder('Select a driver')
+            ->nullable()
+            ->live()
+            ->afterStateUpdated(function (?int $state, OldGoldBooking $record, Forms\Set $set, $livewire): void {
+                if (! $livewire instanceof Pages\ViewSellJewelleryOrder) {
+                    return;
+                }
+
+                $record->update(['driver_id' => $state]);
+                $record->refresh();
+
+                $set('driver_assigned_at', $record->driver_assigned_at);
+
+                Notification::make()
+                    ->title(filled($state) ? 'Driver assigned to sell request' : 'Driver unassigned from sell request')
                     ->success()
                     ->send();
             });

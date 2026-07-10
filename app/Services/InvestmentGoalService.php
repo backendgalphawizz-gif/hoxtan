@@ -82,23 +82,23 @@ class InvestmentGoalService
         $goals = $query->get();
         $goalPayloads = $this->mapGoals($goals, $portfolio);
 
-        $activeCount = InvestmentGoal::query()
+        $allGoals = InvestmentGoal::query()
             ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->count();
+            ->get();
 
-        $completedCount = InvestmentGoal::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->count();
+        $activeCount = $allGoals->where('status', 'active')->count();
+        $completedCount = $allGoals->where('status', 'completed')->count();
 
-        $totalGoalsValue = collect($goalPayloads)->sum('current_amount');
+        $totalGoalsValue = round(
+            $allGoals->sum(fn (InvestmentGoal $goal): float => (float) $goal->target_amount),
+            2,
+        );
 
         return [
             'summary' => [
-                'total_goals_value' => round($totalGoalsValue, 2),
+                'total_goals_value' => $totalGoalsValue,
                 'total_goals_value_display' => '₹'.number_format($totalGoalsValue, 2),
-                'total_goals' => $activeCount + $completedCount,
+                'total_goals' => $allGoals->count(),
                 'active_count' => $activeCount,
                 'completed_count' => $completedCount,
             ],

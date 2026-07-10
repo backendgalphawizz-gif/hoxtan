@@ -52,9 +52,11 @@ class GoalApiTest extends TestCase
         $this->getJson('/api/v1/goals?status=active')
             ->assertOk()
             ->assertJsonPath('data.summary.active_count', 1)
+            ->assertJsonPath('data.summary.total_goals_value', 100000.0)
+            ->assertJsonPath('data.summary.total_goals_value_display', '₹100,000.00')
             ->assertJsonStructure([
                 'data' => [
-                    'summary' => ['total_goals_value', 'total_goals'],
+                    'summary' => ['total_goals_value', 'total_goals_value_display', 'total_goals'],
                     'portfolio' => ['gold_value', 'silver_value', 'total_value'],
                     'goals',
                 ],
@@ -100,6 +102,44 @@ class GoalApiTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('data.goal.monthly_contribution', 3000.0);
+    }
+
+    public function test_total_goals_value_is_sum_of_all_goal_target_amounts(): void
+    {
+        $user = User::factory()->create(['phone' => '9876543215', 'mpin' => '1234']);
+        Sanctum::actingAs($user);
+
+        InvestmentGoal::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Home',
+            'metal_type' => 'gold',
+            'target_grams' => 10,
+            'current_grams' => 2,
+            'target_amount' => 100000,
+            'monthly_contribution' => 5000,
+            'target_date' => now()->addYear(),
+            'status' => 'active',
+        ]);
+
+        InvestmentGoal::query()->create([
+            'user_id' => $user->id,
+            'title' => 'Car',
+            'metal_type' => 'silver',
+            'target_grams' => 500,
+            'current_grams' => 500,
+            'target_amount' => 250000,
+            'monthly_contribution' => 3000,
+            'target_date' => now()->addYears(2),
+            'status' => 'completed',
+        ]);
+
+        $this->getJson('/api/v1/goals?status=active')
+            ->assertOk()
+            ->assertJsonPath('data.summary.total_goals_value', 350000.0)
+            ->assertJsonPath('data.summary.total_goals', 2)
+            ->assertJsonPath('data.summary.active_count', 1)
+            ->assertJsonPath('data.summary.completed_count', 1)
+            ->assertJsonCount(1, 'data.goals');
     }
 
     public function test_user_can_update_and_delete_goal(): void

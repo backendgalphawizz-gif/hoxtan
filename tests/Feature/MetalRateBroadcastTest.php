@@ -60,4 +60,44 @@ class MetalRateBroadcastTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.realtime.host', 'hoxtan.developmentalphawizz.com');
     }
+
+    public function test_misconfigured_pusher_does_not_break_driver_deliveries_api(): void
+    {
+        config([
+            'broadcasting.default' => 'pusher',
+            'broadcasting.connections.pusher.key' => null,
+            'broadcasting.connections.pusher.secret' => null,
+            'broadcasting.connections.pusher.app_id' => null,
+        ]);
+
+        $this->refreshApplication();
+
+        config([
+            'broadcasting.default' => 'pusher',
+            'broadcasting.connections.pusher.key' => null,
+            'broadcasting.connections.pusher.secret' => null,
+            'broadcasting.connections.pusher.app_id' => null,
+            'otp.expose_in_response' => true,
+        ]);
+
+        $driver = \App\Models\Driver::query()->create([
+            'name' => 'Pickup Driver',
+            'phone' => '9876543999',
+            'vehicle_type' => 'bike',
+            'is_active' => true,
+        ]);
+
+        $send = $this->postJson('/api/v1/driver/login/send-otp', [
+            'phone' => $driver->phone,
+        ]);
+
+        $verify = $this->postJson('/api/v1/driver/login/verify-otp', [
+            'phone' => $driver->phone,
+            'otp' => $send->json('data.otp'),
+        ]);
+
+        $this->getJson('/api/v1/driver/deliveries?type=pickup', [
+            'Authorization' => 'Bearer '.$verify->json('data.token'),
+        ])->assertOk();
+    }
 }
