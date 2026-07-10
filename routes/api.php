@@ -110,7 +110,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
         Route::put('/profile/mpin', [ProfileController::class, 'updateMpin']);
         Route::delete('/profile', [ProfileController::class, 'destroy']);
-        Route::post('/profile/close-account', [ProfileController::class, 'destroy']);
+        Route::post('/profile/close-account', [ProfileController::class, 'closeAccount']);
+        Route::post('/profile/close', [ProfileController::class, 'closeAccount']);
         Route::get('/referral-stats', [ProfileController::class, 'referralStats']);
         Route::get('/invoices', [ProfileController::class, 'invoices']);
         Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])

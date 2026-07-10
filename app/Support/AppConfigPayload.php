@@ -36,6 +36,9 @@ class AppConfigPayload
             ],
             'terms' => self::userTerms($settings),
             'privacy' => self::userPrivacy($settings),
+            'driver_privacy' => self::driverPrivacy($settings),
+            'driver_terms' => self::driverTerms($settings),
+            'driver' => self::driverLegal($settings),
             'delete_account' => self::deleteAccount($settings),
         ];
     }
@@ -109,6 +112,28 @@ class AppConfigPayload
         );
     }
 
+    protected static function driverPrivacy(AppSettingService $settings): array
+    {
+        return LegalPagePayload::make('driver_privacy', $settings);
+    }
+
+    protected static function driverTerms(AppSettingService $settings): array
+    {
+        return LegalPagePayload::make('driver_terms', $settings);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected static function driverLegal(AppSettingService $settings): array
+    {
+        return [
+            'privacy' => self::driverPrivacy($settings),
+            'terms' => self::driverTerms($settings),
+            'play_store' => DriverAppConfigPayload::playStoreUrls(),
+        ];
+    }
+
     protected static function deleteAccount(AppSettingService $settings): array
     {
         return LegalPagePayload::make('delete_account', $settings);
@@ -136,6 +161,10 @@ class AppConfigPayload
             'privacy_policy_embed_url' => url($userPlayStore['privacy_policy_embed_url'] ?? $playStore['privacy_policy_embed_url'] ?? '/embed/user-privacy-policy'),
             'terms_embed_url' => url($userPlayStore['terms_embed_url'] ?? '/embed/user-terms-and-conditions'),
             'delete_account_embed_url' => url($playStore['delete_account_embed_url'] ?? '/embed/delete-account'),
+            'driver_privacy_policy_url' => url(config('app_content.driver_play_store.privacy_policy_url', '/driver-privacy-policy')),
+            'driver_terms_url' => url(config('app_content.driver_play_store.terms_url', '/driver-terms-and-conditions')),
+            'driver_privacy_policy_embed_url' => url(config('app_content.driver_play_store.privacy_policy_embed_url', '/embed/driver-privacy-policy')),
+            'driver_terms_embed_url' => url(config('app_content.driver_play_store.terms_embed_url', '/embed/driver-terms-and-conditions')),
         ];
     }
 }

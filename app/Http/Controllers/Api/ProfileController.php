@@ -168,6 +168,11 @@ class ProfileController extends Controller
 
     public function destroy(Request $request): JsonResponse
     {
+        return $this->closeAccount($request);
+    }
+
+    public function closeAccount(Request $request): JsonResponse
+    {
         $length = MpinRules::length();
 
         $data = $request->validate([
@@ -191,7 +196,10 @@ class ProfileController extends Controller
 
         $user->delete();
 
-        return ApiResponse::success([], 'Your account has been closed successfully.');
+        return ApiResponse::success([
+            'closed' => true,
+            'message' => 'Your account has been closed successfully.',
+        ], 'Your account has been closed successfully.');
     }
 
     public function referralStats(Request $request): JsonResponse

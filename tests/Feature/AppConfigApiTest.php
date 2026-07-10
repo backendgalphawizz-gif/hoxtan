@@ -56,12 +56,30 @@ class AppConfigApiTest extends TestCase
             'is_published' => true,
         ]);
 
+        StaticPage::query()->create([
+            'title' => 'Driver Privacy Policy',
+            'slug' => 'driver-privacy-policy',
+            'content' => '<p>Driver privacy content</p>',
+            'is_published' => true,
+        ]);
+
+        StaticPage::query()->create([
+            'title' => 'Driver Terms & Conditions',
+            'slug' => 'driver-terms-and-conditions',
+            'content' => '<p>Driver terms content</p>',
+            'is_published' => true,
+        ]);
+
         $response = $this->getJson('/api/v1/app/config');
 
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.privacy.slug', 'user-privacy-policy')
             ->assertJsonPath('data.terms.slug', 'user-terms-and-conditions')
+            ->assertJsonPath('data.driver_privacy.slug', 'driver-privacy-policy')
+            ->assertJsonPath('data.driver_terms.slug', 'driver-terms-and-conditions')
+            ->assertJsonPath('data.driver.privacy.slug', 'driver-privacy-policy')
+            ->assertJsonPath('data.driver.terms.slug', 'driver-terms-and-conditions')
             ->assertJsonPath('data.faqs_screen.headline', 'How may we assist you?')
             ->assertJsonPath('data.terms.version', 'V.4.02')
             ->assertJsonPath('data.privacy.tagline', 'Your trust is our most valuable asset.')
@@ -75,7 +93,14 @@ class AppConfigApiTest extends TestCase
                     'support',
                     'terms' => ['sections', 'agreement_summary', 'url', 'slug'],
                     'privacy' => ['sections', 'url', 'slug'],
-                    'delete_account' => ['url', 'steps'],
+                    'driver_privacy' => ['title', 'content', 'url', 'slug'],
+                    'driver_terms' => ['title', 'content', 'url', 'slug'],
+                    'driver' => [
+                        'privacy' => ['title', 'content', 'url', 'slug'],
+                        'terms' => ['title', 'content', 'url', 'slug'],
+                        'play_store',
+                    ],
+                    'delete_account' => ['url', 'steps', 'close_account'],
                 ],
             ]);
     }

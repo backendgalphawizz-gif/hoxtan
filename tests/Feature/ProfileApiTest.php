@@ -188,7 +188,46 @@ class ProfileApiTest extends TestCase
         ]);
 
         $response->assertOk()
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.closed', true);
         $this->assertSoftDeleted('users', ['id' => $user->id]);
+    }
+
+    public function test_close_account_via_post_endpoint(): void
+    {
+        $user = User::factory()->create([
+            'phone' => '9876543211',
+            'mpin' => '1234',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/profile/close-account', [
+            'mpin' => '1234',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.closed', true)
+            ->assertJsonPath('message', 'Your account has been closed successfully.');
+
+        $this->assertSoftDeleted('users', ['id' => $user->id]);
+    }
+
+    public function test_close_account_rejects_invalid_mpin(): void
+    {
+        $user = User::factory()->create([
+            'phone' => '9876543212',
+            'mpin' => '1234',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/profile/close', [
+            'mpin' => '9999',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['mpin']);
+
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'deleted_at' => null]);
     }
 }

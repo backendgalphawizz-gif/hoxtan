@@ -206,6 +206,14 @@ return [
         'url_path' => '/delete-account',
         'embed_url_path' => '/embed/delete-account',
         'support_email' => 'support@hoxtandigigold.com',
+        'close_account' => [
+            'method' => 'POST',
+            'path' => '/api/v1/profile/close-account',
+            'requires_mpin' => true,
+            'request' => [
+                'mpin' => '4-digit M-PIN',
+            ],
+        ],
         'steps' => [
             'Open the app and sign in.',
             'Go to Profile.',
