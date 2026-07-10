@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Driver;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -101,6 +102,51 @@ class ProfilePhotoStorage
         }
 
         return null;
+    }
+
+    public static function storeForDriver(Driver $driver, Request $request): ?string
+    {
+        $uploaded = static::resolveUploadedFile($request);
+
+        if ($uploaded !== null) {
+            validator(
+                ['file' => $uploaded],
+                ['file' => ['required', 'image', 'max:2048']],
+                [
+                    'file.image' => 'Profile photo must be a valid image file.',
+                    'file.max' => 'Profile photo must not be larger than 2MB.',
+                ]
+            )->validate();
+
+            return static::storeUploadedFileForDriver($driver, $uploaded);
+        }
+
+        $base64 = static::resolveBase64Payload($request);
+
+        if ($base64 !== null) {
+            return static::storeBase64ImageForDriver($driver, $base64);
+        }
+
+        return null;
+    }
+
+    public static function storeUploadedFileForDriver(Driver $driver, UploadedFile $photo): string
+    {
+        static::deleteExistingDriverPhoto($driver);
+
+        return $photo->store('driver-profiles', 'public');
+    }
+
+    public static function storeBase64ImageForDriver(Driver $driver, string $payload): string
+    {
+        [$binary, $extension] = static::decodeBase64Image($payload);
+
+        static::deleteExistingDriverPhoto($driver);
+
+        $path = 'driver-profiles/'.Str::uuid().'.'.$extension;
+        Storage::disk('public')->put($path, $binary);
+
+        return $path;
     }
 
     public static function storeUploadedFile(User $user, UploadedFile $photo): string
@@ -257,5 +303,14 @@ class ProfilePhotoStorage
         }
 
         Storage::disk('public')->delete($user->profile_photo);
+    }
+
+    protected static function deleteExistingDriverPhoto(Driver $driver): void
+    {
+        if (blank($driver->profile_image)) {
+            return;
+        }
+
+        Storage::disk('public')->delete($driver->profile_image);
     }
 }

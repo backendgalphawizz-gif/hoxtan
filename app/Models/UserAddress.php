@@ -12,6 +12,7 @@ class UserAddress extends Model
         'address_type',
         'is_default',
         'full_name',
+        'flat_no',
         'address_line',
         'city',
         'state',

@@ -15,6 +15,7 @@ class AddressPayload
             'address_type_label' => strtoupper($address->address_type),
             'is_default' => $address->is_default,
             'full_name' => $address->full_name,
+            'flat_no' => $address->flat_no,
             'address_line' => $address->address_line,
             'city' => $address->city,
             'state' => $address->state,
@@ -41,6 +42,7 @@ class AddressPayload
     protected static function fullAddress(UserAddress $address): string
     {
         return collect([
+            $address->flat_no,
             $address->address_line,
             $address->city,
             $address->state.' '.$address->pincode,

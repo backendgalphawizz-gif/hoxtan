@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\MetalRateService;
 use App\Support\ApiResponse;
+use App\Support\MetalRateRealtimeConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,15 @@ class MetalRateController extends Controller
             filled($data['metal_type'] ?? null) ? $data['metal_type'] : null,
         );
 
-        return ApiResponse::success($payload);
+        return ApiResponse::success(array_merge($payload, [
+            'realtime' => MetalRateRealtimeConfig::make(),
+        ]));
+    }
+
+    public function realtimeConfig(): JsonResponse
+    {
+        return ApiResponse::success([
+            'realtime' => MetalRateRealtimeConfig::make(),
+        ]);
     }
 }

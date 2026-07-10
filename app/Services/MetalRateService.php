@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\MetalRatesUpdated;
 use App\Models\MetalRate;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -96,7 +97,7 @@ class MetalRateService
 
         Cache::forget('dashboard_metal_rates');
 
-        return MetalRate::create([
+        $record = MetalRate::create([
             'metal_type' => $metalType,
             'rate_per_gram' => $rate,
             'source' => 'live_sync',
@@ -109,6 +110,10 @@ class MetalRateService
                 default => 'Synced using fallback rate from settings',
             },
         ]);
+
+        $this->broadcastCurrentRates();
+
+        return $record;
     }
 
     public function applyManualRate(string $metalType, float $rate, bool $isActive, ?string $notes = null): MetalRate
@@ -119,7 +124,7 @@ class MetalRateService
 
         Cache::forget('dashboard_metal_rates');
 
-        return MetalRate::create([
+        $record = MetalRate::create([
             'metal_type' => $metalType,
             'rate_per_gram' => $rate,
             'source' => 'manual_override',
@@ -127,6 +132,10 @@ class MetalRateService
             'updated_by' => Auth::guard('admin')->id(),
             'notes' => $notes,
         ]);
+
+        $this->broadcastCurrentRates();
+
+        return $record;
     }
 
     /**
@@ -204,6 +213,32 @@ class MetalRateService
     public function forgetDashboardRatesCache(): void
     {
         Cache::forget('dashboard_metal_rates');
+    }
+
+    public function broadcastCurrentRates(): void
+    {
+        if (! $this->realtimeBroadcastingEnabled()) {
+            return;
+        }
+
+        MetalRatesUpdated::dispatch($this->getApiRates());
+    }
+
+    protected function realtimeBroadcastingEnabled(): bool
+    {
+        $driver = (string) config('broadcasting.default', 'null');
+
+        if (! in_array($driver, ['reverb', 'pusher', 'log'], true)) {
+            return false;
+        }
+
+        if ($driver === 'log') {
+            return true;
+        }
+
+        $connection = config("broadcasting.connections.{$driver}", []);
+
+        return is_array($connection) && filled($connection['key'] ?? null);
     }
 
     /**

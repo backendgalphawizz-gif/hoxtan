@@ -25,6 +25,7 @@ class AddressApiTest extends TestCase
             'address_type' => 'home',
             'is_default' => true,
             'full_name' => 'Alexander Vance',
+            'flat_no' => 'A-501',
             'address_line' => '5th Floor, Tech Park, Whitefield Main Road',
             'city' => 'Bangalore',
             'state' => 'Karnataka',
@@ -35,7 +36,8 @@ class AddressApiTest extends TestCase
         $create->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.address.is_default', true)
-            ->assertJsonPath('data.address.address_type_label', 'HOME');
+            ->assertJsonPath('data.address.address_type_label', 'HOME')
+            ->assertJsonPath('data.address.flat_no', 'A-501');
 
         $addressId = $create->json('data.address.id');
 
@@ -49,6 +51,7 @@ class AddressApiTest extends TestCase
             'address_type' => 'other',
             'is_default' => true,
             'full_name' => 'Rahul Sharma',
+            'flat_no' => 'B-12',
             'address_line' => '45, Green Park Society',
             'city' => 'Bangalore',
             'state' => 'Karnataka',
@@ -58,6 +61,7 @@ class AddressApiTest extends TestCase
 
         $update->assertOk()
             ->assertJsonPath('data.address.full_name', 'Rahul Sharma')
+            ->assertJsonPath('data.address.flat_no', 'B-12')
             ->assertJsonPath('data.address.address_type_label', 'OTHER');
 
         $second = $this->postJson('/api/v1/addresses', [

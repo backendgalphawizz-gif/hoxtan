@@ -47,6 +47,11 @@ class DriverResource extends Resource
                         Forms\Components\TextInput::make('email')
                             ->email()
                             ->maxLength(255),
+                        Forms\Components\FileUpload::make('profile_image')
+                            ->label('Profile Image')
+                            ->image()
+                            ->directory('driver-profiles')
+                            ->maxSize(2048),
                         Forms\Components\Select::make('vehicle_type')
                             ->options(Driver::vehicleTypeOptions())
                             ->default('bike')

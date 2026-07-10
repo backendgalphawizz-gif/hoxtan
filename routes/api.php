@@ -26,6 +26,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/app/pages/{slug}', [AppConfigController::class, 'page']);
 
     Route::get('/rates', [MetalRateController::class, 'index']);
+    Route::get('/rates/realtime-config', [MetalRateController::class, 'realtimeConfig']);
 
     Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
@@ -65,6 +66,10 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware(['auth:sanctum', 'driver.api'])->group(function (): void {
             Route::post('/logout', [DriverAuthController::class, 'logout']);
             Route::get('/profile', [DriverProfileController::class, 'show']);
+            Route::put('/profile', [DriverProfileController::class, 'update']);
+            Route::post('/profile', [DriverProfileController::class, 'update']);
+            Route::put('/availability', [DriverProfileController::class, 'updateAvailability']);
+            Route::post('/availability', [DriverProfileController::class, 'updateAvailability']);
         });
     });
 

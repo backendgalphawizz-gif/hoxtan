@@ -118,6 +118,7 @@ class AddressController extends Controller
             'address_type' => ['required', 'string', Rule::in(['home', 'work', 'other'])],
             'is_default' => ['nullable', 'boolean'],
             'full_name' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z\s]+$/'],
+            'flat_no' => ['nullable', 'string', 'max:50'],
             'address_line' => ['required', 'string', 'max:500'],
             'city' => ['required', 'string', 'max:100'],
             'state' => ['required', 'string', 'max:100'],

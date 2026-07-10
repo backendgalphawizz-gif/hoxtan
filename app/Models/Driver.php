@@ -14,10 +14,13 @@ class Driver extends Model
         'name',
         'phone',
         'email',
+        'profile_image',
+        'primary_residence',
         'vehicle_type',
         'vehicle_number',
         'notes',
         'is_active',
+        'is_online',
         'last_login_at',
     ];
 
@@ -25,6 +28,7 @@ class Driver extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_online' => 'boolean',
             'last_login_at' => 'datetime',
         ];
     }
