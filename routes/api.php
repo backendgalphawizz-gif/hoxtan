@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ForgotMpinController;
+use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\JewelleryCheckoutController;
 use App\Http\Controllers\Api\JewelleryController;
 use App\Http\Controllers\Api\KycController;
@@ -136,5 +137,13 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/sig/pause', [SigController::class, 'pause']);
         Route::post('/sig/resume', [SigController::class, 'resume']);
         Route::post('/sig/stop', [SigController::class, 'stop']);
+
+        Route::get('/goals/config', [GoalController::class, 'config']);
+        Route::get('/goals', [GoalController::class, 'index']);
+        Route::post('/goals', [GoalController::class, 'store']);
+        Route::get('/goals/{goal}', [GoalController::class, 'show']);
+        Route::put('/goals/{goal}', [GoalController::class, 'update']);
+        Route::post('/goals/{goal}', [GoalController::class, 'update']);
+        Route::delete('/goals/{goal}', [GoalController::class, 'destroy']);
     });
 });

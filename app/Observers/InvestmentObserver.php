@@ -3,20 +3,25 @@
 namespace App\Observers;
 
 use App\Models\Investment;
+use App\Models\User;
+use App\Services\InvestmentGoalService;
 use App\Services\InvoiceService;
-use App\Services\UserHoldingsService;
 
 class InvestmentObserver
 {
     public function __construct(
-        protected UserHoldingsService $holdings,
+        protected InvestmentGoalService $goals,
         protected InvoiceService $invoices,
     ) {}
 
     public function saved(Investment $investment): void
     {
         if ($investment->wasChanged('status') || $investment->wasRecentlyCreated) {
-            $this->holdings->recalculateForUser((int) $investment->user_id);
+            $user = User::query()->find($investment->user_id);
+
+            if ($user) {
+                $this->goals->syncUserGoals($user);
+            }
         }
 
         if ($investment->wasChanged('status')
@@ -28,6 +33,10 @@ class InvestmentObserver
 
     public function deleted(Investment $investment): void
     {
-        $this->holdings->recalculateForUser((int) $investment->user_id);
+        $user = User::query()->find($investment->user_id);
+
+        if ($user) {
+            $this->goals->syncUserGoals($user);
+        }
     }
 }
