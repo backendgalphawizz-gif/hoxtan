@@ -112,7 +112,6 @@ class JewelleryProductResource extends Resource
 
                 Forms\Components\Section::make('Product Images')
                     ->description('Upload up to 5 images. Drag to reorder — the first image is the cover shown in the app.')
-                    ->extraAttributes(['class' => 'gs-product-images-section'])
                     ->schema([
                         static::productImagesField(),
                     ]),
@@ -214,6 +213,8 @@ class JewelleryProductResource extends Resource
             ->maxFiles(5)
             ->reorderable()
             ->appendFiles()
+            ->panelLayout('grid')
+            ->itemPanelAspectRatio(1)
             ->imagePreviewHeight('136')
             ->placeholder('Drag & drop images here, or click to browse')
             ->disk('public')
@@ -221,8 +222,6 @@ class JewelleryProductResource extends Resource
             ->visibility('public')
             ->required()
             ->maxSize(4096)
-            ->extraAttributes(['class' => 'gs-product-images-upload'])
-            ->extraFieldWrapperAttributes(['class' => 'gs-product-images-field'])
             ->columnSpanFull();
     }
 
