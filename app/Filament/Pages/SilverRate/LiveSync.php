@@ -40,7 +40,7 @@ class LiveSync extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Fetch and apply the latest live silver rate from the market feed.';
+        return 'Fetch and apply the latest live silver rate from Metals-API.';
     }
 
     protected function getHeaderActions(): array

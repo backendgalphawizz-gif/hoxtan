@@ -8,6 +8,7 @@ use App\Support\AdminPermissions;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
@@ -48,7 +49,13 @@ class Settings extends Page implements HasForms
         $values = [];
 
         foreach ($settings->definitions() as $key => $definition) {
-            $values[$key] = $settings->get($key, $definition['default'] ?? '');
+            $value = $settings->get($key, $definition['default'] ?? '');
+
+            if (($definition['type'] ?? 'text') === 'toggle') {
+                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            }
+
+            $values[$key] = $value;
         }
 
         $this->form->fill($values);
@@ -56,7 +63,7 @@ class Settings extends Page implements HasForms
 
     public function getSubheading(): ?string
     {
-        return 'Configure GST, metal rate APIs, and application details without code changes.';
+        return 'Configure GST, Metals-API options, and application details without code changes.';
     }
 
     public function form(Form $form): Form
@@ -86,11 +93,17 @@ class Settings extends Page implements HasForms
                     'email' => TextInput::make($key)->email(),
                     'url' => TextInput::make($key)->url(),
                     'textarea' => Textarea::make($key)->rows(3),
+                    'toggle' => Toggle::make($key)
+                        ->label($definition['label'] ?? $key)
+                        ->inline(false),
                     default => TextInput::make($key),
                 };
 
+                if (($definition['type'] ?? 'text') !== 'toggle') {
+                    $field = $field->label($definition['label'] ?? $key);
+                }
+
                 $fields[] = $field
-                    ->label($definition['label'] ?? $key)
                     ->helperText($definition['description'] ?? null);
             }
 

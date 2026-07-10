@@ -48,6 +48,8 @@ return [
         'key' => env('METALS_API_KEY'),
         'base_url' => env('METALS_API_BASE_URL', 'https://metals-api.com/api'),
         'gold_symbol' => env('METALS_API_GOLD_SYMBOL', 'VISA-24k'),
+        // When using /latest for Indian gold symbols, divide the USD{symbol} price by this to get INR/gram (default 1).
+        'gold_price_divisor' => env('METALS_API_GOLD_PRICE_DIVISOR', 1),
         'currency' => env('METALS_API_CURRENCY', 'INR'),
     ],
 

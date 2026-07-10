@@ -2,13 +2,11 @@
 
 namespace App\Support;
 
-use App\Services\AppSettingService;
-
 class MpinRules
 {
     public static function length(): int
     {
-        return max(4, min(6, app(AppSettingService::class)->getInt('mpin_length', 4)));
+        return max(4, min(6, (int) config('otp.mpin_length', 4)));
     }
 
   public static function validationRules(string $field = 'mpin', bool $confirmed = true): array

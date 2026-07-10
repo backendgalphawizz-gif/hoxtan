@@ -19,4 +19,6 @@ return [
   */
   'expose_in_response' => env('OTP_EXPOSE_IN_RESPONSE', env('APP_DEBUG', false)),
 
+  'mpin_length' => (int) env('MPIN_LENGTH', 4),
+
 ];

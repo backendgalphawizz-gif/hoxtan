@@ -31,7 +31,7 @@ class MetalRateBroadcastTest extends TestCase
             ->assertJsonPath('data.realtime.key', 'test-key');
     }
 
-    public function test_manual_rate_update_broadcasts_event(): void
+    public function test_rate_broadcast_dispatches_event(): void
     {
         Event::fake([MetalRatesUpdated::class]);
 
@@ -40,11 +40,9 @@ class MetalRateBroadcastTest extends TestCase
             'broadcasting.connections.reverb.key' => 'test-key',
         ]);
 
-        app(MetalRateService::class)->applyManualRate('gold', 7300.50, true, 'Test override');
+        app(MetalRateService::class)->broadcastCurrentRates();
 
-        Event::assertDispatched(MetalRatesUpdated::class, function (MetalRatesUpdated $event): bool {
-            return ($event->rates['gold']['rate_per_gram'] ?? null) === 7300.50;
-        });
+        Event::assertDispatched(MetalRatesUpdated::class);
     }
 
     public function test_realtime_config_endpoint(): void

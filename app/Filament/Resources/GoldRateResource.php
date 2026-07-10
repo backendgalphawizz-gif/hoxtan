@@ -36,8 +36,6 @@ class GoldRateResource extends MetalRateResource
     {
         return [
             'index' => Pages\ListGoldRates::route('/'),
-            'create' => Pages\CreateGoldRate::route('/create'),
-            'edit' => Pages\EditGoldRate::route('/{record}/edit'),
         ];
     }
 }

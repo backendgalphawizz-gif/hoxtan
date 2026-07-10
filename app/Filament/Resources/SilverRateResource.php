@@ -36,8 +36,6 @@ class SilverRateResource extends MetalRateResource
     {
         return [
             'index' => Pages\ListSilverRates::route('/'),
-            'create' => Pages\CreateSilverRate::route('/create'),
-            'edit' => Pages\EditSilverRate::route('/{record}/edit'),
         ];
     }
 }

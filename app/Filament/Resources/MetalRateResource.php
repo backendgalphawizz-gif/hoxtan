@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Models\MetalRate;
-use App\Support\FilamentTableActions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -85,10 +84,6 @@ abstract class MetalRateResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')->boolean(),
                 Tables\Columns\TextColumn::make('updatedBy.name')->label('Updated By'),
                 Tables\Columns\TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
-            ])
-            ->actions([
-                FilamentTableActions::edit(),
-                FilamentTableActions::delete(),
             ])
             ->defaultSort('created_at', 'desc');
     }

@@ -22,36 +22,13 @@ class MetalsApiService
 
         $symbol = $this->goldSymbol();
 
-        try {
-            $response = Http::timeout($this->timeout())
-                ->get($this->baseUrl().'/gold-price-india', [
-                    'access_key' => $this->apiKey(),
-                    'symbols' => $symbol,
-                ]);
+        $rate = $this->fetchGoldFromIndiaEndpoint($symbol);
 
-            if (! $response->successful() || ! $response->json('success')) {
-                Log::warning('Metals-API gold-price-india failed', [
-                    'status' => $response->status(),
-                    'body' => $response->json(),
-                ]);
-
-                return null;
-            }
-
-            $rate = data_get($response->json(), "rates.{$symbol}");
-
-            if (! is_numeric($rate)) {
-                Log::warning('Metals-API gold symbol missing from response', ['symbol' => $symbol]);
-
-                return null;
-            }
-
-            return round((float) $rate, 2);
-        } catch (\Throwable $exception) {
-            Log::warning('Metals-API gold request exception', ['message' => $exception->getMessage()]);
-
-            return null;
+        if ($rate !== null) {
+            return $rate;
         }
+
+        return $this->fetchGoldFromLatestEndpoint($symbol);
     }
 
     public function fetchSilverRatePerGram(): ?float
@@ -60,41 +37,93 @@ class MetalsApiService
             return null;
         }
 
+        return $this->fetchSilverFromLatestGram();
+    }
+
+    protected function fetchGoldFromIndiaEndpoint(string $symbol): ?float
+    {
         try {
             $response = Http::timeout($this->timeout())
-                ->get($this->baseUrl().'/convert', [
+                ->get($this->baseUrl().'/gold-price-india', [
                     'access_key' => $this->apiKey(),
-                    'from' => 'XAG',
-                    'to' => $this->currency(),
-                    'amount' => 1,
+                    'symbols' => $symbol,
                 ]);
 
             if (! $response->successful() || ! $response->json('success')) {
-                return $this->fetchSilverFromLatest();
+                Log::info('Metals-API gold-price-india unavailable, using /latest fallback', [
+                    'status' => $response->status(),
+                    'error' => data_get($response->json(), 'error.type'),
+                ]);
+
+                return null;
             }
 
-            $inrPerTroyOz = data_get($response->json(), 'result');
+            $rate = data_get($response->json(), "rates.{$symbol}");
 
-            if (! is_numeric($inrPerTroyOz)) {
-                return $this->fetchSilverFromLatest();
+            if (! is_numeric($rate)) {
+                Log::warning('Metals-API gold symbol missing from gold-price-india response', ['symbol' => $symbol]);
+
+                return null;
             }
 
-            return round((float) $inrPerTroyOz / self::TROY_OUNCE_GRAMS, 2);
+            return $this->normalizeIndianGoldPrice((float) $rate);
         } catch (\Throwable $exception) {
-            Log::warning('Metals-API silver convert exception', ['message' => $exception->getMessage()]);
+            Log::warning('Metals-API gold-price-india exception', ['message' => $exception->getMessage()]);
 
-            return $this->fetchSilverFromLatest();
+            return null;
         }
     }
 
-    protected function fetchSilverFromLatest(): ?float
+    protected function fetchGoldFromLatestEndpoint(string $symbol): ?float
     {
         try {
             $response = Http::timeout($this->timeout())
                 ->get($this->baseUrl().'/latest', [
                     'access_key' => $this->apiKey(),
-                    'base' => 'USD',
-                    'symbols' => 'USDXAG,'.$this->currency(),
+                    'symbols' => $symbol,
+                ]);
+
+            if (! $response->successful() || ! $response->json('success')) {
+                Log::warning('Metals-API gold latest fallback failed', [
+                    'status' => $response->status(),
+                    'body' => $response->json(),
+                ]);
+
+                return null;
+            }
+
+            $rates = $response->json('rates', []);
+            $usdSymbolKey = 'USD'.$symbol;
+            $rate = $rates[$usdSymbolKey] ?? null;
+
+            if (! is_numeric($rate)) {
+                Log::warning('Metals-API gold latest missing INR price key', [
+                    'symbol' => $symbol,
+                    'expected_key' => $usdSymbolKey,
+                    'available_keys' => array_keys($rates),
+                ]);
+
+                return null;
+            }
+
+            // rates.{symbol} is an inverse value (e.g. 6.9e-5), not INR/gram.
+            return $this->normalizeIndianGoldPrice((float) $rate);
+        } catch (\Throwable $exception) {
+            Log::warning('Metals-API gold latest exception', ['message' => $exception->getMessage()]);
+
+            return null;
+        }
+    }
+
+    protected function fetchSilverFromLatestGram(): ?float
+    {
+        try {
+            $response = Http::timeout($this->timeout())
+                ->get($this->baseUrl().'/latest', [
+                    'access_key' => $this->apiKey(),
+                    'base' => $this->currency(),
+                    'symbols' => 'XAG',
+                    'unit' => 'Gram',
                 ]);
 
             if (! $response->successful() || ! $response->json('success')) {
@@ -103,23 +132,25 @@ class MetalsApiService
                 return null;
             }
 
-            $rates = $response->json('rates', []);
-            $usdPerOz = $rates['USDXAG'] ?? null;
-            $currencyRate = $rates[$this->currency()] ?? null;
+            $rate = data_get($response->json(), 'rates.XAG');
 
-            if (! is_numeric($usdPerOz) || ! is_numeric($currencyRate) || (float) $currencyRate <= 0) {
+            if (! is_numeric($rate)) {
                 return null;
             }
 
-            // Base USD: USDXAG = USD/troy oz, INR = INR per 1 USD.
-            $inrPerOz = (float) $usdPerOz * (float) $currencyRate;
-
-            return round($inrPerOz / self::TROY_OUNCE_GRAMS, 2);
+            return round((float) $rate, 2);
         } catch (\Throwable $exception) {
             Log::warning('Metals-API silver latest exception', ['message' => $exception->getMessage()]);
 
             return null;
         }
+    }
+
+    protected function normalizeIndianGoldPrice(float $price): float
+    {
+        $divisor = max(1, (int) config('services.metals_api.gold_price_divisor', 1));
+
+        return round($price / $divisor, 2);
     }
 
     protected function apiKey(): ?string
