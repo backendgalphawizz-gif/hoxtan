@@ -99,11 +99,11 @@ class JewelleryProduct extends Model
     {
         $image = $this->image;
 
-        if (is_array($image)) {
-            return array_values(array_filter($image, fn ($path) => filled($path)));
+        if (! is_array($image) || $image === []) {
+            $image = $this->decodeImageAttribute($this->getRawOriginal('image'));
         }
 
-        return filled($image) && is_string($image) ? [$image] : [];
+        return self::normalizeImagePaths($image);
     }
 
     /**
@@ -121,6 +121,78 @@ class JewelleryProduct extends Model
     public function imageUrl(): ?string
     {
         return $this->imageUrls()[0] ?? null;
+    }
+
+    /**
+     * @return list<array{url: string, is_cover: bool, sort_order: int}>
+     */
+    public function imageItems(): array
+    {
+        return collect($this->imageUrls())
+            ->values()
+            ->map(fn (string $url, int $index): array => [
+                'url' => $url,
+                'is_cover' => $index === 0,
+                'sort_order' => $index,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected static function normalizeImagePaths(mixed $image): array
+    {
+        if (blank($image)) {
+            return [];
+        }
+
+        if (is_string($image)) {
+            $decoded = json_decode($image, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return self::normalizeImagePaths($decoded);
+            }
+
+            if (str_contains($image, ',')) {
+                return collect(explode(',', $image))
+                    ->map(fn (string $path) => trim($path))
+                    ->filter(fn (string $path) => filled($path))
+                    ->values()
+                    ->all();
+            }
+
+            return filled($image) ? [$image] : [];
+        }
+
+        if (! is_array($image)) {
+            return [];
+        }
+
+        return collect($image)
+            ->flatMap(fn (mixed $value): array => self::normalizeImagePaths($value))
+            ->filter(fn (mixed $path) => is_string($path) && filled($path))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>|string|null
+     */
+    protected function decodeImageAttribute(mixed $raw): mixed
+    {
+        if (blank($raw)) {
+            return null;
+        }
+
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+
+            return json_last_error() === JSON_ERROR_NONE ? $decoded : $raw;
+        }
+
+        return $raw;
     }
 
     public function specificationLabel(): string

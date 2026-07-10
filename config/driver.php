@@ -52,6 +52,26 @@ return [
         ],
     ],
 
+    'pickup' => [
+        'otp_length' => 4,
+        'failure_reasons' => [
+            ['value' => 'customer_unavailable', 'label' => 'Customer unavailable'],
+            ['value' => 'wrong_address', 'label' => 'Wrong Address'],
+            ['value' => 'customer_refused', 'label' => 'Customer Refused'],
+            ['value' => 'jewellery_mismatch', 'label' => 'Jewellery mismatch'],
+            ['value' => 'vehicle_issue', 'label' => 'Vehicle Issue'],
+            ['value' => 'other', 'label' => 'Other'],
+        ],
+        'statuses' => [
+            'processing' => ['label' => 'Processing', 'color' => 'muted'],
+            'accepted' => ['label' => 'Accepted', 'color' => 'warning'],
+            'verified' => ['label' => 'Verified', 'color' => 'primary'],
+            'proof_uploaded' => ['label' => 'Proof Uploaded', 'color' => 'info'],
+            'collected' => ['label' => 'Collected', 'color' => 'success'],
+            'cancelled' => ['label' => 'Cancelled', 'color' => 'danger'],
+        ],
+    ],
+
     'deliveries' => [
         'search_placeholder' => 'Search for orders ID, Sell ID...',
         'per_page' => 10,

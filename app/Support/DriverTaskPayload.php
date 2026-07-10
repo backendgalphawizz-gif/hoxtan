@@ -57,7 +57,9 @@ class DriverTaskPayload
             ?? $booking->driver_assigned_at
             ?? $booking->created_at;
 
-        return self::base(
+        $driverStatus = DriverPickupPayload::resolveStatus($booking);
+
+        return array_merge(self::base(
             id: $booking->id,
             taskType: 'pickup',
             taskTypeLabel: 'Jewellery Pickup',
@@ -80,7 +82,11 @@ class DriverTaskPayload
             statusLabel: SellJewelleryPayload::statusLabel($booking->status),
             isPending: self::isPickupPending($booking),
             isCompleted: self::isPickupCompleted($booking),
-        );
+        ), [
+            'driver_pickup_status' => $driverStatus['key'],
+            'driver_pickup_status_label' => $driverStatus['label'],
+            'driver_pickup_status_color' => $driverStatus['color'],
+        ]);
     }
 
     /**
@@ -128,10 +134,13 @@ class DriverTaskPayload
             ];
             $displayIdLabel = 'Order ID';
         } else {
+            $statusKey = (string) ($task['driver_pickup_status'] ?? 'processing');
+            $statuses = config('driver.pickup.statuses', []);
+
             $statusTag = [
-                'key' => 'pickup',
-                'label' => (string) ($task['task_type_label'] ?? 'Jewellery Pickup'),
-                'color' => 'warning',
+                'key' => $statusKey,
+                'label' => $task['driver_pickup_status_label'] ?? ($statuses[$statusKey]['label'] ?? ''),
+                'color' => $task['driver_pickup_status_color'] ?? ($statuses[$statusKey]['color'] ?? 'muted'),
             ];
             $displayIdLabel = 'Sell ID';
         }
@@ -183,7 +192,9 @@ class DriverTaskPayload
 
     public static function isPickupCompleted(OldGoldBooking $booking): bool
     {
-        return SellJewelleryPayload::normalizeStatus($booking->status) === 'completed';
+        $status = SellJewelleryPayload::normalizeStatus($booking->status);
+
+        return in_array($status, ['picked_up', 'completed'], true) || filled($booking->picked_up_at);
     }
 
     public static function isPickupPending(OldGoldBooking $booking): bool

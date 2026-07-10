@@ -32,6 +32,10 @@ class OldGoldBooking extends Model
         'admin_notes',
         'accepted_at',
         'pickup_scheduled_at',
+        'driver_accepted_at',
+        'customer_verified_at',
+        'pickup_proof_images',
+        'pickup_failure_reason',
         'picked_up_at',
         'completed_at',
     ];
@@ -44,7 +48,10 @@ class OldGoldBooking extends Model
             'quoted_amount' => 'decimal:2',
             'final_amount' => 'decimal:2',
             'documents' => 'array',
+            'pickup_proof_images' => 'array',
             'driver_assigned_at' => 'datetime',
+            'driver_accepted_at' => 'datetime',
+            'customer_verified_at' => 'datetime',
             'accepted_at' => 'datetime',
             'pickup_scheduled_at' => 'datetime',
             'picked_up_at' => 'datetime',
@@ -59,7 +66,17 @@ class OldGoldBooking extends Model
                 return;
             }
 
-            $booking->driver_assigned_at = $booking->driver_id ? now() : null;
+            if ($booking->driver_id) {
+                $booking->driver_assigned_at = now();
+
+                if (in_array($booking->status, ['pending', 'accepted', 'pickup_scheduling'], true)) {
+                    $booking->status = 'processing';
+                }
+
+                return;
+            }
+
+            $booking->driver_assigned_at = null;
         });
     }
 

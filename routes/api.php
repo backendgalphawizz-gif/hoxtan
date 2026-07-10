@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Driver\DriverAuthController;
 use App\Http\Controllers\Api\Driver\DriverDeliveriesController;
 use App\Http\Controllers\Api\Driver\DriverDeliveryController;
 use App\Http\Controllers\Api\Driver\DriverHomeController;
+use App\Http\Controllers\Api\Driver\DriverPickupController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
@@ -36,6 +37,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
     Route::get('/jewellery/products', [JewelleryController::class, 'products']);
     Route::get('/jewellery/products/{product}', [JewelleryController::class, 'show']);
+    Route::get('/products/{product}', [JewelleryController::class, 'show']);
 
     Route::get('/register/config', [RegistrationController::class, 'config']);
     Route::post('/register/send-otp', [RegistrationController::class, 'sendOtp']);
@@ -83,7 +85,13 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/tasks/deliveries/{order}/picked-up', [DriverDeliveryController::class, 'markPickedUp']);
             Route::post('/tasks/deliveries/{order}/verify-delivery', [DriverDeliveryController::class, 'verifyDelivery']);
             Route::post('/tasks/deliveries/{order}/unable-to-deliver', [DriverDeliveryController::class, 'markUnableToDeliver']);
-            Route::get('/tasks/pickups/{booking}', [DriverHomeController::class, 'showPickup']);
+            Route::get('/pickups/config', [DriverPickupController::class, 'config']);
+            Route::get('/tasks/pickups/{booking}', [DriverPickupController::class, 'show']);
+            Route::post('/tasks/pickups/{booking}/accept', [DriverPickupController::class, 'accept']);
+            Route::post('/tasks/pickups/{booking}/verify-customer', [DriverPickupController::class, 'verifyCustomer']);
+            Route::post('/tasks/pickups/{booking}/upload-proof', [DriverPickupController::class, 'uploadProof']);
+            Route::post('/tasks/pickups/{booking}/verify-otp', [DriverPickupController::class, 'verifyOtp']);
+            Route::post('/tasks/pickups/{booking}/unable-to-pickup', [DriverPickupController::class, 'markUnableToPickup']);
         });
     });
 

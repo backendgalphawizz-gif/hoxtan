@@ -28,14 +28,16 @@ class JewelleryProductPayload
 
         $gstService = app(GstService::class);
         $gst = $gstService->calculateGstAmount($price);
+        $imageUrls = $product->imageUrls();
 
         return [
             'id' => $product->id,
             'sku' => $product->sku,
             'name' => $product->name,
             'description' => $product->description,
-            'image_url' => $product->imageUrl(),
-            'image_urls' => $product->imageUrls(),
+            'image_url' => $imageUrls[0] ?? null,
+            'image_urls' => $imageUrls,
+            'images' => $product->imageItems(),
             'metal_type' => $product->metal_type,
             'purity' => $product->purity,
             'weight_grams' => $product->weight_grams !== null ? (float) $product->weight_grams : null,

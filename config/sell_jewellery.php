@@ -46,6 +46,7 @@ return [
     'statuses' => [
         'pending' => 'Pending for Acceptance',
         'accepted' => 'Request Accepted',
+        'processing' => 'Processing',
         'pickup_scheduling' => 'Pickup Scheduling',
         'picked_up' => 'Jewellery Picked',
         'completed' => 'Completed',
@@ -63,6 +64,7 @@ return [
     'tracking_steps' => [
         ['key' => 'pending', 'label' => 'Pending for Acceptance'],
         ['key' => 'accepted', 'label' => 'Request Accepted'],
+        ['key' => 'processing', 'label' => 'Processing'],
         ['key' => 'pickup_scheduling', 'label' => 'Pickup Scheduling'],
         ['key' => 'picked_up', 'label' => 'Jewellery Picked'],
         ['key' => 'completed', 'label' => 'Completed'],
@@ -71,9 +73,10 @@ return [
     'status_tracking_index' => [
         'pending' => 0,
         'accepted' => 1,
-        'pickup_scheduling' => 2,
-        'picked_up' => 3,
-        'completed' => 4,
+        'processing' => 2,
+        'pickup_scheduling' => 3,
+        'picked_up' => 4,
+        'completed' => 5,
         'cancelled' => 0,
         'failed' => 0,
     ],

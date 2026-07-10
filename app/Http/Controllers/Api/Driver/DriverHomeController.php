@@ -4,16 +4,13 @@ namespace App\Http\Controllers\Api\Driver;
 
 use App\Http\Controllers\Controller;
 use App\Models\Driver;
-use App\Models\OldGoldBooking;
 use App\Services\DriverTaskService;
 use App\Support\ApiResponse;
 use App\Support\DriverPayload;
 use App\Support\DriverTaskPayload;
-use App\Support\SellJewelleryPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\Response;
 
 class DriverHomeController extends Controller
 {
@@ -74,27 +71,5 @@ class DriverHomeController extends Controller
             'pagination' => $result['pagination'],
             'filters' => config('driver.home.task_filters', []),
         ]);
-    }
-
-    public function showPickup(Request $request, OldGoldBooking $booking): JsonResponse
-    {
-        /** @var Driver $driver */
-        $driver = $request->user();
-
-        $this->ensurePickupAssignedToDriver($driver, $booking);
-
-        $booking->load('user');
-
-        return ApiResponse::success([
-            'task' => DriverTaskPayload::fromPickup($booking),
-            'pickup' => SellJewelleryPayload::make($booking, detailed: true, includeDeliveryOtp: false),
-        ]);
-    }
-
-    protected function ensurePickupAssignedToDriver(Driver $driver, OldGoldBooking $booking): void
-    {
-        if ($booking->driver_id !== $driver->id) {
-            abort(Response::HTTP_NOT_FOUND, 'Resource not found.');
-        }
     }
 }

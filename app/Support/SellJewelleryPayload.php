@@ -143,7 +143,8 @@ class SellJewelleryPayload
         $at = match ($stepKey) {
             'pending' => $booking->created_at,
             'accepted' => $booking->accepted_at ?? $booking->updated_at,
-            'pickup_scheduling' => $booking->pickup_scheduled_at ?? $booking->accepted_at ?? $booking->updated_at,
+            'processing' => $booking->driver_assigned_at ?? $booking->updated_at,
+            'pickup_scheduling' => $booking->pickup_scheduled_at ?? $booking->driver_assigned_at ?? $booking->updated_at,
             'picked_up' => $booking->picked_up_at ?? $booking->pickup_scheduled_at ?? $booking->updated_at,
             'completed' => $booking->completed_at ?? $booking->picked_up_at ?? $booking->updated_at,
             default => null,
@@ -154,10 +155,7 @@ class SellJewelleryPayload
 
     public static function normalizeStatus(?string $status): string
     {
-        return match ($status) {
-            'processing' => 'accepted',
-            default => (string) $status,
-        };
+        return (string) $status;
     }
 
     public static function statusLabel(?string $status): string
