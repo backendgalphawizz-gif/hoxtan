@@ -341,7 +341,12 @@ class DummyDataSeeder extends Seeder
         ]);
         StaticPage::updateOrCreate(['slug' => 'privacy-policy'], [
             'title' => 'Privacy Policy',
-            'content' => '<h2>Privacy Policy</h2><p>We respect your privacy and protect your personal data...</p>',
+            'content' => '<h2>Privacy Policy</h2><p>We respect your privacy and protect your personal data. See the full policy on our website.</p>',
+            'is_published' => true,
+        ]);
+        StaticPage::updateOrCreate(['slug' => 'delete-account'], [
+            'title' => 'Delete Your Account',
+            'content' => '<h2>Delete Account</h2><p>Open the app → Profile → Close Account → confirm with your M-PIN.</p>',
             'is_published' => true,
         ]);
         StaticPage::updateOrCreate(['slug' => 'about-us'], [

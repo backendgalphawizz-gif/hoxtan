@@ -28,10 +28,16 @@ class AppConfigPayload
             ->where('is_published', true)
             ->first();
 
+        $deleteAccountPage = StaticPage::query()
+            ->where('slug', config('app_content.delete_account.slug', 'delete-account'))
+            ->where('is_published', true)
+            ->first();
+
         return [
             'app' => [
                 'name' => $settings->get('app_name', config('app_content.app_name', 'HOXTAN')),
             ],
+            'play_store' => self::playStoreUrls(),
             'faqs_screen' => config('app_content.faqs_screen', []),
             'faq_categories' => config('app_content.faq_categories', []),
             'faqs' => self::faqCollection($faqs),
@@ -46,6 +52,7 @@ class AppConfigPayload
             ],
             'terms' => self::terms($termsPage),
             'privacy' => self::privacy($privacyPage, $settings),
+            'delete_account' => self::deleteAccount($deleteAccountPage, $settings),
         ];
     }
 
@@ -120,8 +127,35 @@ class AppConfigPayload
         return array_merge($config, [
             'title' => $page?->title ?? ($config['title'] ?? 'Privacy Policy'),
             'content' => $page?->content,
+            'url' => url(config('app_content.play_store.privacy_policy_url', '/privacy-policy')),
             'privacy_support_email' => $settings->get('support_email', $config['privacy_support_email'] ?? 'privacy@hoxtan.com'),
             'updated_at' => $page?->updated_at?->toIso8601String(),
         ]);
+    }
+
+    protected static function deleteAccount(?StaticPage $page, AppSettingService $settings): array
+    {
+        $config = config('app_content.delete_account', []);
+
+        return array_merge($config, [
+            'title' => $page?->title ?? ($config['title'] ?? 'Delete Your Account'),
+            'content' => $page?->content,
+            'url' => url(config('app_content.play_store.delete_account_url', '/delete-account')),
+            'support_email' => $settings->get('support_email', $config['support_email'] ?? 'support@hoxtandigigold.com'),
+            'updated_at' => $page?->updated_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * @return array{privacy_policy_url: string, delete_account_url: string}
+     */
+    public static function playStoreUrls(): array
+    {
+        $playStore = config('app_content.play_store', []);
+
+        return [
+            'privacy_policy_url' => url($playStore['privacy_policy_url'] ?? '/privacy-policy'),
+            'delete_account_url' => url($playStore['delete_account_url'] ?? '/delete-account'),
+        ];
     }
 }

@@ -16,6 +16,15 @@ return [
         ['key' => 'about', 'slug' => 'about-us', 'label' => 'About Us'],
         ['key' => 'terms', 'slug' => 'terms-and-conditions', 'label' => 'Terms & Conditions'],
         ['key' => 'privacy', 'slug' => 'privacy-policy', 'label' => 'Privacy Policy'],
+        ['key' => 'delete_account', 'slug' => 'delete-account', 'label' => 'Delete Account'],
+    ],
+
+    /*
+    | Public URLs for Google Play Console (use APP_URL in production).
+    */
+    'play_store' => [
+        'privacy_policy_url' => '/privacy-policy',
+        'delete_account_url' => '/delete-account',
     ],
 
     'faqs_screen' => [
@@ -126,6 +135,18 @@ return [
         'privacy_support' => [
             'title' => 'Privacy Support',
             'description' => 'For inquiries regarding your data or to exercise your rights, contact our privacy desk.',
+        ],
+    ],
+
+    'delete_account' => [
+        'slug' => 'delete-account',
+        'title' => 'Delete Your Account',
+        'support_email' => 'support@hoxtandigigold.com',
+        'steps' => [
+            'Open the app and sign in.',
+            'Go to Profile.',
+            'Tap Close Account / Delete Account.',
+            'Enter your M-PIN to confirm.',
         ],
     ],
 

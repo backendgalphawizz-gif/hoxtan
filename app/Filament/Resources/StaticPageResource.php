@@ -43,7 +43,7 @@ class StaticPageResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Page Details')
-                    ->description('Website pages use fixed slugs: about-us, team, terms-and-conditions, privacy-policy.')
+                    ->description('Website pages use fixed slugs: about-us, team, terms-and-conditions, privacy-policy, delete-account.')
                     ->schema([
                         Forms\Components\Select::make('website_preset')
                             ->label('Website Page Type')
@@ -73,7 +73,7 @@ class StaticPageResource extends Resource
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->alphaDash()
-                            ->helperText('Use about-us, team, terms-and-conditions, or privacy-policy for website pages.'),
+                            ->helperText('Use about-us, team, terms-and-conditions, privacy-policy, or delete-account for website pages.'),
                         Forms\Components\Toggle::make('is_published')
                             ->label('Published')
                             ->default(false),

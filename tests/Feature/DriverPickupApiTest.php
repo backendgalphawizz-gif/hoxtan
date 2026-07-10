@@ -59,6 +59,29 @@ class DriverPickupApiTest extends TestCase
             ->assertJsonMissingPath('data.pickup.delivery_otp');
     }
 
+    public function test_driver_pickup_routes_accept_booking_number(): void
+    {
+        $token = $this->driverAuthToken(['phone' => '9876543611']);
+        $driver = Driver::query()->where('phone', '9876543611')->firstOrFail();
+        $booking = $this->createAssignedPickup($driver, [
+            'booking_number' => 'SELL96309',
+        ]);
+
+        $this->getJson('/api/v1/driver/tasks/pickups/'.$booking->booking_number, [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.pickup.booking_number', 'SELL96309');
+
+        $this->postJson('/api/v1/driver/tasks/pickups/'.$booking->booking_number.'/verify-customer', [
+            'confirmed' => true,
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.pickup.driver_pickup_status', 'verified');
+    }
+
     public function test_driver_can_complete_full_pickup_flow(): void
     {
         Storage::fake('public');

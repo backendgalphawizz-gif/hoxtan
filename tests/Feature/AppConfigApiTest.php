@@ -35,6 +35,13 @@ class AppConfigApiTest extends TestCase
             'is_published' => true,
         ]);
 
+        StaticPage::query()->create([
+            'title' => 'Delete Your Account',
+            'slug' => 'delete-account',
+            'content' => '<p>Delete account instructions</p>',
+            'is_published' => true,
+        ]);
+
         $response = $this->getJson('/api/v1/app/config');
 
         $response->assertOk()
@@ -45,14 +52,36 @@ class AppConfigApiTest extends TestCase
             ->assertJsonStructure([
                 'data' => [
                     'app',
+                    'play_store' => ['privacy_policy_url', 'delete_account_url'],
                     'faq_categories',
                     'faqs',
                     'concierge',
                     'support',
                     'terms' => ['sections', 'agreement_summary'],
-                    'privacy' => ['sections'],
+                    'privacy' => ['sections', 'url'],
+                    'delete_account' => ['url', 'steps'],
                 ],
             ]);
+    }
+
+    public function test_play_store_pages_are_public_on_website(): void
+    {
+        StaticPage::query()->create([
+            'title' => 'Privacy Policy',
+            'slug' => 'privacy-policy',
+            'content' => '<p>Privacy content</p>',
+            'is_published' => true,
+        ]);
+
+        StaticPage::query()->create([
+            'title' => 'Delete Your Account',
+            'slug' => 'delete-account',
+            'content' => '<p>Delete account instructions</p>',
+            'is_published' => true,
+        ]);
+
+        $this->get('/privacy-policy')->assertOk()->assertSee('Privacy Policy');
+        $this->get('/delete-account')->assertOk()->assertSee('Delete Your Account');
     }
 
     public function test_faqs_endpoint_supports_search_and_category_filter(): void
