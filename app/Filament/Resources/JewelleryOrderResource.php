@@ -4,12 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\JewelleryOrderResource\Pages;
+use App\Models\Driver;
 use App\Models\JewelleryOrder;
 use App\Support\FilamentDateFilters;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -41,7 +43,7 @@ class JewelleryOrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'payment', 'items.product', 'address']);
+            ->with(['user', 'payment', 'items.product', 'address', 'driver']);
     }
 
     public static function form(Form $form): Form
@@ -130,6 +132,28 @@ class JewelleryOrderResource extends Resource
                     ])->columns(3),
                 Forms\Components\Section::make('Delivery Tracking')
                     ->schema([
+                        Forms\Components\Select::make('driver_id')
+                            ->label('Assigned Driver')
+                            ->relationship(
+                                name: 'driver',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: fn (Builder $query) => $query
+                                    ->where('is_active', true)
+                                    ->orderBy('name'),
+                            )
+                            ->getOptionLabelFromRecordUsing(
+                                fn (Driver $record): string => "{$record->name} — +91 {$record->phone}"
+                            )
+                            ->searchable(['name', 'phone'])
+                            ->preload()
+                            ->nullable()
+                            ->helperText('Assign an active driver to handle delivery for this order.'),
+                        Forms\Components\DateTimePicker::make('driver_assigned_at')
+                            ->label('Driver Assigned At')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->native(false)
+                            ->visible(fn (Forms\Get $get): bool => filled($get('driver_id'))),
                         Forms\Components\TextInput::make('tracking_number')
                             ->label('Tracking Number')
                             ->maxLength(100),
@@ -224,6 +248,15 @@ class JewelleryOrderResource extends Resource
                     ->label('Total')
                     ->inr()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('driver.name')
+                    ->label('Driver')
+                    ->description(fn (JewelleryOrder $record): ?string => $record->driver
+                        ? '+91 '.$record->driver->phone
+                        : null)
+                    ->placeholder('Unassigned')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('expected_delivery_date')
                     ->label('Delivery By')
                     ->date('d M Y')
@@ -246,11 +279,46 @@ class JewelleryOrderResource extends Resource
                         'failed' => 'Failed',
                         'cancelled' => 'Cancelled',
                     ]),
+                Tables\Filters\SelectFilter::make('driver_id')
+                    ->label('Driver')
+                    ->relationship('driver', 'name')
+                    ->searchable()
+                    ->preload(),
                 FilamentDateFilters::tableFilter('ordered_date', 'created_at', 'Order Date'),
             ])
             ->actions([
                 FilamentTableActions::view(),
                 FilamentTableActions::edit(),
+                FilamentTableActions::make('assign_driver')
+                    ->icon('heroicon-o-user-plus')
+                    ->color('info')
+                    ->tooltip('Assign Driver')
+                    ->visible(fn (JewelleryOrder $record): bool => in_array($record->status, ['pending', 'processing'], true))
+                    ->form([
+                        Forms\Components\Select::make('driver_id')
+                            ->label('Driver')
+                            ->options(fn (): array => Driver::query()
+                                ->where('is_active', true)
+                                ->orderBy('name')
+                                ->get()
+                                ->mapWithKeys(fn (Driver $driver): array => [
+                                    $driver->id => "{$driver->name} — +91 {$driver->phone}",
+                                ])
+                                ->all())
+                            ->searchable()
+                            ->required()
+                            ->default(fn (JewelleryOrder $record): ?int => $record->driver_id),
+                    ])
+                    ->action(function (JewelleryOrder $record, array $data): void {
+                        $record->update([
+                            'driver_id' => $data['driver_id'],
+                        ]);
+
+                        Notification::make()
+                            ->title('Driver assigned to order')
+                            ->success()
+                            ->send();
+                    }),
             ])
             ->defaultSort('created_at', 'desc')
             ->emptyStateHeading('No buy now orders yet')

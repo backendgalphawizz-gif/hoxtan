@@ -21,6 +21,8 @@ class OldGoldBooking extends Model
         'identity_owner',
         'sell_location',
         'user_address_id',
+        'driver_id',
+        'driver_assigned_at',
         'status',
         'pickup_address',
         'pickup_name',
@@ -41,6 +43,7 @@ class OldGoldBooking extends Model
             'quoted_amount' => 'decimal:2',
             'final_amount' => 'decimal:2',
             'documents' => 'array',
+            'driver_assigned_at' => 'datetime',
             'accepted_at' => 'datetime',
             'pickup_scheduled_at' => 'datetime',
             'picked_up_at' => 'datetime',
@@ -48,9 +51,25 @@ class OldGoldBooking extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function (OldGoldBooking $booking): void {
+            if (! $booking->isDirty('driver_id')) {
+                return;
+            }
+
+            $booking->driver_assigned_at = $booking->driver_id ? now() : null;
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
     }
 
     public function payment(): BelongsTo

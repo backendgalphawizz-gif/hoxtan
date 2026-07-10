@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Driver\DriverAuthController;
+use App\Http\Controllers\Api\Driver\DriverHomeController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
@@ -71,6 +72,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/profile', [DriverProfileController::class, 'update']);
             Route::put('/availability', [DriverProfileController::class, 'updateAvailability']);
             Route::post('/availability', [DriverProfileController::class, 'updateAvailability']);
+            Route::get('/home', [DriverHomeController::class, 'home']);
+            Route::get('/statistics', [DriverHomeController::class, 'statistics']);
+            Route::get('/tasks', [DriverHomeController::class, 'tasks']);
+            Route::get('/tasks/deliveries/{order}', [DriverHomeController::class, 'showDelivery']);
+            Route::get('/tasks/pickups/{booking}', [DriverHomeController::class, 'showPickup']);
         });
     });
 

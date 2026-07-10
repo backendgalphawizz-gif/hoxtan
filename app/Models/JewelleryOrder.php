@@ -12,6 +12,8 @@ class JewelleryOrder extends Model
         'order_number',
         'user_id',
         'user_address_id',
+        'driver_id',
+        'driver_assigned_at',
         'payment_id',
         'subtotal',
         'metal_value',
@@ -43,9 +45,21 @@ class JewelleryOrder extends Model
             'discount_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'expected_delivery_date' => 'date',
+            'driver_assigned_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'delivered_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (JewelleryOrder $order): void {
+            if (! $order->isDirty('driver_id')) {
+                return;
+            }
+
+            $order->driver_assigned_at = $order->driver_id ? now() : null;
+        });
     }
 
     public function user(): BelongsTo
@@ -56,6 +70,11 @@ class JewelleryOrder extends Model
     public function address(): BelongsTo
     {
         return $this->belongsTo(UserAddress::class, 'user_address_id');
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
     }
 
     public function payment(): BelongsTo

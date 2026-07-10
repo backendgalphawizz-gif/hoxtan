@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\PhoneRules;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class Driver extends Model
@@ -58,5 +59,15 @@ class Driver extends Model
             'van' => 'Van',
             'other' => 'Other',
         ];
+    }
+
+    public function jewelleryOrders(): HasMany
+    {
+        return $this->hasMany(JewelleryOrder::class);
+    }
+
+    public function oldGoldBookings(): HasMany
+    {
+        return $this->hasMany(OldGoldBooking::class);
     }
 }

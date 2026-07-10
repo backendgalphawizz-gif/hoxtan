@@ -17,4 +17,20 @@ return [
         ['value' => 'van', 'label' => 'Van'],
         ['value' => 'other', 'label' => 'Other'],
     ],
+
+    'home' => [
+        'tasks_preview_limit' => 5,
+        'task_filters' => [
+            'types' => [
+                ['value' => 'all', 'label' => 'All Tasks'],
+                ['value' => 'delivery', 'label' => 'Assigned Orders'],
+                ['value' => 'pickup', 'label' => 'Jewellery Pickups'],
+            ],
+            'statuses' => [
+                ['value' => 'all', 'label' => 'All'],
+                ['value' => 'pending', 'label' => 'Pending'],
+                ['value' => 'completed', 'label' => 'Completed'],
+            ],
+        ],
+    ],
 ];
