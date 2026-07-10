@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin.active' => \App\Http\Middleware\EnsureAdminIsActive::class,
+            'driver.api' => \App\Http\Middleware\EnsureApiDriver::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {

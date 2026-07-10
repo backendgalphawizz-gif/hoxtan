@@ -14,14 +14,14 @@ return [
             'label' => 'Support Email',
             'type' => 'email',
             'description' => 'Contact email shown to users.',
-            'default' => 'support@hoxtan.com',
+            'default' => 'support@hoxtandigigold.com',
         ],
         'support_phone' => [
             'group' => 'general',
-            'label' => 'Support Phone',
+            'label' => 'Support Phone (Toll Free)',
             'type' => 'text',
-            'description' => 'Support contact number.',
-            'default' => '',
+            'description' => 'Toll-free support number shown in website footer and app.',
+            'default' => '18005693934',
         ],
         'gst_rate_percent' => [
             'group' => 'finance',

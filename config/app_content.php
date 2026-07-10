@@ -3,6 +3,11 @@
 return [
     'app_name' => 'HOXTAN',
 
+    'website_support' => [
+        'email' => 'support@hoxtandigigold.com',
+        'toll_free' => '18005693934',
+    ],
+
     /*
     | Website pages managed from Admin → CMS → Static Pages.
     | Slug must match the static page record to appear on the website.

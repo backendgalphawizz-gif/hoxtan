@@ -13,14 +13,29 @@ class WebsiteViewData
   public static function shared(): array
   {
     $settings = app(AppSettingService::class);
+    $support = config('app_content.website_support', []);
+    $supportEmail = (string) ($support['email'] ?? 'support@hoxtandigigold.com');
+    $supportPhone = (string) ($support['toll_free'] ?? '18005693934');
 
     return [
       'appName' => $settings->get('app_name', config('app_content.app_name', 'HOXTAN')),
-      'supportEmail' => $settings->get('support_email', 'support@hoxtan.com'),
-      'supportPhone' => $settings->get('support_phone', ''),
+      'supportEmail' => $supportEmail,
+      'supportPhone' => $supportPhone,
+      'supportPhoneFormatted' => self::formatSupportPhone($supportPhone),
       'socialLinks' => self::socialLinks(),
       'websitePages' => self::publishedPages(),
     ];
+  }
+
+  protected static function formatSupportPhone(string $phone): string
+  {
+    $digits = preg_replace('/\D/', '', $phone) ?? '';
+
+    if (strlen($digits) === 11 && str_starts_with($digits, '1800')) {
+      return substr($digits, 0, 4).' '.substr($digits, 4, 3).' '.substr($digits, 7);
+    }
+
+    return $phone;
   }
 
   /**

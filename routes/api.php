@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Driver\DriverAuthController;
+use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
@@ -53,6 +55,18 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/forgot-mpin/resend-otp', [ForgotMpinController::class, 'resendOtp']);
     Route::post('/forgot-mpin/verify-otp', [ForgotMpinController::class, 'verifyOtp']);
     Route::post('/forgot-mpin/set-mpin', [ForgotMpinController::class, 'setMpin']);
+
+    Route::prefix('driver')->group(function (): void {
+        Route::get('/login/config', [DriverAuthController::class, 'config']);
+        Route::post('/login/send-otp', [DriverAuthController::class, 'sendOtp']);
+        Route::post('/login/resend-otp', [DriverAuthController::class, 'resendOtp']);
+        Route::post('/login/verify-otp', [DriverAuthController::class, 'verifyOtp']);
+
+        Route::middleware(['auth:sanctum', 'driver.api'])->group(function (): void {
+            Route::post('/logout', [DriverAuthController::class, 'logout']);
+            Route::get('/profile', [DriverProfileController::class, 'show']);
+        });
+    });
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Driver;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -70,6 +71,48 @@ class OtpService
             true,
             config('otp.registration_session_ttl', 1800),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendDriverLoginOtp(string $phone): array
+    {
+        $phone = $this->normalizePhone($phone);
+        $driver = $this->findActiveDriverByPhone($phone);
+
+        return $this->sendOtp($phone, 'driver-login', [
+            'phone' => $phone,
+            'driver_name' => $driver->name,
+        ]);
+    }
+
+    public function verifyDriverLoginOtp(string $phone, string $otp): void
+    {
+        $phone = $this->normalizePhone($phone);
+        $this->findActiveDriverByPhone($phone);
+        $this->verifyOtp($phone, $otp, 'driver-login');
+    }
+
+    protected function findActiveDriverByPhone(string $phone): Driver
+    {
+        $phone = $this->normalizePhone($phone);
+
+        $driver = Driver::query()->where('phone', $phone)->first();
+
+        if (! $driver) {
+            throw ValidationException::withMessages([
+                'phone' => ['This mobile number is not registered as a driver. Please contact admin.'],
+            ]);
+        }
+
+        if (! $driver->is_active) {
+            throw ValidationException::withMessages([
+                'phone' => ['Your driver account is inactive. Please contact admin.'],
+            ])->status(403);
+        }
+
+        return $driver;
     }
 
     protected function findActiveUserByPhone(string $phone): User

@@ -44,7 +44,7 @@
                         <li><a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a></li>
                     @endif
                     @if ($supportPhone)
-                        <li><a href="tel:{{ $supportPhone }}">+91 {{ $supportPhone }}</a></li>
+                        <li><a href="tel:{{ preg_replace('/\D/', '', $supportPhone) }}">Toll Free: {{ $supportPhoneFormatted }}</a></li>
                     @endif
                 </ul>
             </div>

@@ -95,7 +95,7 @@ class AppConfigPayload
             'email_concierge' => [
                 'title' => 'Email Concierge',
                 'description' => 'Document-heavy inquiries or formal records of strategic decisions.',
-                'email' => $settings->get('support_email', 'support@hoxtan.com'),
+                'email' => $settings->get('support_email', 'support@hoxtandigigold.com'),
             ],
             'response_time' => config('support.response_time'),
             'hours' => config('support.support_hours'),
