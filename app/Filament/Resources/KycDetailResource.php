@@ -3,9 +3,11 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\InteractsWithAdminPermissions;
+use App\Filament\Exports\KycDetailExporter;
 use App\Filament\Resources\KycDetailResource\Pages;
 use App\Models\KycDetail;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentExportActions;
 use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
@@ -137,6 +139,9 @@ class KycDetailResource extends Resource
                         $record->user->update(['kyc_status' => 'rejected']);
                         Notification::make()->title('KYC Rejected')->danger()->send();
                     }),
+            ])
+            ->bulkActions([
+                FilamentExportActions::bulkExport(KycDetailExporter::class, 'kyc'),
             ])
             ->defaultSort('submitted_at', 'desc');
     }

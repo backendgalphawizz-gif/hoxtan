@@ -10,23 +10,38 @@ use Filament\Actions\Exports\Jobs\PrepareCsvExport;
 use Filament\Actions\Exports\Models\Export;
 use Filament\Facades\Filament;
 use Filament\Tables\Contracts\HasTable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FilamentImmediateExportService
 {
-    public function download(Component $livewire, string $exporterClass, string $format = 'csv'): StreamedResponse
-    {
-        $export = $this->buildExport($livewire, $exporterClass, $format);
+    /**
+     * @param  list<int|string>|null  $selectedKeys
+     */
+    public function download(
+        Component $livewire,
+        string $exporterClass,
+        string $format = 'csv',
+        ?array $selectedKeys = null,
+    ): StreamedResponse {
+        $export = $this->buildExport($livewire, $exporterClass, $format, $selectedKeys);
 
         $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
 
         return ExportFormat::from($format)->getDownloader()($export);
     }
 
-    protected function buildExport(Component $livewire, string $exporterClass, string $format): Export
-    {
+    /**
+     * @param  list<int|string>|null  $selectedKeys
+     */
+    protected function buildExport(
+        Component $livewire,
+        string $exporterClass,
+        string $format,
+        ?array $selectedKeys = null,
+    ): Export {
         if (! $livewire instanceof HasTable) {
             throw new \InvalidArgumentException('Export requires a table view.');
         }
@@ -35,6 +50,14 @@ class FilamentImmediateExportService
 
         $query = $exporterClass::modifyQuery($livewire->getTableQueryForExport());
 
+        $records = null;
+
+        if ($selectedKeys !== null && $selectedKeys !== []) {
+            $selectedKeys = $this->normalizeSelectedKeys($selectedKeys);
+            $query = (clone $query)->whereKey($selectedKeys);
+            $records = $selectedKeys;
+        }
+
         $columnMap = collect($exporterClass::getColumns())
             ->mapWithKeys(fn (ExportColumn $column): array => [$column->getName() => $column->getLabel()])
             ->all();
@@ -42,7 +65,7 @@ class FilamentImmediateExportService
         $export = app(Export::class);
         $export->user()->associate(Filament::auth()->user());
         $export->exporter = $exporterClass;
-        $export->total_rows = $query->count();
+        $export->total_rows = $records !== null ? count($records) : $query->count();
 
         $exporter = $export->getExporter(
             columnMap: $columnMap,
@@ -65,7 +88,7 @@ class FilamentImmediateExportService
                     'columnMap' => $columnMap,
                     'options' => [],
                     'chunkSize' => 100,
-                    'records' => null,
+                    'records' => $records,
                 ]),
             ])
                 ->onConnection('sync')
@@ -92,5 +115,18 @@ class FilamentImmediateExportService
         ]);
 
         return $export;
+    }
+
+    /**
+     * @param  list<int|string|Model>  $selectedKeys
+     * @return list<int|string>
+     */
+    protected function normalizeSelectedKeys(array $selectedKeys): array
+    {
+        return collect($selectedKeys)
+            ->map(fn (mixed $key): mixed => $key instanceof Model ? $key->getKey() : $key)
+            ->filter(fn (mixed $key): bool => $key !== null && $key !== '')
+            ->values()
+            ->all();
     }
 }
