@@ -33,6 +33,7 @@ class AccountActivityApiTest extends TestCase
             'shipping_name' => 'Alexander Vance',
             'shipping_phone' => '9876543210',
             'shipping_address' => '12 MG Road, Mumbai',
+            'delivery_otp' => '5678',
         ]);
 
         $this->getJson('/api/v1/orders/config')
@@ -43,6 +44,7 @@ class AccountActivityApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.orders.0.order_number', 'HOX12345')
             ->assertJsonPath('data.orders.0.status_label', 'Processing')
+            ->assertJsonPath('data.orders.0.delivery_otp', '5678')
             ->assertJsonPath('data.pagination.total', 1)
             ->assertJsonStructure([
                 'data' => [
@@ -68,6 +70,7 @@ class AccountActivityApiTest extends TestCase
         $this->getJson('/api/v1/orders/'.$order->id)
             ->assertOk()
             ->assertJsonPath('data.order.order_number_display', '#HOX12345')
+            ->assertJsonPath('data.order.delivery_otp', '5678')
             ->assertJsonStructure([
                 'data' => [
                     'order' => [

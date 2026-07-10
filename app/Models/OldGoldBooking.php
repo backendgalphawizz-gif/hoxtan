@@ -27,6 +27,7 @@ class OldGoldBooking extends Model
         'pickup_address',
         'pickup_name',
         'pickup_phone',
+        'delivery_otp',
         'documents',
         'admin_notes',
         'accepted_at',

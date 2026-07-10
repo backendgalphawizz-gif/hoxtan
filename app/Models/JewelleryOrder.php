@@ -28,6 +28,7 @@ class JewelleryOrder extends Model
         'shipping_phone',
         'shipping_address_type',
         'expected_delivery_date',
+        'delivery_otp',
         'tracking_number',
         'courier_name',
         'dispatched_at',

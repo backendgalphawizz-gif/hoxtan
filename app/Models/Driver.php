@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\PhoneRules;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
@@ -59,6 +60,43 @@ class Driver extends Model
             'van' => 'Van',
             'other' => 'Other',
         ];
+    }
+
+    /**
+     * @return Builder<Driver>
+     */
+    public static function assignableQuery(?int $includeDriverId = null): Builder
+    {
+        return static::query()
+            ->where(function (Builder $query) use ($includeDriverId): void {
+                $query->where('is_active', true);
+
+                if ($includeDriverId !== null) {
+                    $query->orWhere('id', $includeDriverId);
+                }
+            })
+            ->orderBy('name');
+    }
+
+    public static function assignmentOptionLabel(self $driver): string
+    {
+        $availability = $driver->is_online ? 'Online' : 'Offline';
+        $statusSuffix = $driver->is_active ? '' : ' · Inactive';
+
+        return "{$driver->name} — +91 {$driver->phone} · {$availability}{$statusSuffix}";
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function assignmentOptions(?int $includeDriverId = null): array
+    {
+        return static::assignableQuery($includeDriverId)
+            ->get()
+            ->mapWithKeys(fn (self $driver): array => [
+                $driver->id => static::assignmentOptionLabel($driver),
+            ])
+            ->all();
     }
 
     public function jewelleryOrders(): HasMany

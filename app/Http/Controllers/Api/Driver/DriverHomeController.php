@@ -89,7 +89,7 @@ class DriverHomeController extends Controller
 
         return ApiResponse::success([
             'task' => DriverTaskPayload::fromDelivery($order),
-            'order' => OrderPayload::make($order, detailed: true),
+            'order' => OrderPayload::make($order, detailed: true, includeDeliveryOtp: false),
         ]);
     }
 
@@ -104,7 +104,7 @@ class DriverHomeController extends Controller
 
         return ApiResponse::success([
             'task' => DriverTaskPayload::fromPickup($booking),
-            'pickup' => SellJewelleryPayload::make($booking, detailed: true),
+            'pickup' => SellJewelleryPayload::make($booking, detailed: true, includeDeliveryOtp: false),
         ]);
     }
 

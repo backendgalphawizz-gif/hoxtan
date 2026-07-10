@@ -87,6 +87,7 @@ class SellJewelleryApiTest extends TestCase
                 'data' => [
                     'request' => [
                         'booking_number_display',
+                        'delivery_otp',
                         'documents',
                         'tracking' => [
                             ['key', 'label', 'completed', 'current', 'completed_at'],
@@ -95,17 +96,23 @@ class SellJewelleryApiTest extends TestCase
                 ],
             ]);
 
+        $deliveryOtp = $create->json('data.request.delivery_otp');
+        $this->assertNotNull($deliveryOtp);
+        $this->assertMatchesRegularExpression('/^\d{4}$/', $deliveryOtp);
+
         $requestId = $create->json('data.request.id');
 
         $list = $this->getJson('/api/v1/sell-jewellery/requests?status=pending');
 
         $list->assertOk()
             ->assertJsonPath('data.pagination.total', 1)
-            ->assertJsonPath('data.requests.0.id', $requestId);
+            ->assertJsonPath('data.requests.0.id', $requestId)
+            ->assertJsonPath('data.requests.0.delivery_otp', $deliveryOtp);
 
         $show = $this->getJson("/api/v1/sell-jewellery/requests/{$requestId}");
 
         $show->assertOk()
+            ->assertJsonPath('data.request.delivery_otp', $deliveryOtp)
             ->assertJsonPath('data.request.tracking.0.key', 'pending')
             ->assertJsonPath('data.request.tracking.0.current', true)
             ->assertJsonPath('data.request.documents.1.uploaded', true);

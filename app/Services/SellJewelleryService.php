@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\OldGoldBooking;
 use App\Models\User;
 use App\Models\UserAddress;
+use App\Support\DeliveryOtp;
 use App\Support\SellJewelleryPayload;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -111,6 +112,7 @@ class SellJewelleryService
                 'pickup_phone' => $pickup['pickup_phone'],
                 'pickup_address' => $pickup['pickup_address'],
                 'documents' => $documents,
+                'delivery_otp' => DeliveryOtp::generate(),
                 'status' => 'pending',
             ]);
         });

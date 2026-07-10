@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\UserAddress;
 use App\Services\BlockedPincodeService;
 use App\Support\AddressPayload;
+use App\Support\DeliveryOtp;
 use App\Support\JewelleryPricing;
 use App\Support\JewelleryProductPayload;
 use Illuminate\Support\Carbon;
@@ -90,6 +91,7 @@ class JewelleryCheckoutService
                 'shipping_phone' => $address->phone,
                 'shipping_address_type' => $address->address_type,
                 'expected_delivery_date' => $delivery['date'],
+                'delivery_otp' => DeliveryOtp::generate(),
             ]);
 
             JewelleryOrderItem::query()->create([
@@ -289,6 +291,7 @@ class JewelleryCheckoutService
             'shipping_address' => $order->shipping_address,
             'shipping_address_type' => $order->shipping_address_type,
             'expected_delivery_date' => $order->expected_delivery_date?->toDateString(),
+            'delivery_otp' => $order->delivery_otp,
             'created_at' => $order->created_at?->toIso8601String(),
             'items' => $order->items->map(fn (JewelleryOrderItem $item) => [
                 'id' => $item->id,

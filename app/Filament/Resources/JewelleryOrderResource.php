@@ -134,20 +134,11 @@ class JewelleryOrderResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('driver_id')
                             ->label('Assigned Driver')
-                            ->relationship(
-                                name: 'driver',
-                                titleAttribute: 'name',
-                                modifyQueryUsing: fn (Builder $query) => $query
-                                    ->where('is_active', true)
-                                    ->orderBy('name'),
-                            )
-                            ->getOptionLabelFromRecordUsing(
-                                fn (Driver $record): string => "{$record->name} — +91 {$record->phone}"
-                            )
-                            ->searchable(['name', 'phone'])
+                            ->options(fn (?JewelleryOrder $record): array => Driver::assignmentOptions($record?->driver_id))
+                            ->searchable()
                             ->preload()
                             ->nullable()
-                            ->helperText('Assign an active driver to handle delivery for this order.'),
+                            ->helperText('Only active drivers are listed. Online/offline status is shown for reference.'),
                         Forms\Components\DateTimePicker::make('driver_assigned_at')
                             ->label('Driver Assigned At')
                             ->disabled()
@@ -297,14 +288,7 @@ class JewelleryOrderResource extends Resource
                     ->form([
                         Forms\Components\Select::make('driver_id')
                             ->label('Driver')
-                            ->options(fn (): array => Driver::query()
-                                ->where('is_active', true)
-                                ->orderBy('name')
-                                ->get()
-                                ->mapWithKeys(fn (Driver $driver): array => [
-                                    $driver->id => "{$driver->name} — +91 {$driver->phone}",
-                                ])
-                                ->all())
+                            ->options(fn (JewelleryOrder $record): array => Driver::assignmentOptions($record->driver_id))
                             ->searchable()
                             ->required()
                             ->default(fn (JewelleryOrder $record): ?int => $record->driver_id),

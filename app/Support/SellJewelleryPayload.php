@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class SellJewelleryPayload
 {
-    public static function make(OldGoldBooking $booking, bool $detailed = false): array
+    public static function make(OldGoldBooking $booking, bool $detailed = false, bool $includeDeliveryOtp = true): array
     {
         $payload = [
             'id' => $booking->id,
@@ -47,6 +47,10 @@ class SellJewelleryPayload
             'submitted_at_display' => $booking->created_at?->format('M d, Y | h:i A'),
             'completed_at' => $booking->completed_at?->toIso8601String(),
         ];
+
+        if ($includeDeliveryOtp) {
+            $payload['delivery_otp'] = $booking->delivery_otp;
+        }
 
         if ($detailed) {
             $payload['documents'] = self::documents($booking);

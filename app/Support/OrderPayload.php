@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 
 class OrderPayload
 {
-    public static function make(JewelleryOrder $order, bool $detailed = false): array
+    public static function make(JewelleryOrder $order, bool $detailed = false, bool $includeDeliveryOtp = true): array
     {
         $order->loadMissing(['items.product', 'payment']);
 
@@ -53,6 +53,10 @@ class OrderPayload
                 ->values()
                 ->all(),
         ];
+
+        if ($includeDeliveryOtp) {
+            $payload['delivery_otp'] = $order->delivery_otp;
+        }
 
         if ($detailed) {
             $payload['payment'] = self::payment($order->payment);
