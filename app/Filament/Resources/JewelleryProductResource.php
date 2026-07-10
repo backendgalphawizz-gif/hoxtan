@@ -132,6 +132,32 @@ class JewelleryProductResource extends Resource
                             ->live(debounce: 400)
                             ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get))
                             ->helperText('Optional percentage added on top of metal value.'),
+                        Forms\Components\Select::make('discount_type')
+                            ->label('Discount Type')
+                            ->options([
+                                'percent' => 'Percent (%)',
+                                'flat' => 'Flat (₹)',
+                            ])
+                            ->nullable()
+                            ->placeholder('No discount')
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
+                                if (! filled($state)) {
+                                    $set('discount_value', null);
+                                }
+
+                                static::syncSellingPrice($set, $get);
+                            }),
+                        Forms\Components\TextInput::make('discount_value')
+                            ->label('Discount Value')
+                            ->numeric()
+                            ->minValue(0)
+                            ->step(0.01)
+                            ->visible(fn (Get $get): bool => filled($get('discount_type')))
+                            ->suffix(fn (Get $get): string => $get('discount_type') === 'percent' ? '%' : '₹')
+                            ->maxValue(fn (Get $get): ?float => $get('discount_type') === 'percent' ? 100 : null)
+                            ->live(debounce: 400)
+                            ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
                         Forms\Components\TextInput::make('price')
                             ->label('Selling Price (Total)')
                             ->numeric()
@@ -227,22 +253,38 @@ class JewelleryProductResource extends Resource
 
     protected static function syncSellingPrice(Set $set, Get $get): void
     {
-        $pricing = JewelleryPricing::calculate(
-            $get('metal_type'),
-            $get('weight_grams'),
-            $get('making_charge_percent'),
-        );
+        $pricing = static::pricingForForm($get);
 
         $set('price', $pricing['total']);
     }
 
-    protected static function pricingBreakdownHtml(Get $get): HtmlString
+    /**
+     * @return array{
+     *     rate_per_gram: ?float,
+     *     metal_value: float,
+     *     making_charge_percent: float,
+     *     making_charge_amount: float,
+     *     subtotal_before_discount: float,
+     *     discount_type: ?string,
+     *     discount_value: float,
+     *     discount_amount: float,
+     *     total: float
+     * }
+     */
+    protected static function pricingForForm(Get $get): array
     {
-        $pricing = JewelleryPricing::calculate(
+        return JewelleryPricing::calculate(
             $get('metal_type'),
             $get('weight_grams'),
             $get('making_charge_percent'),
+            $get('discount_type'),
+            $get('discount_value'),
         );
+    }
+
+    protected static function pricingBreakdownHtml(Get $get): HtmlString
+    {
+        $pricing = static::pricingForForm($get);
 
         if ($pricing['rate_per_gram'] === null) {
             return new HtmlString('<p class="text-sm text-gray-500">Select metal type and enter weight to calculate price.</p>');
@@ -265,6 +307,18 @@ class JewelleryProductResource extends Resource
                 'Making charge (%s%%): %s',
                 number_format($pricing['making_charge_percent'], 2),
                 FilamentFormat::inr($pricing['making_charge_amount']),
+            );
+        }
+
+        if ($pricing['discount_amount'] > 0) {
+            $discountLabel = $pricing['discount_type'] === 'percent'
+                ? number_format($pricing['discount_value'], 2).'%'
+                : FilamentFormat::inr($pricing['discount_value']);
+
+            $lines[] = sprintf(
+                'Discount (%s): -%s',
+                $discountLabel,
+                FilamentFormat::inr($pricing['discount_amount']),
             );
         }
 

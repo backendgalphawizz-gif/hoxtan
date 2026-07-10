@@ -22,6 +22,8 @@ class EditJewelleryProduct extends BaseEditRecord
             $data['metal_type'] ?? null,
             $data['weight_grams'] ?? null,
             $data['making_charge_percent'] ?? null,
+            $data['discount_type'] ?? null,
+            $data['discount_value'] ?? null,
         );
 
         $data['price'] = $pricing['total'];

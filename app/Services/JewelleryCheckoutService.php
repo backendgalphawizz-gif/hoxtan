@@ -171,6 +171,9 @@ class JewelleryCheckoutService
      *     weight_grams: ?float,
      *     rate_per_gram: ?float,
      *     unit_price: float,
+     *     subtotal_before_discount: float,
+     *     discount_type: ?string,
+     *     discount_value: ?float,
      *     subtotal: float,
      *     gst_percent: float,
      *     gst_amount: float,
@@ -189,17 +192,19 @@ class JewelleryCheckoutService
             $product->metal_type,
             $product->weight_grams,
             $product->making_charge_percent,
+            $product->discount_type,
+            $product->discount_value,
         );
 
         $unitPrice = $pricing['total'] > 0 ? $pricing['total'] : (float) $product->price;
         $metalValue = round($pricing['metal_value'] * $quantity, 2);
         $makingCharges = round($pricing['making_charge_amount'] * $quantity, 2);
+        $subtotalBeforeDiscount = round($pricing['subtotal_before_discount'] * $quantity, 2);
+        $discountAmount = round($pricing['discount_amount'] * $quantity, 2);
         $subtotal = round($unitPrice * $quantity, 2);
 
         $gst = $this->gst->calculateGstAmount($subtotal);
-        $originalAmount = $gst['total'];
-        $discountAmount = 0.0;
-        $total = round($originalAmount - $discountAmount, 2);
+        $total = $gst['total'];
 
         return [
             'metal_value' => $metalValue,
@@ -211,12 +216,17 @@ class JewelleryCheckoutService
                 : null,
             'rate_per_gram' => $pricing['rate_per_gram'],
             'unit_price' => $unitPrice,
+            'subtotal_before_discount' => $subtotalBeforeDiscount,
+            'discount_type' => $product->discount_type,
+            'discount_value' => $product->discount_value !== null
+                ? (float) $product->discount_value
+                : null,
             'subtotal' => $subtotal,
             'gst_percent' => $this->gst->ratePercent(),
             'gst_amount' => $gst['gst_amount'],
             'cgst' => $gst['cgst'],
             'sgst' => $gst['sgst'],
-            'original_amount' => $originalAmount,
+            'original_amount' => $total,
             'discount_amount' => $discountAmount,
             'discounted_amount' => $total,
             'total' => $total,

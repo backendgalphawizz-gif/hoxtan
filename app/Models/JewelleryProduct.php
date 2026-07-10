@@ -19,6 +19,8 @@ class JewelleryProduct extends Model
         'image',
         'price',
         'making_charge_percent',
+        'discount_type',
+        'discount_value',
         'weight_grams',
         'metal_type',
         'purity',
@@ -32,6 +34,7 @@ class JewelleryProduct extends Model
         return [
             'price' => 'decimal:2',
             'making_charge_percent' => 'decimal:2',
+            'discount_value' => 'decimal:2',
             'weight_grams' => 'decimal:3',
             'is_active' => 'boolean',
             'image' => 'array',
@@ -51,6 +54,8 @@ class JewelleryProduct extends Model
                 $product->metal_type,
                 $product->weight_grams,
                 $product->making_charge_percent,
+                $product->discount_type,
+                $product->discount_value,
             );
 
             $product->price = $pricing['total'];

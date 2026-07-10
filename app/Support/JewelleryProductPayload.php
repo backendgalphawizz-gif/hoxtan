@@ -13,12 +13,18 @@ class JewelleryProductPayload
             $product->metal_type,
             $product->weight_grams,
             $product->making_charge_percent,
+            $product->discount_type,
+            $product->discount_value,
         );
 
         // Always price from the current gold/silver rate (not the stored DB price).
         $price = $pricing['total'] > 0
             ? $pricing['total']
             : (float) $product->price;
+
+        $priceBeforeDiscount = $pricing['subtotal_before_discount'] > 0
+            ? $pricing['subtotal_before_discount']
+            : $price;
 
         $gstService = app(GstService::class);
         $gst = $gstService->calculateGstAmount($price);
@@ -42,6 +48,14 @@ class JewelleryProductPayload
             'making_charge_amount' => $pricing['making_charge_amount'] > 0
                 ? $pricing['making_charge_amount']
                 : null,
+            'discount_type' => $product->discount_type,
+            'discount_value' => $product->discount_value !== null
+                ? (float) $product->discount_value
+                : null,
+            'discount_amount' => $pricing['discount_amount'] > 0
+                ? $pricing['discount_amount']
+                : null,
+            'price_before_discount' => $priceBeforeDiscount,
             'price' => $price,
             'gst_percent' => $gstService->ratePercent(),
             'gst_amount' => $gst['gst_amount'],
