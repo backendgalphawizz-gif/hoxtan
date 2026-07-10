@@ -31,11 +31,30 @@ class MetalRateRealtimeConfig
 
         return array_merge($payload, [
             'key' => $key,
-            'host' => $options['host'] ?? null,
+            'host' => self::normalizeHost($options['host'] ?? null),
             'port' => isset($options['port']) ? (int) $options['port'] : null,
             'scheme' => $options['scheme'] ?? 'https',
             'use_tls' => (bool) ($options['useTLS'] ?? ($options['scheme'] ?? 'https') === 'https'),
             'cluster' => $options['cluster'] ?? null,
         ]);
+    }
+
+    protected static function normalizeHost(?string $host): ?string
+    {
+        if (blank($host)) {
+            return null;
+        }
+
+        $host = trim($host);
+
+        if (str_contains($host, '://')) {
+            $parsed = parse_url($host, PHP_URL_HOST);
+
+            if (is_string($parsed) && filled($parsed)) {
+                $host = $parsed;
+            }
+        }
+
+        return rtrim($host, '/');
     }
 }

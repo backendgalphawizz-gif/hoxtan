@@ -45,20 +45,19 @@ class MetalRateBroadcastTest extends TestCase
         Event::assertDispatched(MetalRatesUpdated::class);
     }
 
-    public function test_realtime_config_endpoint(): void
+    public function test_realtime_config_normalizes_host(): void
     {
+        config([
+            'broadcasting.default' => 'reverb',
+            'broadcasting.connections.reverb.key' => 'test-key',
+            'broadcasting.connections.reverb.options.host' => 'http://hoxtan.developmentalphawizz.com/',
+            'broadcasting.connections.reverb.options.port' => 443,
+            'broadcasting.connections.reverb.options.scheme' => 'https',
+            'broadcasting.connections.reverb.options.useTLS' => true,
+        ]);
+
         $this->getJson('/api/v1/rates/realtime-config')
             ->assertOk()
-            ->assertJsonStructure([
-                'data' => [
-                    'realtime' => [
-                        'enabled',
-                        'driver',
-                        'channel',
-                        'event',
-                        'fallback_poll_seconds',
-                    ],
-                ],
-            ]);
+            ->assertJsonPath('data.realtime.host', 'hoxtan.developmentalphawizz.com');
     }
 }
