@@ -139,15 +139,6 @@ class JewelleryProductResource extends Resource
                             ->disabled()
                             ->dehydrated()
                             ->helperText('Auto-calculated from weight × current rate + making charge.'),
-                        Forms\Components\Select::make('stock_status')
-                            ->options([
-                                'in_stock' => 'In Stock',
-                                'out_of_stock' => 'Out of Stock',
-                                'sold_out' => 'Sold Out',
-                                'coming_soon' => 'Coming Soon',
-                            ])
-                            ->default('in_stock')
-                            ->required(),
                         Forms\Components\TextInput::make('sort_order')
                             ->numeric()
                             ->minValue(0)
@@ -184,7 +175,6 @@ class JewelleryProductResource extends Resource
                     ->label('Making %')
                     ->suffix('%')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('stock_status')->badge(),
                 Tables\Columns\IconColumn::make('is_active')->boolean()->label('App'),
             ])
             ->filters([
@@ -193,13 +183,6 @@ class JewelleryProductResource extends Resource
                 Tables\Filters\SelectFilter::make('jewellery_category_id')
                     ->label('Category')
                     ->relationship('category', 'name'),
-                Tables\Filters\SelectFilter::make('stock_status')
-                    ->options([
-                        'in_stock' => 'In Stock',
-                        'out_of_stock' => 'Out of Stock',
-                        'sold_out' => 'Sold Out',
-                        'coming_soon' => 'Coming Soon',
-                    ]),
                 Tables\Filters\TernaryFilter::make('is_active')->label('Active in App'),
             ])
             ->actions([

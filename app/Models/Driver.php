@@ -18,6 +18,12 @@ class Driver extends Model
         'primary_residence',
         'vehicle_type',
         'vehicle_number',
+        'registration_card_image',
+        'licence_no',
+        'licence_image',
+        'emergency_no',
+        'aadhaar_front_image',
+        'aadhaar_back_image',
         'notes',
         'is_active',
         'is_online',
@@ -36,8 +42,10 @@ class Driver extends Model
     protected static function booted(): void
     {
         static::saving(function (Driver $driver): void {
-            if (filled($driver->phone)) {
-                $driver->phone = PhoneRules::normalize($driver->phone);
+            foreach (['phone', 'emergency_no'] as $field) {
+                if (filled($driver->{$field})) {
+                    $driver->{$field} = PhoneRules::normalize($driver->{$field});
+                }
             }
         });
     }

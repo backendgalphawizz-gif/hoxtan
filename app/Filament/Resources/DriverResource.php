@@ -59,12 +59,55 @@ class DriverResource extends Resource
                         Forms\Components\TextInput::make('vehicle_number')
                             ->label('Vehicle Number')
                             ->maxLength(30),
-                        Forms\Components\Textarea::make('notes')
-                            ->rows(3)
-                            ->columnSpanFull(),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
+                        Forms\Components\Textarea::make('notes')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Contact & Address')
+                    ->schema([
+                        Forms\Components\Textarea::make('primary_residence')
+                            ->label('Address')
+                            ->required()
+                            ->rows(3)
+                            ->maxLength(500)
+                            ->columnSpanFull(),
+                        FilamentFormFields::mobile('emergency_no', 'Emergency No', true),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Documents & Licence')
+                    ->schema([
+                        Forms\Components\FileUpload::make('registration_card_image')
+                            ->label('Registration Card Image')
+                            ->image()
+                            ->directory('driver-documents/registration')
+                            ->maxSize(4096)
+                            ->required(),
+                        Forms\Components\TextInput::make('licence_no')
+                            ->label('Licence No')
+                            ->required()
+                            ->maxLength(30),
+                        Forms\Components\FileUpload::make('licence_image')
+                            ->label('Licence Image')
+                            ->image()
+                            ->directory('driver-documents/licence')
+                            ->maxSize(4096)
+                            ->required(),
+                        Forms\Components\FileUpload::make('aadhaar_front_image')
+                            ->label('Aadhaar Card Image (Front)')
+                            ->image()
+                            ->directory('driver-documents/aadhaar')
+                            ->maxSize(4096)
+                            ->required(),
+                        Forms\Components\FileUpload::make('aadhaar_back_image')
+                            ->label('Aadhaar Card Image (Back)')
+                            ->image()
+                            ->directory('driver-documents/aadhaar')
+                            ->maxSize(4096)
+                            ->required(),
                     ])->columns(2),
             ]);
     }
@@ -84,6 +127,9 @@ class DriverResource extends Resource
                 Tables\Columns\TextColumn::make('vehicle_number')
                     ->label('Vehicle No.')
                     ->toggleable(),
+                Tables\Columns\TextColumn::make('licence_no')
+                    ->label('Licence No.')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
                     ->label('Active'),

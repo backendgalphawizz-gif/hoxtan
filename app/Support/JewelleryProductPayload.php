@@ -46,7 +46,8 @@ class JewelleryProductPayload
             'gst_percent' => $gstService->ratePercent(),
             'gst_amount' => $gst['gst_amount'],
             'total_price' => $gst['total'],
-            'stock_status' => $product->stock_status,
+            'stock_status' => 'in_stock',
+            'is_available' => true,
             'category' => $product->category ? [
                 'id' => $product->category->id,
                 'name' => $product->category->name,

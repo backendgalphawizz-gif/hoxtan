@@ -66,7 +66,7 @@ class JewelleryCheckoutService
      */
     public function buyNow(User $user, int $productId, int $quantity = 1, ?int $addressId = null): array
     {
-        $product = $this->resolveProduct($productId, requireInStock: true);
+        $product = $this->resolveProduct($productId);
         $address = $this->resolveAddress($user, $addressId, required: true);
         $breakup = $this->priceBreakup($product, $quantity);
         $delivery = $this->expectedDelivery();
@@ -211,7 +211,7 @@ class JewelleryCheckoutService
         ];
     }
 
-    protected function resolveProduct(int $productId, bool $requireInStock = false): JewelleryProduct
+    protected function resolveProduct(int $productId): JewelleryProduct
     {
         $product = JewelleryProduct::query()
             ->with(['category', 'subCategory'])
@@ -221,12 +221,6 @@ class JewelleryCheckoutService
         if (! $product) {
             throw ValidationException::withMessages([
                 'product_id' => ['Product not found.'],
-            ]);
-        }
-
-        if ($requireInStock && $product->stock_status !== 'in_stock') {
-            throw ValidationException::withMessages([
-                'product_id' => ['This product is currently unavailable.'],
             ]);
         }
 
