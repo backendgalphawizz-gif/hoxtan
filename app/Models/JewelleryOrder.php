@@ -22,6 +22,11 @@ class JewelleryOrder extends Model
         'gst_amount',
         'discount_amount',
         'total_amount',
+        'payment_mode',
+        'jewellery_emi_plan_id',
+        'emi_tenure',
+        'total_emi_cost',
+        'monthly_emi_amount',
         'status',
         'shipping_address',
         'shipping_name',
@@ -45,6 +50,9 @@ class JewelleryOrder extends Model
             'gst_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'total_emi_cost' => 'decimal:2',
+            'monthly_emi_amount' => 'decimal:2',
+            'emi_tenure' => 'integer',
             'expected_delivery_date' => 'date',
             'driver_assigned_at' => 'datetime',
             'dispatched_at' => 'datetime',
@@ -76,6 +84,11 @@ class JewelleryOrder extends Model
     public function driver(): BelongsTo
     {
         return $this->belongsTo(Driver::class);
+    }
+
+    public function emiPlan(): BelongsTo
+    {
+        return $this->belongsTo(JewelleryEmiPlan::class, 'jewellery_emi_plan_id');
     }
 
     public function payment(): BelongsTo

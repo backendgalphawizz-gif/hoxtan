@@ -43,7 +43,7 @@ class JewelleryOrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'payment', 'items.product', 'address', 'driver']);
+            ->with(['user', 'payment', 'items.product', 'address', 'driver', 'emiPlan']);
     }
 
     public static function form(Form $form): Form
@@ -110,6 +110,39 @@ class JewelleryOrderResource extends Resource
                             ->disabled()
                             ->dehydrated(false),
                     ])->columns(3),
+                Forms\Components\Section::make('EMI')
+                    ->schema([
+                        Forms\Components\Select::make('payment_mode')
+                            ->label('Payment Mode')
+                            ->options([
+                                'full' => 'Pay in Full',
+                                'emi' => 'EMI',
+                            ])
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('emi_tenure')
+                            ->label('EMI Tenure (months)')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
+                        Forms\Components\TextInput::make('total_emi_cost')
+                            ->label('Total EMI Cost')
+                            ->prefix('₹')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
+                        Forms\Components\TextInput::make('monthly_emi_amount')
+                            ->label('Monthly EMI')
+                            ->prefix('₹')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
+                        Forms\Components\Placeholder::make('emi_plan_label')
+                            ->label('EMI Plan')
+                            ->content(fn (?JewelleryOrder $record): string => $record?->emiPlan?->displayLabel() ?? '—')
+                            ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
+                    ])->columns(2)
+                    ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
                 Forms\Components\Section::make('Delivery Address')
                     ->schema([
                         Forms\Components\TextInput::make('shipping_name')
@@ -238,6 +271,23 @@ class JewelleryOrderResource extends Resource
                     ->label('Total')
                     ->inr()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('payment_mode')
+                    ->label('Payment')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state === 'emi' ? 'EMI' : 'Full')
+                    ->color(fn (?string $state): string => $state === 'emi' ? 'info' : 'gray'),
+                Tables\Columns\TextColumn::make('emi_tenure')
+                    ->label('EMI Tenure')
+                    ->formatStateUsing(fn (?int $state, JewelleryOrder $record): ?string => $record->payment_mode === 'emi' && $state
+                        ? $state.' mo'
+                        : null)
+                    ->placeholder('—')
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('total_emi_cost')
+                    ->label('Total EMI Cost')
+                    ->inr()
+                    ->placeholder('—')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('driver.name')
                     ->label('Driver')
                     ->description(fn (JewelleryOrder $record): ?string => $record->driver

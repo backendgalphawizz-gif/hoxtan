@@ -11,6 +11,7 @@ use App\Models\UserAddress;
 use App\Services\BlockedPincodeService;
 use App\Support\AddressPayload;
 use App\Support\DeliveryOtp;
+use App\Support\JewelleryEmiPayload;
 use App\Support\JewelleryPricing;
 use App\Support\JewelleryProductPayload;
 use Illuminate\Support\Carbon;
@@ -23,6 +24,7 @@ class JewelleryCheckoutService
         protected GstService $gst,
         protected AppSettingService $settings,
         protected BlockedPincodeService $blockedPincodeService,
+        protected JewelleryEmiService $emi,
     ) {}
 
     /**
@@ -36,12 +38,13 @@ class JewelleryCheckoutService
      *     order_date_display: string
      * }
      */
-    public function summary(User $user, int $productId, int $quantity = 1, ?int $addressId = null): array
+    public function summary(User $user, int $productId, int $quantity = 1, ?int $addressId = null, ?int $emiPlanId = null): array
     {
         $product = $this->resolveProduct($productId);
         $address = $this->resolveAddress($user, $addressId);
         $breakup = $this->priceBreakup($product, $quantity);
         $delivery = $this->expectedDelivery();
+        $emi = $this->emiContext($breakup['total'], $emiPlanId);
 
         return [
             'product' => JewelleryProductPayload::make($product),
@@ -51,6 +54,11 @@ class JewelleryCheckoutService
             'expected_delivery' => $delivery,
             'order_date' => now()->toDateString(),
             'order_date_display' => now()->format('d F Y'),
+            'payment_modes' => [
+                ['key' => 'full', 'label' => 'Pay in Full'],
+                ['key' => 'emi', 'label' => 'EMI'],
+            ],
+            'emi' => $emi,
         ];
     }
 
@@ -65,15 +73,24 @@ class JewelleryCheckoutService
      *     payment: array
      * }
      */
-    public function buyNow(User $user, int $productId, int $quantity = 1, ?int $addressId = null): array
-    {
+    public function buyNow(
+        User $user,
+        int $productId,
+        int $quantity = 1,
+        ?int $addressId = null,
+        string $paymentMode = 'full',
+        ?int $emiPlanId = null,
+    ): array {
         $product = $this->resolveProduct($productId);
         $address = $this->resolveAddress($user, $addressId, required: true);
         $breakup = $this->priceBreakup($product, $quantity);
         $delivery = $this->expectedDelivery();
+        $emiSelection = $paymentMode === 'emi'
+            ? $this->emi->resolveSelection((int) $emiPlanId, $breakup['total'])
+            : null;
 
         /** @var JewelleryOrder $order */
-        $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery): JewelleryOrder {
+        $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery, $paymentMode, $emiSelection): JewelleryOrder {
             $order = JewelleryOrder::query()->create([
                 'order_number' => $this->generateOrderNumber(),
                 'user_id' => $user->id,
@@ -85,6 +102,11 @@ class JewelleryCheckoutService
                 'gst_amount' => $breakup['gst_amount'],
                 'discount_amount' => $breakup['discount_amount'],
                 'total_amount' => $breakup['total'],
+                'payment_mode' => $paymentMode,
+                'jewellery_emi_plan_id' => $emiSelection['plan']->id ?? null,
+                'emi_tenure' => $emiSelection['tenure_months'] ?? null,
+                'total_emi_cost' => $emiSelection['total_emi_cost'] ?? null,
+                'monthly_emi_amount' => $emiSelection['monthly_emi_amount'] ?? null,
                 'status' => 'pending',
                 'shipping_address' => AddressPayload::make($address)['full_address'],
                 'shipping_name' => $address->full_name,
@@ -114,8 +136,13 @@ class JewelleryCheckoutService
 
             $order->update(['payment_id' => $payment->id]);
 
-            return $order->fresh(['items.product.category', 'items.product.subCategory', 'payment']);
+            return $order->fresh(['items.product.category', 'items.product.subCategory', 'payment', 'emiPlan']);
         });
+
+        $emi = $this->emiContext(
+            $breakup['total'],
+            $emiSelection !== null ? $emiSelection['plan']->id : $emiPlanId,
+        );
 
         return [
             'product' => JewelleryProductPayload::make($product),
@@ -125,6 +152,11 @@ class JewelleryCheckoutService
             'expected_delivery' => $delivery,
             'order_date' => $order->created_at?->toDateString() ?? now()->toDateString(),
             'order_date_display' => ($order->created_at ?? now())->format('d F Y'),
+            'payment_modes' => [
+                ['key' => 'full', 'label' => 'Pay in Full'],
+                ['key' => 'emi', 'label' => 'EMI'],
+            ],
+            'emi' => $emi,
             'order' => $this->orderPayload($order),
             'payment' => $this->paymentPayload($order->payment),
         ];
@@ -272,6 +304,28 @@ class JewelleryCheckoutService
         return $number;
     }
 
+    /**
+     * @return array{
+     *     options: list<array<string, mixed>>,
+     *     selected: ?array<string, mixed>
+     * }
+     */
+    protected function emiContext(float $orderTotal, ?int $emiPlanId = null): array
+    {
+        $options = $this->emi->optionsForAmount($orderTotal);
+
+        $selected = null;
+
+        if ($emiPlanId !== null) {
+            $selected = collect($options)->firstWhere('id', $emiPlanId);
+        }
+
+        return [
+            'options' => $options,
+            'selected' => $selected,
+        ];
+    }
+
     protected function orderPayload(JewelleryOrder $order): array
     {
         return [
@@ -279,6 +333,7 @@ class JewelleryCheckoutService
             'order_number' => $order->order_number,
             'order_number_display' => '#'.$order->order_number,
             'status' => $order->status,
+            'payment_mode' => $order->payment_mode,
             'subtotal' => (float) $order->subtotal,
             'metal_value' => (float) $order->metal_value,
             'making_charge_amount' => (float) $order->making_charge_amount,
@@ -286,6 +341,7 @@ class JewelleryCheckoutService
             'gst_amount' => (float) $order->gst_amount,
             'discount_amount' => (float) $order->discount_amount,
             'total_amount' => (float) $order->total_amount,
+            'emi' => JewelleryEmiPayload::forOrder($order),
             'shipping_name' => $order->shipping_name,
             'shipping_phone' => $order->shipping_phone,
             'shipping_address' => $order->shipping_address,

@@ -17,10 +17,9 @@ class MetalRateBroadcastTest extends TestCase
         config([
             'broadcasting.default' => 'reverb',
             'broadcasting.connections.reverb.key' => 'test-key',
-            'broadcasting.connections.reverb.options.host' => 'localhost',
-            'broadcasting.connections.reverb.options.port' => 8080,
-            'broadcasting.connections.reverb.options.scheme' => 'http',
-            'broadcasting.connections.reverb.options.useTLS' => false,
+            'reverb.client.host' => 'localhost',
+            'reverb.client.port' => 8080,
+            'reverb.client.scheme' => 'http',
         ]);
 
         $this->getJson('/api/v1/rates')
@@ -28,7 +27,9 @@ class MetalRateBroadcastTest extends TestCase
             ->assertJsonPath('data.realtime.enabled', true)
             ->assertJsonPath('data.realtime.channel', 'metal-rates')
             ->assertJsonPath('data.realtime.event', 'rates.updated')
-            ->assertJsonPath('data.realtime.key', 'test-key');
+            ->assertJsonPath('data.realtime.key', 'test-key')
+            ->assertJsonPath('data.realtime.host', 'localhost')
+            ->assertJsonPath('data.realtime.port', 8080);
     }
 
     public function test_rate_broadcast_dispatches_event(): void
@@ -50,10 +51,9 @@ class MetalRateBroadcastTest extends TestCase
         config([
             'broadcasting.default' => 'reverb',
             'broadcasting.connections.reverb.key' => 'test-key',
-            'broadcasting.connections.reverb.options.host' => 'http://hoxtan.developmentalphawizz.com/',
-            'broadcasting.connections.reverb.options.port' => 443,
-            'broadcasting.connections.reverb.options.scheme' => 'https',
-            'broadcasting.connections.reverb.options.useTLS' => true,
+            'reverb.client.host' => 'http://hoxtan.developmentalphawizz.com/',
+            'reverb.client.port' => 443,
+            'reverb.client.scheme' => 'https',
         ]);
 
         $this->getJson('/api/v1/rates/realtime-config')

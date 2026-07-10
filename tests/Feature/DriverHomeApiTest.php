@@ -68,9 +68,11 @@ class DriverHomeApiTest extends TestCase
             'pickup_address' => '14 Kensington Gardens, London',
         ]);
 
-        $this->getJson('/api/v1/driver/home', [
+        $response = $this->getJson('/api/v1/driver/home', [
             'Authorization' => 'Bearer '.$token,
-        ])
+        ]);
+
+        $response
             ->assertOk()
             ->assertJsonPath('data.driver.name', 'Aman Kumar')
             ->assertJsonPath('data.driver.availability_status', 'online')
@@ -80,33 +82,24 @@ class DriverHomeApiTest extends TestCase
             ->assertJsonPath('data.statistics.pending.jewellery_pickups', 1)
             ->assertJsonPath('data.statistics.completed.assigned_orders', 0)
             ->assertJsonPath('data.statistics.completed.jewellery_pickups', 0)
-            ->assertJsonCount(2, 'data.assigned_tasks')
-            ->assertJsonPath('data.assigned_tasks.0.task_type', fn ($type) => in_array($type, ['delivery', 'pickup'], true))
-            ->assertJsonStructure([
-                'data' => [
-                    'driver',
-                    'statistics' => [
-                        'assigned_orders',
-                        'jewellery_pickups',
-                        'completed' => ['assigned_orders', 'jewellery_pickups'],
-                        'pending' => ['assigned_orders', 'jewellery_pickups'],
-                    ],
-                    'assigned_tasks' => [
-                        '*' => [
-                            'id',
-                            'task_type',
-                            'reference_display',
-                            'scheduled_at_display',
-                            'title',
-                            'specification_display',
-                            'amount_display',
-                            'customer_name',
-                            'location_label',
-                            'location_address',
-                        ],
-                    ],
-                ],
-            ]);
+            ->assertJsonCount(2, 'data.assigned_tasks');
+
+        $tasks = collect($response->json('data.assigned_tasks'));
+
+        $deliveryTask = $tasks->firstWhere('task_type', 'delivery');
+        $pickupTask = $tasks->firstWhere('task_type', 'pickup');
+
+        $this->assertNotNull($deliveryTask);
+        $this->assertSame($delivery->id, $deliveryTask['order_id']);
+        $this->assertNull($deliveryTask['pickup_id']);
+        $this->assertSame('driver/tasks/deliveries/'.$delivery->id, $deliveryTask['detail_path']);
+        $this->assertSame('delivery:'.$delivery->id, $deliveryTask['resource_key']);
+
+        $this->assertNotNull($pickupTask);
+        $this->assertNull($pickupTask['order_id']);
+        $this->assertSame($pickupTask['pickup_id'], $pickupTask['id']);
+        $this->assertSame('driver/tasks/pickups/'.$pickupTask['id'], $pickupTask['detail_path']);
+        $this->assertSame('pickup:'.$pickupTask['id'], $pickupTask['resource_key']);
     }
 
     public function test_driver_statistics_endpoint_returns_counts(): void

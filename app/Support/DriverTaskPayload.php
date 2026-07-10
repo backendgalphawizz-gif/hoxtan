@@ -24,6 +24,8 @@ class DriverTaskPayload
             id: $order->id,
             taskType: 'delivery',
             taskTypeLabel: 'Assigned Order',
+            orderId: $order->id,
+            pickupId: null,
             referenceId: $order->order_number,
             referenceDisplay: $order->order_number,
             scheduledAt: $scheduledAt,
@@ -54,6 +56,8 @@ class DriverTaskPayload
             id: $booking->id,
             taskType: 'pickup',
             taskTypeLabel: 'Jewellery Pickup',
+            orderId: null,
+            pickupId: $booking->id,
             referenceId: $booking->booking_number,
             referenceDisplay: str_starts_with((string) $booking->booking_number, '#')
                 ? $booking->booking_number
@@ -121,6 +125,8 @@ class DriverTaskPayload
         int $id,
         string $taskType,
         string $taskTypeLabel,
+        ?int $orderId,
+        ?int $pickupId,
         string $referenceId,
         string $referenceDisplay,
         mixed $scheduledAt,
@@ -138,11 +144,18 @@ class DriverTaskPayload
         bool $isCompleted,
     ): array {
         $scheduled = $scheduledAt instanceof Carbon ? $scheduledAt : ($scheduledAt ? Carbon::parse($scheduledAt) : null);
+        $detailPath = $taskType === 'delivery'
+            ? 'driver/tasks/deliveries/'.$id
+            : 'driver/tasks/pickups/'.$id;
 
         return [
             'id' => $id,
             'task_type' => $taskType,
             'task_type_label' => $taskTypeLabel,
+            'resource_key' => $taskType.':'.$id,
+            'order_id' => $orderId,
+            'pickup_id' => $pickupId,
+            'detail_path' => $detailPath,
             'reference_id' => $referenceId,
             'reference_display' => $referenceDisplay,
             'scheduled_at' => $scheduled?->toIso8601String(),

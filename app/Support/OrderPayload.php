@@ -36,6 +36,8 @@ class OrderPayload
             'discount_amount' => (float) $order->discount_amount,
             'total_amount' => (float) $order->total_amount,
             'total_amount_display' => '₹'.number_format((float) $order->total_amount, 2),
+            'payment_mode' => $order->payment_mode,
+            'emi' => \App\Support\JewelleryEmiPayload::forOrder($order),
             'shipping_name' => $order->shipping_name,
             'shipping_phone' => $order->shipping_phone,
             'shipping_address' => $order->shipping_address,
