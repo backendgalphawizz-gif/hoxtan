@@ -29,7 +29,35 @@ class MetalRateBroadcastTest extends TestCase
             ->assertJsonPath('data.realtime.event', 'rates.updated')
             ->assertJsonPath('data.realtime.key', 'test-key')
             ->assertJsonPath('data.realtime.host', 'localhost')
-            ->assertJsonPath('data.realtime.port', 8080);
+            ->assertJsonPath('data.realtime.port', 8080)
+            ->assertJsonPath('data.realtime.websocket_url', 'ws://localhost:8080/app/test-key');
+    }
+
+    public function test_realtime_config_includes_websocket_url_and_rates(): void
+    {
+        config([
+            'broadcasting.default' => 'reverb',
+            'broadcasting.connections.reverb.key' => 'test-key',
+            'reverb.client.host' => 'localhost',
+            'reverb.client.port' => 8080,
+            'reverb.client.scheme' => 'http',
+        ]);
+
+        $this->getJson('/api/v1/rates/realtime-config')
+            ->assertOk()
+            ->assertJsonPath('data.realtime.websocket_url', 'ws://localhost:8080/app/test-key')
+            ->assertJsonPath('data.realtime.channel', 'metal-rates')
+            ->assertJsonPath('data.realtime.event', 'rates.updated')
+            ->assertJsonStructure([
+                'data' => [
+                    'rates' => [
+                        'currency',
+                        'unit',
+                        'gold',
+                        'silver',
+                    ],
+                ],
+            ]);
     }
 
     public function test_rate_broadcast_dispatches_event(): void
@@ -58,7 +86,24 @@ class MetalRateBroadcastTest extends TestCase
 
         $this->getJson('/api/v1/rates/realtime-config')
             ->assertOk()
-            ->assertJsonPath('data.realtime.host', 'hoxtan.developmentalphawizz.com');
+            ->assertJsonPath('data.realtime.host', 'hoxtan.developmentalphawizz.com')
+            ->assertJsonPath('data.realtime.websocket_url', 'wss://hoxtan.developmentalphawizz.com/app/test-key');
+    }
+
+    public function test_app_config_includes_metal_rates_realtime(): void
+    {
+        config([
+            'broadcasting.default' => 'reverb',
+            'broadcasting.connections.reverb.key' => 'test-key',
+            'reverb.client.host' => 'localhost',
+            'reverb.client.port' => 8080,
+            'reverb.client.scheme' => 'http',
+        ]);
+
+        $this->getJson('/api/v1/app/config')
+            ->assertOk()
+            ->assertJsonPath('data.metal_rates_realtime.websocket_url', 'ws://localhost:8080/app/test-key')
+            ->assertJsonPath('data.metal_rates_realtime.channel', 'metal-rates');
     }
 
     public function test_misconfigured_pusher_does_not_break_driver_deliveries_api(): void

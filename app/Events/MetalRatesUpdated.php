@@ -39,12 +39,13 @@ class MetalRatesUpdated implements ShouldBroadcastNow
     }
 
     /**
+     * Same shape as the old GET /api/v1/rates `data` payload (without realtime).
+     * Mobile should read gold/silver from this event only.
+     *
      * @return array<string, mixed>
      */
     public function broadcastWith(): array
     {
-        return [
-            'rates' => $this->rates,
-        ];
+        return $this->rates;
     }
 }

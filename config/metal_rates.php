@@ -4,6 +4,9 @@ return [
     'broadcast_channel' => 'metal-rates',
     'broadcast_event' => 'rates.updated',
 
+    // How often the scheduler pushes rates to the WebSocket (mobile should not poll REST).
+    'broadcast_interval_seconds' => 60,
+
     // Emergency fallback only when Metals-API is unavailable (not editable in admin).
     'fallback_rates' => [
         'gold' => 7250.0,

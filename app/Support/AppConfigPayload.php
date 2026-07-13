@@ -40,6 +40,7 @@ class AppConfigPayload
             'driver_terms' => self::driverTerms($settings),
             'driver' => self::driverLegal($settings),
             'delete_account' => self::deleteAccount($settings),
+            'metal_rates_realtime' => MetalRateRealtimeConfig::make(),
         ];
     }
 

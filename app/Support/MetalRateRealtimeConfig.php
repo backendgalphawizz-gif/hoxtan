@@ -5,6 +5,9 @@ namespace App\Support;
 class MetalRateRealtimeConfig
 {
     /**
+     * Connection details for the mobile app.
+     * Rates are delivered only over this WebSocket — do not poll GET /rates.
+     *
      * @return array<string, mixed>
      */
     public static function make(): array
@@ -20,23 +23,39 @@ class MetalRateRealtimeConfig
             'protocol' => 'pusher',
             'channel' => (string) config('metal_rates.broadcast_channel', 'metal-rates'),
             'event' => (string) config('metal_rates.broadcast_event', 'rates.updated'),
-            'fallback_poll_seconds' => 45,
+            'websocket_url' => null,
+            'key' => null,
+            'host' => null,
+            'port' => null,
+            'scheme' => null,
+            'use_tls' => false,
+            'cluster' => null,
+            'broadcast_interval_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 60),
+            'instructions' => [
+                'Connect to websocket_url (Pusher protocol).',
+                'Subscribe to channel (public, no auth).',
+                'Listen for event — payload contains gold/silver rates.',
+                'Do not call GET /api/v1/rates for live prices; use this socket only.',
+            ],
         ];
 
-        if (! $enabled || ! is_array($connection)) {
+        if (! $enabled || ! is_array($connection) || blank($key)) {
             return $payload;
         }
 
         $client = config('reverb.client', []);
-        $scheme = is_array($client) ? ($client['scheme'] ?? 'https') : 'https';
+        $scheme = is_array($client) ? (string) ($client['scheme'] ?? 'https') : 'https';
+        $host = self::normalizeHost(is_array($client) ? ($client['host'] ?? null) : null);
+        $port = is_array($client) && isset($client['port']) ? (int) $client['port'] : null;
 
         return array_merge($payload, [
             'key' => $key,
-            'host' => self::normalizeHost(is_array($client) ? ($client['host'] ?? null) : null),
-            'port' => is_array($client) && isset($client['port']) ? (int) $client['port'] : null,
+            'host' => $host,
+            'port' => $port,
             'scheme' => $scheme,
             'use_tls' => $scheme === 'https',
             'cluster' => null,
+            'websocket_url' => self::buildWebsocketUrl($scheme, $host, $port, (string) $key),
         ]);
     }
 
@@ -55,6 +74,23 @@ class MetalRateRealtimeConfig
         $connection = config("broadcasting.connections.{$driver}", []);
 
         return is_array($connection) && filled($connection['key'] ?? null);
+    }
+
+    protected static function buildWebsocketUrl(?string $scheme, ?string $host, ?int $port, string $key): ?string
+    {
+        if (blank($host) || blank($key)) {
+            return null;
+        }
+
+        $wsScheme = ($scheme === 'https') ? 'wss' : 'ws';
+        $defaultPort = $wsScheme === 'wss' ? 443 : 80;
+        $authority = $host;
+
+        if ($port !== null && $port !== $defaultPort) {
+            $authority .= ":{$port}";
+        }
+
+        return "{$wsScheme}://{$authority}/app/{$key}";
     }
 
     protected static function normalizeHost(?string $host): ?string

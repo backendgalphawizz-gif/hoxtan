@@ -118,6 +118,10 @@ class MetalRateService
             'notes' => $notes,
         ]);
 
+        if ($isActive) {
+            $this->broadcastCurrentRates();
+        }
+
         return $record;
     }
 

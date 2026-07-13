@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('notifications:dispatch-scheduled')->everyMinute();
 Schedule::command('metals:sync-live')->everyFiveMinutes();
+Schedule::command('metals:broadcast-rates')->everyMinute();
