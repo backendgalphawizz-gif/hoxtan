@@ -299,7 +299,16 @@ class DriverTaskService
     protected function assignedDeliveriesQuery(Driver $driver): HasMany
     {
         return $driver->jewelleryOrders()
-            ->where('status', '!=', 'cart');
+            ->where('status', '!=', 'cart')
+            ->where(function ($query): void {
+                $query
+                    ->where('payment_mode', '!=', 'emi')
+                    ->orWhere(function ($emiQuery): void {
+                        $emiQuery
+                            ->where('payment_mode', 'emi')
+                            ->whereDoesntHave('emiInstallments', fn ($q) => $q->where('status', 'pending'));
+                    });
+            });
     }
 
     /**

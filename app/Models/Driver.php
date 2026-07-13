@@ -88,8 +88,11 @@ class Driver extends Model
     {
         return $query
             ->where(function (Builder $query) use ($includeDriverId): void {
-                $query->where('is_active', true);
+                $query
+                    ->where('is_active', true)
+                    ->where('is_online', true);
 
+                // Keep currently assigned driver visible even if they went offline.
                 if ($includeDriverId !== null) {
                     $query->orWhere('id', $includeDriverId);
                 }

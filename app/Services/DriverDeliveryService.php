@@ -106,6 +106,12 @@ class DriverDeliveryService
 
     protected function ensureActiveDelivery(JewelleryOrder $order): void
     {
+        if (! $order->isDeliveryEligible()) {
+            throw ValidationException::withMessages([
+                'order' => ['EMI jewellery cannot be delivered until all monthly EMIs are paid.'],
+            ]);
+        }
+
         if (DriverDeliveryPayload::isDelivered($order)) {
             throw ValidationException::withMessages([
                 'order' => ['This delivery has already been completed.'],

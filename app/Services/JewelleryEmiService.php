@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Models\JewelleryEmiPlan;
+use App\Models\JewelleryOrder;
+use App\Models\JewelleryOrderEmiInstallment;
+use App\Support\DeliveryOtp;
 use App\Support\JewelleryEmiPayload;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -22,15 +25,127 @@ class JewelleryEmiService
     }
 
     /**
+     * Create monthly EMI rows for an order (all start as pending).
+     */
+    public function createInstallmentSchedule(JewelleryOrder $order): void
+    {
+        $tenure = max(1, (int) ($order->emi_tenure ?? 0));
+        $total = round((float) ($order->total_emi_cost ?? 0), 2);
+
+        if ($tenure < 1 || $total <= 0) {
+            return;
+        }
+
+        $monthly = round($total / $tenure, 2);
+        $allocated = 0.0;
+
+        for ($number = 1; $number <= $tenure; $number++) {
+            $amount = $number === $tenure
+                ? round($total - $allocated, 2)
+                : $monthly;
+            $allocated = round($allocated + $amount, 2);
+
+            JewelleryOrderEmiInstallment::query()->create([
+                'jewellery_order_id' => $order->id,
+                'installment_number' => $number,
+                'amount' => $amount,
+                'due_date' => now()->startOfDay()->addMonths($number - 1)->toDateString(),
+                'status' => 'pending',
+            ]);
+        }
+    }
+
+    /**
+     * Mark one installment as paid. When all are paid, release delivery (OTP + expected date).
+     */
+    public function markInstallmentPaid(
+        JewelleryOrderEmiInstallment $installment,
+        ?int $adminId = null,
+        ?string $notes = null,
+    ): JewelleryOrderEmiInstallment {
+        if ($installment->isPaid()) {
+            return $installment;
+        }
+
+        $installment->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+            'marked_paid_by' => $adminId,
+            'notes' => $notes ?? $installment->notes,
+        ]);
+
+        $order = $installment->order()->with('emiInstallments')->first();
+
+        if ($order && $order->emiInstallmentsFullyPaid()) {
+            $this->releaseEmiDelivery($order);
+        }
+
+        return $installment->fresh();
+    }
+
+    /**
+     * Mark installment back to pending (admin correction).
+     */
+    public function markInstallmentPending(JewelleryOrderEmiInstallment $installment): JewelleryOrderEmiInstallment
+    {
+        $installment->update([
+            'status' => 'pending',
+            'paid_at' => null,
+            'marked_paid_by' => null,
+        ]);
+
+        return $installment->fresh();
+    }
+
+    public function releaseEmiDelivery(JewelleryOrder $order): void
+    {
+        if (! $order->isEmi() || ! $order->emiInstallmentsFullyPaid()) {
+            return;
+        }
+
+        $updates = [];
+
+        if (blank($order->delivery_otp)) {
+            $updates['delivery_otp'] = DeliveryOtp::generate();
+        }
+
+        if ($order->expected_delivery_date === null) {
+            $days = max(1, (int) app(AppSettingService::class)->jewelleryDeliveryDays());
+            $updates['expected_delivery_date'] = now()->addDays($days)->toDateString();
+        }
+
+        if ($updates !== []) {
+            $order->update($updates);
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listPlans(?float $orderAmount = null): array
+    {
+        $plans = $this->activePlans();
+
+        if ($orderAmount !== null && $orderAmount > 0) {
+            return $plans
+                ->filter(fn (JewelleryEmiPlan $plan): bool => $this->isEligible($plan, $orderAmount))
+                ->map(fn (JewelleryEmiPlan $plan): array => JewelleryEmiPayload::option($plan, $orderAmount))
+                ->values()
+                ->all();
+        }
+
+        return $plans
+            ->map(fn (JewelleryEmiPlan $plan): array => JewelleryEmiPayload::plan($plan))
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function optionsForAmount(float $orderTotal): array
     {
-        return $this->activePlans()
-            ->filter(fn (JewelleryEmiPlan $plan): bool => $this->isEligible($plan, $orderTotal))
-            ->map(fn (JewelleryEmiPlan $plan): array => JewelleryEmiPayload::option($plan, $orderTotal))
-            ->values()
-            ->all();
+        return $this->listPlans($orderTotal);
     }
 
     /**

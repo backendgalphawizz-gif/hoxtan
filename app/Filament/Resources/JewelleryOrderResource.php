@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\JewelleryOrderResource\Pages;
+use App\Filament\Resources\JewelleryOrderResource\RelationManagers\EmiInstallmentsRelationManager;
 use App\Models\Driver;
 use App\Models\JewelleryOrder;
 use App\Models\JewelleryOrderListing;
@@ -46,7 +47,7 @@ class JewelleryOrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'payment', 'items.product', 'address', 'driver', 'emiPlan']);
+            ->with(['user', 'payment', 'items.product', 'address', 'driver', 'emiPlan', 'emiInstallments']);
     }
 
     public static function form(Form $form): Form
@@ -144,6 +145,16 @@ class JewelleryOrderResource extends Resource
                             ->label('EMI Plan')
                             ->content(fn (?JewelleryOrder $record): string => $record?->emiPlan?->displayLabel() ?? '—')
                             ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
+                        Forms\Components\Placeholder::make('emi_progress')
+                            ->label('EMI Progress')
+                            ->content(fn (?JewelleryOrder $record): string => $record?->emiProgressLabel() ?? '—')
+                            ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
+                        Forms\Components\Placeholder::make('emi_delivery_hold')
+                            ->label('Delivery')
+                            ->content(fn (?JewelleryOrder $record): string => $record?->isDeliveryEligible()
+                                ? 'Unlocked — all EMIs paid. You can assign a driver.'
+                                : 'On hold — deliver only after all monthly EMIs are paid.')
+                            ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
                     ])->columns(2)
                     ->visible(fn (?JewelleryOrder $record): bool => $record?->payment_mode === 'emi'),
                 Forms\Components\Section::make('Delivery Address')
@@ -167,9 +178,15 @@ class JewelleryOrderResource extends Resource
                             ->columnSpanFull(),
                     ])->columns(3),
                 Forms\Components\Section::make('Delivery Tracking')
+                    ->description(fn (?JewelleryOrder $record): ?string => $record?->payment_mode === 'emi' && ! $record->isDeliveryEligible()
+                        ? 'EMI delivery is locked until all installments are marked Paid below.'
+                        : null)
                     ->schema([
                         static::driverAssignmentSelect()
-                            ->helperText('Only active drivers are listed. Online/offline status is shown for reference.'),
+                            ->disabled(fn (?JewelleryOrder $record): bool => (bool) ($record?->payment_mode === 'emi' && ! $record->isDeliveryEligible()))
+                            ->helperText(fn (?JewelleryOrder $record): string => $record?->payment_mode === 'emi' && ! $record->isDeliveryEligible()
+                                ? 'Disabled until all monthly EMIs are paid.'
+                                : 'Only active drivers are listed. Online/offline status is shown for reference.'),
                         Forms\Components\DateTimePicker::make('driver_assigned_at')
                             ->label('Driver Assigned At')
                             ->disabled()
@@ -356,7 +373,17 @@ class JewelleryOrderResource extends Resource
                                 $booking->update(['driver_id' => $data['driver_id']]);
                             }
                         } else {
-                            $order = JewelleryOrder::query()->find($record->source_id);
+                            $order = JewelleryOrder::query()->with('emiInstallments')->find($record->source_id);
+
+                            if ($order && ! $order->isDeliveryEligible()) {
+                                Notification::make()
+                                    ->title('Delivery on hold')
+                                    ->body('This EMI order cannot be delivered until all monthly EMIs are paid ('.$order->emiProgressLabel().').')
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
 
                             if ($order) {
                                 $order->update(['driver_id' => $data['driver_id']]);
@@ -372,6 +399,13 @@ class JewelleryOrderResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->emptyStateHeading('No jewellery orders yet')
             ->emptyStateDescription('Buy Now and Sell Jewellery requests from the mobile app will appear here.');
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            EmiInstallmentsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
@@ -486,7 +520,8 @@ class JewelleryOrderResource extends Resource
                     ])->columns(2),
                 Forms\Components\Section::make('Pickup Scheduling')
                     ->schema([
-                        static::sellDriverAssignmentSelect(),
+                        static::sellDriverAssignmentSelect()
+                            ->helperText('Only online drivers are listed.'),
                         Forms\Components\DateTimePicker::make('driver_assigned_at')
                             ->label('Driver Assigned At')
                             ->disabled()
@@ -543,7 +578,8 @@ class JewelleryOrderResource extends Resource
             ->options(function (?JewelleryOrder $record) use ($includeDriverId): array {
                 return Driver::assignmentOptions($includeDriverId ?? $record?->driver_id);
             })
-            ->placeholder('Select a driver')
+            ->placeholder('Select an online driver')
+            ->searchable()
             ->nullable()
             ->live()
             ->afterStateUpdated(function (?int $state, JewelleryOrder $record, Forms\Set $set, $livewire): void {
@@ -572,7 +608,8 @@ class JewelleryOrderResource extends Resource
                     $includeDriverId ?? $record?->driver_id ?? $get('driver_id'),
                 );
             })
-            ->placeholder('Select a driver')
+            ->placeholder('Select an online driver')
+            ->searchable()
             ->nullable()
             ->live()
             ->afterStateUpdated(function (?int $state, OldGoldBooking $record, Forms\Set $set, $livewire): void {

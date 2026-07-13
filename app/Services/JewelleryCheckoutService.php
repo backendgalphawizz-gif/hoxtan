@@ -101,6 +101,8 @@ class JewelleryCheckoutService
 
         /** @var JewelleryOrder $order */
         $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery, $paymentType, $emiFields): JewelleryOrder {
+            $isEmi = $paymentType === 'emi';
+
             $order = JewelleryOrder::query()->create([
                 'order_number' => $this->generateOrderNumber(),
                 'user_id' => $user->id,
@@ -122,8 +124,9 @@ class JewelleryCheckoutService
                 'shipping_name' => $address->full_name,
                 'shipping_phone' => $address->phone,
                 'shipping_address_type' => $address->address_type,
-                'expected_delivery_date' => $delivery['date'],
-                'delivery_otp' => DeliveryOtp::generate(),
+                // EMI: hold delivery until all installments are paid.
+                'expected_delivery_date' => $isEmi ? null : $delivery['date'],
+                'delivery_otp' => $isEmi ? null : DeliveryOtp::generate(),
             ]);
 
             JewelleryOrderItem::query()->create([
@@ -134,19 +137,31 @@ class JewelleryCheckoutService
                 'line_total' => $breakup['subtotal'],
             ]);
 
+            if ($isEmi) {
+                $this->emi->createInstallmentSchedule($order);
+            }
+
             $payment = Payment::query()->create([
                 'reference_id' => 'PAY-'.strtoupper(uniqid()),
                 'user_id' => $user->id,
                 'payable_type' => JewelleryOrder::class,
                 'payable_id' => $order->id,
-                'amount' => $breakup['total'],
+                'amount' => $isEmi
+                    ? (float) ($emiFields['monthly_emi_amount'] ?? $breakup['total'])
+                    : $breakup['total'],
                 'currency' => 'INR',
                 'status' => 'pending',
             ]);
 
             $order->update(['payment_id' => $payment->id]);
 
-            return $order->fresh(['items.product.category', 'items.product.subCategory', 'payment', 'emiPlan']);
+            return $order->fresh([
+                'items.product.category',
+                'items.product.subCategory',
+                'payment',
+                'emiPlan',
+                'emiInstallments',
+            ]);
         });
 
         $emi = $this->emiContext(
@@ -156,12 +171,21 @@ class JewelleryCheckoutService
             $emiFields['total_emi_cost'] ?? $totalEmiCost,
         );
 
+        $expectedDelivery = $paymentType === 'emi'
+            ? [
+                'date' => null,
+                'date_display' => 'After all EMI installments are paid',
+                'held' => true,
+                'message' => 'Jewellery will be delivered only after all monthly EMIs are paid.',
+            ]
+            : $delivery;
+
         return [
             'product' => JewelleryProductPayload::make($product),
             'quantity' => $quantity,
             'address' => AddressPayload::make($address),
             'price_breakup' => $breakup,
-            'expected_delivery' => $delivery,
+            'expected_delivery' => $expectedDelivery,
             'order_date' => $order->created_at?->toDateString() ?? now()->toDateString(),
             'order_date_display' => ($order->created_at ?? now())->format('d F Y'),
             'payment_types' => [

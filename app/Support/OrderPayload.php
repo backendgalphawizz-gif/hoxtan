@@ -12,7 +12,7 @@ class OrderPayload
 {
     public static function make(JewelleryOrder $order, bool $detailed = false, bool $includeDeliveryOtp = true): array
     {
-        $order->loadMissing(['items.product', 'payment']);
+        $order->loadMissing(['items.product', 'payment', 'emiInstallments']);
 
         $firstItem = $order->items->first();
         $itemTitle = $firstItem?->product?->name ?? 'Jewellery Order';

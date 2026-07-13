@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\ValidationException;
 
 class JewelleryOrder extends Model
 {
@@ -72,6 +73,12 @@ class JewelleryOrder extends Model
             }
 
             if ($order->driver_id) {
+                if (! $order->isDeliveryEligible()) {
+                    throw ValidationException::withMessages([
+                        'driver_id' => ['EMI order cannot be delivered until all monthly EMIs are paid.'],
+                    ]);
+                }
+
                 $order->driver_assigned_at = now();
 
                 if ($order->status === 'pending') {
@@ -105,6 +112,11 @@ class JewelleryOrder extends Model
         return $this->belongsTo(JewelleryEmiPlan::class, 'jewellery_emi_plan_id');
     }
 
+    public function emiInstallments(): HasMany
+    {
+        return $this->hasMany(JewelleryOrderEmiInstallment::class)->orderBy('installment_number');
+    }
+
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);
@@ -113,5 +125,56 @@ class JewelleryOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(JewelleryOrderItem::class);
+    }
+
+    public function isEmi(): bool
+    {
+        return $this->payment_mode === 'emi';
+    }
+
+    public function emiPaidCount(): int
+    {
+        return (int) $this->emiInstallments()->where('status', 'paid')->count();
+    }
+
+    public function emiTotalCount(): int
+    {
+        return max(0, (int) ($this->emi_tenure ?? $this->emiInstallments()->count()));
+    }
+
+    public function emiInstallmentsFullyPaid(): bool
+    {
+        if (! $this->isEmi()) {
+            return true;
+        }
+
+        $total = $this->emiInstallments()->count();
+
+        if ($total === 0) {
+            return false;
+        }
+
+        return $this->emiInstallments()->where('status', 'pending')->doesntExist();
+    }
+
+    /**
+     * EMI jewellery is held until every monthly installment is paid.
+     */
+    public function isDeliveryEligible(): bool
+    {
+        if (! $this->isEmi()) {
+            return true;
+        }
+
+        return $this->emiInstallmentsFullyPaid();
+    }
+
+    public function emiProgressLabel(): string
+    {
+        if (! $this->isEmi()) {
+            return '—';
+        }
+
+        return $this->emiPaidCount().'/'.$this->emiTotalCount().' paid';
     }
 }

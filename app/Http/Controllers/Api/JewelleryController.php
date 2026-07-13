@@ -9,6 +9,7 @@ use App\Models\JewelleryProductView;
 use App\Models\JewellerySubCategory;
 use App\Models\JewellerySubSubCategory;
 use App\Models\User;
+use App\Services\JewelleryEmiService;
 use App\Support\ApiResponse;
 use App\Support\JewelleryProductPayload;
 use Illuminate\Database\Eloquent\Builder;
@@ -83,6 +84,21 @@ class JewelleryController extends Controller
             ]);
 
         return ApiResponse::success(['sub_sub_categories' => $subSubCategories]);
+    }
+
+    public function emiPlans(Request $request, JewelleryEmiService $emi): JsonResponse
+    {
+        $data = $request->validate([
+            'order_amount' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $orderAmount = isset($data['order_amount']) ? (float) $data['order_amount'] : null;
+        $plans = $emi->listPlans($orderAmount);
+
+        return ApiResponse::success([
+            'emi_plans' => $plans,
+            'order_amount' => $orderAmount,
+        ]);
     }
 
     public function products(Request $request): JsonResponse
