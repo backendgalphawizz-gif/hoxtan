@@ -38,8 +38,11 @@ class JewelleryPricing
         $makingAmount = $makingPercent > 0
             ? round($metalValue * ($makingPercent / 100), 2)
             : 0.0;
+        // Discount applies only to making charge — never to metal value.
+        $discountAmount = self::discountAmount($makingAmount, $discountType, $discountValue);
+        $makingAfterDiscount = max(0, round($makingAmount - $discountAmount, 2));
         $subtotalBeforeDiscount = round($metalValue + $makingAmount, 2);
-        $discountAmount = self::discountAmount($subtotalBeforeDiscount, $discountType, $discountValue);
+        $total = round($metalValue + $makingAfterDiscount, 2);
 
         return [
             'rate_per_gram' => $rate,
@@ -50,24 +53,27 @@ class JewelleryPricing
             'discount_type' => self::normalizeDiscountType($discountType),
             'discount_value' => max(0, (float) ($discountValue ?? 0)),
             'discount_amount' => $discountAmount,
-            'total' => max(0, round($subtotalBeforeDiscount - $discountAmount, 2)),
+            'total' => $total,
         ];
     }
 
-    public static function discountAmount(float $baseTotal, ?string $discountType, mixed $discountValue): float
+    /**
+     * Discount is calculated on making charge only (percent or flat, capped at making charge).
+     */
+    public static function discountAmount(float $makingChargeAmount, ?string $discountType, mixed $discountValue): float
     {
         $type = self::normalizeDiscountType($discountType);
         $value = max(0, (float) ($discountValue ?? 0));
 
-        if ($baseTotal <= 0 || $value <= 0 || $type === null) {
+        if ($makingChargeAmount <= 0 || $value <= 0 || $type === null) {
             return 0.0;
         }
 
         if ($type === 'percent') {
-            return round($baseTotal * (min(100, $value) / 100), 2);
+            return round($makingChargeAmount * (min(100, $value) / 100), 2);
         }
 
-        return round(min($baseTotal, $value), 2);
+        return round(min($makingChargeAmount, $value), 2);
     }
 
     public static function normalizeDiscountType(?string $discountType): ?string

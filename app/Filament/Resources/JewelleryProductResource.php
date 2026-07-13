@@ -159,6 +159,7 @@ class JewelleryProductResource extends Resource
                             ])
                             ->nullable()
                             ->placeholder('No discount')
+                            ->helperText('Discount applies only on making charge, not on metal value.')
                             ->live()
                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                                 if (! filled($state)) {
@@ -175,6 +176,7 @@ class JewelleryProductResource extends Resource
                             ->visible(fn (Get $get): bool => filled($get('discount_type')))
                             ->suffix(fn (Get $get): string => $get('discount_type') === 'percent' ? '%' : '₹')
                             ->maxValue(fn (Get $get): ?float => $get('discount_type') === 'percent' ? 100 : null)
+                            ->helperText('Percent or flat amount off the making charge only.')
                             ->live(debounce: 400)
                             ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
                         Forms\Components\TextInput::make('price')
@@ -183,7 +185,7 @@ class JewelleryProductResource extends Resource
                             ->prefix('₹')
                             ->disabled()
                             ->dehydrated()
-                            ->helperText('Auto-calculated from weight × current rate + making charge.'),
+                            ->helperText('Metal value + making charge − discount on making charge.'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Show in App')
                             ->default(true),
@@ -340,7 +342,7 @@ class JewelleryProductResource extends Resource
                 : FilamentFormat::inr($pricing['discount_value']);
 
             $lines[] = sprintf(
-                'Discount (%s): -%s',
+                'Discount on making charge (%s): -%s',
                 $discountLabel,
                 FilamentFormat::inr($pricing['discount_amount']),
             );
