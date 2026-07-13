@@ -6,6 +6,7 @@ use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\JewelleryProductResource\Pages;
 use App\Models\JewelleryProduct;
 use App\Models\JewellerySubCategory;
+use App\Models\JewellerySubSubCategory;
 use App\Models\JewelleryCategory;
 use App\Support\FilamentTableActions;
 use App\Support\FilamentFormat;
@@ -35,7 +36,7 @@ class JewelleryProductResource extends Resource
 
     protected static ?string $navigationGroup = 'Jewellery Management';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $navigationLabel = 'Products';
 
@@ -72,7 +73,10 @@ class JewelleryProductResource extends Resource
                             ->searchable()
                             ->required()
                             ->live()
-                            ->afterStateUpdated(fn (Forms\Set $set) => $set('jewellery_sub_category_id', null)),
+                            ->afterStateUpdated(function (Forms\Set $set): void {
+                                $set('jewellery_sub_category_id', null);
+                                $set('jewellery_sub_sub_category_id', null);
+                            }),
                         Forms\Components\Select::make('jewellery_sub_category_id')
                             ->label('Sub Category (optional)')
                             ->options(fn (Forms\Get $get): array => JewellerySubCategory::query()
@@ -80,6 +84,21 @@ class JewelleryProductResource extends Resource
                                 ->when(
                                     filled($get('jewellery_category_id')),
                                     fn (Builder $q) => $q->where('jewellery_category_id', $get('jewellery_category_id'))
+                                )
+                                ->orderBy('sort_order')
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->searchable()
+                            ->nullable()
+                            ->live()
+                            ->afterStateUpdated(fn (Forms\Set $set) => $set('jewellery_sub_sub_category_id', null)),
+                        Forms\Components\Select::make('jewellery_sub_sub_category_id')
+                            ->label('Sub Sub Category (optional)')
+                            ->options(fn (Forms\Get $get): array => JewellerySubSubCategory::query()
+                                ->where('is_active', true)
+                                ->when(
+                                    filled($get('jewellery_sub_category_id')),
+                                    fn (Builder $q) => $q->where('jewellery_sub_category_id', $get('jewellery_sub_category_id'))
                                 )
                                 ->orderBy('sort_order')
                                 ->pluck('name', 'id')
@@ -111,7 +130,7 @@ class JewelleryProductResource extends Resource
                     ])->columns(2),
 
                 Forms\Components\Section::make('Product Images')
-                    ->description('Upload up to 5 images. Drag to reorder — the first image is the cover shown in the app.')
+                    ->description('Upload up to 5 images (size 1000*1000). Drag to reorder — the first image is the cover shown in the app.')
                     ->schema([
                         static::productImagesField(),
                     ]),
@@ -189,6 +208,7 @@ class JewelleryProductResource extends Resource
                     ->colors(['warning' => 'gold', 'gray' => 'silver']),
                 Tables\Columns\TextColumn::make('category.name')->label('Category'),
                 Tables\Columns\TextColumn::make('subCategory.name')->label('Sub Category')->placeholder('—'),
+                Tables\Columns\TextColumn::make('subSubCategory.name')->label('Sub Sub Category')->placeholder('—'),
                 Tables\Columns\TextColumn::make('purity')->placeholder('—'),
                 Tables\Columns\TextColumn::make('weight_grams')->suffix(' g')->placeholder('—'),
                 Tables\Columns\TextColumn::make('price')->inr()->label('Total Price'),
@@ -238,6 +258,15 @@ class JewelleryProductResource extends Resource
             ->itemPanelAspectRatio(1)
             ->imagePreviewHeight('136')
             ->placeholder('Drag & drop images here, or click to browse')
+            ->helperText('Image size: 1000*1000 px (square). Max 4 MB each.')
+            ->imageEditor()
+            ->imageEditorAspectRatios([
+                '1:1' => 'Square (1:1)',
+            ])
+            ->imageCropAspectRatio('1:1')
+            ->imageResizeMode('cover')
+            ->imageResizeTargetWidth('1000')
+            ->imageResizeTargetHeight('1000')
             ->disk('public')
             ->directory('jewellery/products')
             ->visibility('public')

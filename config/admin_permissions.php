@@ -106,6 +106,10 @@ return [
             'label' => 'Jewellery Sub Categories',
             'group' => 'Jewellery Management',
         ],
+        'jewellery_sub_sub_categories' => [
+            'label' => 'Jewellery Sub Sub Categories',
+            'group' => 'Jewellery Management',
+        ],
         'jewellery_products' => [
             'label' => 'Jewellery Products',
             'group' => 'Jewellery Management',

@@ -7,6 +7,7 @@ use App\Models\JewelleryCategory;
 use App\Models\JewelleryProduct;
 use App\Models\JewelleryProductView;
 use App\Models\JewellerySubCategory;
+use App\Models\JewellerySubSubCategory;
 use App\Models\User;
 use App\Support\ApiResponse;
 use App\Support\JewelleryProductPayload;
@@ -64,20 +65,42 @@ class JewelleryController extends Controller
         return ApiResponse::success(['sub_categories' => $subCategories]);
     }
 
+    public function subSubCategories(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'sub_category_id' => ['required', 'integer', 'exists:jewellery_sub_categories,id'],
+        ]);
+
+        $subSubCategories = JewellerySubSubCategory::query()
+            ->where('jewellery_sub_category_id', $data['sub_category_id'])
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (JewellerySubSubCategory $subSub) => [
+                'id' => $subSub->id,
+                'name' => $subSub->name,
+                'slug' => $subSub->slug,
+            ]);
+
+        return ApiResponse::success(['sub_sub_categories' => $subSubCategories]);
+    }
+
     public function products(Request $request): JsonResponse
     {
         $data = $request->validate([
             'metal_type' => ['nullable', Rule::in(['gold', 'silver'])],
             'category_id' => ['nullable', 'integer', 'exists:jewellery_categories,id'],
             'sub_category_id' => ['nullable', 'integer', 'exists:jewellery_sub_categories,id'],
+            'sub_sub_category_id' => ['nullable', 'integer', 'exists:jewellery_sub_sub_categories,id'],
         ]);
 
         $products = JewelleryProduct::query()
-            ->with(['category', 'subCategory'])
+            ->with(['category', 'subCategory', 'subSubCategory'])
             ->where('is_active', true)
             ->when(filled($data['metal_type'] ?? null), fn (Builder $q) => $q->where('metal_type', $data['metal_type']))
             ->when(filled($data['category_id'] ?? null), fn (Builder $q) => $q->where('jewellery_category_id', $data['category_id']))
             ->when(filled($data['sub_category_id'] ?? null), fn (Builder $q) => $q->where('jewellery_sub_category_id', $data['sub_category_id']))
+            ->when(filled($data['sub_sub_category_id'] ?? null), fn (Builder $q) => $q->where('jewellery_sub_sub_category_id', $data['sub_sub_category_id']))
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->get()
@@ -97,7 +120,7 @@ class JewelleryController extends Controller
             'recently_viewed_ids.*' => ['integer', 'distinct'],
         ]);
 
-        $product->load(['category', 'subCategory']);
+        $product->load(['category', 'subCategory', 'subSubCategory']);
 
         /** @var User|null $user */
         $user = $request->user('sanctum');

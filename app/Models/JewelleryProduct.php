@@ -13,6 +13,7 @@ class JewelleryProduct extends Model
     protected $fillable = [
         'jewellery_category_id',
         'jewellery_sub_category_id',
+        'jewellery_sub_sub_category_id',
         'sku',
         'name',
         'description',
@@ -70,6 +71,11 @@ class JewelleryProduct extends Model
     public function subCategory(): BelongsTo
     {
         return $this->belongsTo(JewellerySubCategory::class, 'jewellery_sub_category_id');
+    }
+
+    public function subSubCategory(): BelongsTo
+    {
+        return $this->belongsTo(JewellerySubSubCategory::class, 'jewellery_sub_sub_category_id');
     }
 
     public function orderItems(): HasMany

@@ -74,6 +74,11 @@ class JewelleryProductPayload
                 'name' => $product->subCategory->name,
                 'slug' => $product->subCategory->slug,
             ] : null,
+            'sub_sub_category' => $product->subSubCategory ? [
+                'id' => $product->subSubCategory->id,
+                'name' => $product->subSubCategory->name,
+                'slug' => $product->subSubCategory->slug,
+            ] : null,
         ];
     }
 }

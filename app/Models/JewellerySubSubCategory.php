@@ -7,10 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-class JewellerySubCategory extends Model
+class JewellerySubSubCategory extends Model
 {
     protected $fillable = [
-        'jewellery_category_id',
+        'jewellery_sub_category_id',
         'name',
         'slug',
         'sort_order',
@@ -26,21 +26,16 @@ class JewellerySubCategory extends Model
 
     protected static function booted(): void
     {
-        static::saving(function (JewellerySubCategory $subCategory): void {
-            if (blank($subCategory->slug)) {
-                $subCategory->slug = Str::slug($subCategory->name);
+        static::saving(function (JewellerySubSubCategory $subSubCategory): void {
+            if (blank($subSubCategory->slug)) {
+                $subSubCategory->slug = Str::slug($subSubCategory->name);
             }
         });
     }
 
-    public function category(): BelongsTo
+    public function subCategory(): BelongsTo
     {
-        return $this->belongsTo(JewelleryCategory::class, 'jewellery_category_id');
-    }
-
-    public function subSubCategories(): HasMany
-    {
-        return $this->hasMany(JewellerySubSubCategory::class);
+        return $this->belongsTo(JewellerySubCategory::class, 'jewellery_sub_category_id');
     }
 
     public function products(): HasMany

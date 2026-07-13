@@ -22,7 +22,7 @@ class JewelleryEmiPlanResource extends Resource
 
     protected static ?string $navigationGroup = 'Jewellery Management';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $navigationLabel = 'EMI Plans';
 

@@ -30,7 +30,7 @@ class JewelleryOrderResource extends Resource
 
     protected static ?string $navigationGroup = 'Jewellery Management';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 6;
 
     protected static ?string $navigationLabel = 'Buy Now Orders';
 
