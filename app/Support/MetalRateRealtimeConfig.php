@@ -33,9 +33,16 @@ class MetalRateRealtimeConfig
             'broadcast_interval_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 60),
             'instructions' => [
                 'Connect to websocket_url (Pusher protocol).',
-                'Subscribe to channel (public, no auth).',
+                'After pusher:connection_established, send subscribe JSON (see subscribe_message).',
                 'Listen for event — payload contains gold/silver rates.',
                 'Do not call GET /api/v1/rates for live prices; use this socket only.',
+            ],
+            'subscribe_message' => [
+                'event' => 'pusher:subscribe',
+                'data' => [
+                    'auth' => '',
+                    'channel' => (string) config('metal_rates.broadcast_channel', 'metal-rates'),
+                ],
             ],
         ];
 
@@ -90,7 +97,7 @@ class MetalRateRealtimeConfig
             $authority .= ":{$port}";
         }
 
-        return "{$wsScheme}://{$authority}/app/{$key}";
+        return "{$wsScheme}://{$authority}/app/{$key}?protocol=7&client=js&version=8.4.0&flash=false";
     }
 
     protected static function normalizeHost(?string $host): ?string

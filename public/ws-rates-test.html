@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOXTAN Rates WebSocket Test</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    ol { line-height: 1.5; }
+    button { margin-right: 0.5rem; margin-top: 0.5rem; padding: 0.55rem 1rem; cursor: pointer; }
+    pre { background: #111; color: #d6ffd6; padding: 1rem; border-radius: 8px; min-height: 260px; overflow: auto; white-space: pre-wrap; }
+    .ok { color: #0a7; font-weight: 700; }
+    .warn { color: #b60; }
+    input { width: 100%; padding: 0.5rem; margin-top: 0.35rem; box-sizing: border-box; }
+    label { font-size: 0.85rem; font-weight: 600; }
+    code { background: #f3f3f3; padding: 0.1rem 0.3rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Metal rates WebSocket test</h1>
+  <ol>
+    <li><span class="ok">Connect</span> → you see <code>pusher:connection_established</code></li>
+    <li><span class="ok">Subscribe</span> → this page sends it automatically</li>
+    <li><span class="warn">Rates</span> → run <code>php artisan metals:broadcast-rates</code> in terminal</li>
+  </ol>
+  <p>If you only see step 1 in a raw tester, you never subscribed — rates will never arrive.</p>
+
+  <label for="url">WebSocket URL</label>
+  <input id="url" value="ws://192.168.1.4:8080/app/zzl9glgggunkfpnl0md4?protocol=7&client=js&version=8.4.0&flash=false" />
+
+  <div>
+    <button id="connect">1) Connect + Auto Subscribe</button>
+    <button id="ping" disabled>2) Request broadcast tip</button>
+    <button id="disconnect" disabled>Disconnect</button>
+  </div>
+
+  <h2>Log</h2>
+  <pre id="log">Waiting...</pre>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const connectBtn = document.getElementById('connect');
+    const disconnectBtn = document.getElementById('disconnect');
+    const pingBtn = document.getElementById('ping');
+    let socket = null;
+
+    function log(line) {
+      if (logEl.textContent === 'Waiting...') logEl.textContent = '';
+      logEl.textContent += line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function connect() {
+      if (socket) socket.close();
+      logEl.textContent = '';
+      const url = document.getElementById('url').value.trim();
+      log('Connecting...');
+      socket = new WebSocket(url);
+      connectBtn.disabled = true;
+      disconnectBtn.disabled = false;
+
+      socket.onopen = () => log('Socket open (waiting for pusher:connection_established)');
+
+      socket.onmessage = (event) => {
+        log('← ' + event.data);
+        let payload;
+        try { payload = JSON.parse(event.data); } catch { return; }
+
+        if (payload.event === 'pusher:connection_established') {
+          const outgoing = JSON.stringify({
+            event: 'pusher:subscribe',
+            data: { auth: '', channel: 'metal-rates' },
+          });
+          log('→ SUBSCRIBE metal-rates');
+          log('→ ' + outgoing);
+          socket.send(outgoing);
+          pingBtn.disabled = false;
+        }
+
+        if (String(payload.event || '').includes('subscription_succeeded')) {
+          log('✓ SUBSCRIBED. Now run: php artisan metals:broadcast-rates');
+        }
+
+        if (payload.event === 'rates.updated' || payload.event === '.rates.updated') {
+          log('✓ RATES RECEIVED');
+          try {
+            const data = typeof payload.data === 'string' ? JSON.parse(payload.data) : payload.data;
+            log(JSON.stringify(data, null, 2));
+          } catch {}
+        }
+      };
+
+      socket.onerror = () => log('ERROR: is reverb running? php artisan reverb:start');
+      socket.onclose = () => {
+        log('Closed');
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        pingBtn.disabled = true;
+        socket = null;
+      };
+    }
+
+    connectBtn.addEventListener('click', connect);
+    pingBtn.addEventListener('click', () => {
+      log('TIP: In project terminal run → php artisan metals:broadcast-rates');
+    });
+    disconnectBtn.addEventListener('click', () => socket && socket.close());
+  </script>
+</body>
+</html>
