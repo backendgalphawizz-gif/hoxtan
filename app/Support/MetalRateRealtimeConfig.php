@@ -99,7 +99,7 @@ class MetalRateRealtimeConfig
             return null;
         }
 
-        $host = trim($host);
+        $host = trim($host, " \t\n\r\0\x0B\"'");
 
         if (str_contains($host, '://')) {
             $parsed = parse_url($host, PHP_URL_HOST);
