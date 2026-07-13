@@ -9,7 +9,7 @@ class SyncMetalRatesFromApi extends Command
 {
     protected $signature = 'metals:sync-live';
 
-    protected $description = 'Fetch live gold and silver rates from Metals-API and save as active rates';
+    protected $description = 'Fetch gold/silver from Metals-API once (scheduled 3×/day) and broadcast stored rates';
 
     public function handle(MetalRateService $rates): int
     {

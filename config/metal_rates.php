@@ -4,7 +4,7 @@ return [
     'broadcast_channel' => 'metal-rates',
     'broadcast_event' => 'rates.updated',
 
-    // How often the scheduler pushes rates to the WebSocket (mobile should not poll REST).
+    // How often the scheduler pushes DB rates to the WebSocket (does not call Metals-API).
     'broadcast_interval_seconds' => 60,
 
     // Emergency fallback only when Metals-API is unavailable (not editable in admin).
@@ -13,6 +13,6 @@ return [
         'silver' => 85.5,
     ],
 
-    // Cache live Metals-API responses to avoid hitting the API on every request.
-    'live_cache_seconds' => 60,
+    // Cache Metals-API responses after sync (sync itself is scheduled 3×/day).
+    'live_cache_seconds' => 28800,
 ];

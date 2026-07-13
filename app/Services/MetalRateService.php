@@ -18,16 +18,10 @@ class MetalRateService
 
     public function getLiveRate(string $metalType): float
     {
-        $live = $this->fetchLiveMarketRate($metalType);
+        $active = $this->getAnyActiveRate($metalType);
 
-        if ($live !== null) {
-            return $live;
-        }
-
-        $synced = $this->getLastSyncedRate($metalType);
-
-        if ($synced !== null) {
-            return $synced;
+        if ($active !== null) {
+            return (float) $active->rate_per_gram;
         }
 
         return $this->getConfigFallbackRate($metalType);
@@ -35,12 +29,10 @@ class MetalRateService
 
     public function getLiveRateSource(string $metalType): string
     {
-        if ($this->fetchLiveMarketRate($metalType, bypassCache: true) !== null) {
-            return 'metals_api';
-        }
+        $active = $this->getAnyActiveRate($metalType);
 
-        if ($this->getLastSyncedRate($metalType) !== null) {
-            return 'live_sync';
+        if ($active !== null) {
+            return (string) $active->source;
         }
 
         return 'fallback';
@@ -58,30 +50,28 @@ class MetalRateService
 
     public function getCurrentRatePerGram(string $metalType): float
     {
-        $live = $this->fetchLiveMarketRate($metalType);
-
-        if ($live !== null) {
-            return $live;
-        }
-
-        $synced = $this->getLastSyncedRate($metalType);
-
-        if ($synced !== null) {
-            return $synced;
-        }
-
-        return $this->getConfigFallbackRate($metalType);
+        return $this->getLiveRate($metalType);
     }
 
     public function syncLiveRate(string $metalType): MetalRate
     {
-        $rate = $this->getLiveRate($metalType);
-        $source = $this->getLiveRateSource($metalType);
+        // Only place that should call Metals-API (keep quota low).
+        $apiRate = $this->fetchFromMetalsApi($metalType);
+        $source = $apiRate !== null ? 'metals_api' : (
+            $this->getLastSyncedRate($metalType) !== null ? 'live_sync' : 'fallback'
+        );
+        $rate = $apiRate
+            ?? $this->getLastSyncedRate($metalType)
+            ?? $this->getConfigFallbackRate($metalType);
 
         $this->deactivateRates($metalType);
 
         Cache::forget('dashboard_metal_rates');
         Cache::forget($this->liveRateCacheKey($metalType));
+
+        if ($apiRate !== null) {
+            Cache::put($this->liveRateCacheKey($metalType), $apiRate, $this->liveRateCacheSeconds());
+        }
 
         $record = MetalRate::create([
             'metal_type' => $metalType,
@@ -126,7 +116,7 @@ class MetalRateService
     }
 
     /**
-     * Current buy rates for the mobile app (live Metals-API, else last sync, else fallback).
+     * Current buy rates for mobile / WebSocket from DB only (never calls Metals-API).
      *
      * @return array{currency: string, unit: string, fetched_at: string, rates: list<array>}
      */
@@ -166,10 +156,12 @@ class MetalRateService
      */
     protected function buildApiRatePayload(string $metalType): array
     {
-        $source = $this->getLiveRateSource($metalType);
-        $rate = $this->getCurrentRatePerGram($metalType);
-        $synced = $this->getActiveRate($metalType);
-        $updatedAt = $source === 'metals_api' ? now() : ($synced?->updated_at ?? now());
+        $active = $this->getAnyActiveRate($metalType);
+        $rate = $active !== null
+            ? (float) $active->rate_per_gram
+            : $this->getConfigFallbackRate($metalType);
+        $source = $active?->source ?? 'fallback';
+        $updatedAt = $active?->updated_at ?? now();
 
         return [
             'metal_type' => $metalType,
@@ -178,8 +170,8 @@ class MetalRateService
             'currency' => 'INR',
             'unit' => 'gram',
             'source' => $source,
-            'updated_at' => $updatedAt?->toIso8601String(),
-            'updated_at_display' => $updatedAt?->format('d M Y, h:i A'),
+            'updated_at' => $updatedAt->toIso8601String(),
+            'updated_at_display' => $updatedAt->format('d M Y, h:i A'),
         ];
     }
 
@@ -222,14 +214,11 @@ class MetalRateService
      */
     protected function buildMetalSnapshot(string $metalType): array
     {
-        $active = $this->getActiveRate($metalType);
-        $live = $this->fetchLiveMarketRate($metalType, bypassCache: true);
-        $liveSource = $live !== null ? 'metals_api' : 'fallback';
-
-        if ($live === null) {
-            $live = $this->getLastSyncedRate($metalType) ?? $this->getConfigFallbackRate($metalType);
-            $liveSource = $this->getLastSyncedRate($metalType) !== null ? 'live_sync' : 'fallback';
-        }
+        // Dashboard uses stored rates only — Metals-API is hit only by metals:sync-live.
+        $active = $this->getAnyActiveRate($metalType);
+        $synced = $this->getLastSyncedRate($metalType);
+        $live = $synced ?? $this->getConfigFallbackRate($metalType);
+        $liveSource = $synced !== null ? 'live_sync' : 'fallback';
 
         return [
             'label' => ucfirst($metalType),
@@ -239,6 +228,15 @@ class MetalRateService
             'live_source' => $liveSource,
             'updated_at' => $active?->updated_at?->format('M d, Y g:i A'),
         ];
+    }
+
+    protected function getAnyActiveRate(string $metalType): ?MetalRate
+    {
+        return MetalRate::query()
+            ->where('metal_type', $metalType)
+            ->where('is_active', true)
+            ->latest()
+            ->first();
     }
 
     protected function fetchLiveMarketRate(string $metalType, bool $bypassCache = false): ?float

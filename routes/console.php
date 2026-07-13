@@ -9,5 +9,11 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('notifications:dispatch-scheduled')->everyMinute();
-Schedule::command('metals:sync-live')->everyFiveMinutes();
+
+// Metals-API: only 3 times/day (saves monthly quota). WebSocket uses DB rates only.
+Schedule::command('metals:sync-live')->dailyAt('09:00');
+Schedule::command('metals:sync-live')->dailyAt('13:00');
+Schedule::command('metals:sync-live')->dailyAt('18:00');
+
+// Push stored DB rates to mobile continuously — does NOT call Metals-API.
 Schedule::command('metals:broadcast-rates')->everyMinute();
