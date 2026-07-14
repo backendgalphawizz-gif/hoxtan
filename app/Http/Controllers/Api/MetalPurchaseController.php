@@ -113,11 +113,18 @@ class MetalPurchaseController extends Controller
      *     input_mode: string,
      *     amount?: float,
      *     weight_grams?: float,
-     *     payment_method?: string
+     *     payment_method?: string,
+     *     transaction_id?: string
      * }
      */
     protected function validatedPurchaseRequest(Request $request): array
     {
+        if ($request->filled('Transaction_id') && ! $request->filled('transaction_id')) {
+            $request->merge([
+                'transaction_id' => $request->input('Transaction_id'),
+            ]);
+        }
+
         $data = $request->validate([
             'metal_type' => ['required', Rule::in(['gold', 'silver'])],
             'input_mode' => ['required', Rule::in(['currency', 'weight'])],
@@ -130,9 +137,15 @@ class MetalPurchaseController extends Controller
                 'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
             'payment_method' => ['nullable', Rule::in(['razorpay'])],
+            'transaction_id' => ['nullable', 'string', 'max:64', 'unique:investments,reference_id'],
+            'Transaction_id' => ['nullable', 'string', 'max:64'],
         ]);
 
         $data['payment_method'] = $data['payment_method'] ?? 'razorpay';
+        $data['transaction_id'] = $data['transaction_id']
+            ?? $data['Transaction_id']
+            ?? null;
+        unset($data['Transaction_id']);
 
         return $data;
     }

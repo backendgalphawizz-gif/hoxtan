@@ -60,8 +60,8 @@ class MetalPurchaseService
             isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
         );
 
-        return DB::transaction(function () use ($user, $estimate): array {
-            $investment = Investment::query()->create([
+        return DB::transaction(function () use ($user, $estimate, $data): array {
+            $investmentData = [
                 'user_id' => $user->id,
                 'metal_type' => $estimate['metal_type'],
                 'type' => 'buy',
@@ -72,8 +72,13 @@ class MetalPurchaseService
                 'total_amount' => $estimate['total_amount'],
                 'status' => 'pending',
                 'notes' => 'Mobile buy metal via Razorpay ('.$estimate['input_mode'].')',
-            ]);
+            ];
 
+            if (! empty($data['transaction_id'])) {
+                $investmentData['reference_id'] = (string) $data['transaction_id'];
+            }
+
+            $investment = Investment::query()->create($investmentData);
             $payment = Payment::query()->create([
                 'reference_id' => 'PAY-'.strtoupper(uniqid()),
                 'user_id' => $user->id,
@@ -89,6 +94,7 @@ class MetalPurchaseService
                 (float) $estimate['total_amount'],
                 $payment->reference_id,
                 [
+                    'transaction_id' => (string) $investment->reference_id,
                     'investment_id' => (string) $investment->id,
                     'payment_id' => (string) $payment->id,
                     'user_id' => (string) $user->id,
@@ -120,6 +126,7 @@ class MetalPurchaseService
                         'contact' => $user->phone,
                     ],
                     'notes' => [
+                        'transaction_id' => (string) $investment->reference_id,
                         'investment_id' => (string) $investment->id,
                         'payment_reference' => $payment->reference_id,
                     ],

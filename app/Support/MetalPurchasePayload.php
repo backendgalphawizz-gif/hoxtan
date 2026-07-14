@@ -57,6 +57,8 @@ class MetalPurchasePayload
         $payment = $result['payment'];
 
         return [
+            'transaction_id' => $investment->reference_id,
+            'Transaction_id' => $investment->reference_id,
             'purchase' => self::investment($investment),
             'payment' => [
                 'id' => $payment->id,
@@ -87,6 +89,8 @@ class MetalPurchasePayload
         $investment = $result['investment'];
 
         return [
+            'transaction_id' => $investment->reference_id,
+            'Transaction_id' => $investment->reference_id,
             'purchase' => self::investment($investment),
             'payment' => isset($result['payment']) ? [
                 'id' => $result['payment']->id,
@@ -117,6 +121,8 @@ class MetalPurchasePayload
     {
         return [
             'id' => $investment->id,
+            'transaction_id' => $investment->reference_id,
+            'Transaction_id' => $investment->reference_id,
             'reference_id' => $investment->reference_id,
             'metal_type' => $investment->metal_type,
             'type' => $investment->type,
