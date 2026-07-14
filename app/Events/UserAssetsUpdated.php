@@ -66,12 +66,14 @@ class UserAssetsUpdated implements ShouldBroadcastNow
     {
         $goldGrams = (float) ($this->assets['gold_holdings'] ?? data_get($this->assets, 'gold.grams', 0));
         $silverGrams = (float) ($this->assets['silver_holdings'] ?? data_get($this->assets, 'silver.grams', 0));
+        $sigGrams = (float) ($this->assets['sig_holdings'] ?? data_get($this->assets, 'sig.grams', 0));
         $goldRate = (float) data_get($this->assets, 'gold.rate_per_gram', data_get($this->assets, 'rates.gold', 0));
         $silverRate = (float) data_get($this->assets, 'silver.rate_per_gram', data_get($this->assets, 'rates.silver', 0));
         $goldValue = (float) data_get($this->assets, 'gold.value', round($goldGrams * $goldRate, 2));
         $silverValue = (float) data_get($this->assets, 'silver.value', round($silverGrams * $silverRate, 2));
-        $sigGrams = (float) data_get($this->assets, 'sig.grams', 0);
-        $sigValue = (float) data_get($this->assets, 'sig.value', 0);
+        $sigValue = (float) ($this->assets['sig_value'] ?? data_get($this->assets, 'sig.value', 0));
+        $sigMetal = (string) ($this->assets['sig_metal_type'] ?? data_get($this->assets, 'sig.metal_type', 'gold'));
+        $sigRate = (float) data_get($this->assets, 'sig.rate_per_gram', $sigMetal === 'silver' ? $silverRate : $goldRate);
 
         $withdrawRows = data_get($this->assets, 'withdraw_assets.assets', []);
         $slimWithdraw = [];
@@ -98,8 +100,11 @@ class UserAssetsUpdated implements ShouldBroadcastNow
             'user_id' => $this->userId,
             'gold_holdings' => $goldGrams,
             'silver_holdings' => $silverGrams,
+            'sig_holdings' => $sigGrams,
+            'sig_metal_type' => $sigMetal,
             'gold_value' => $goldValue,
             'silver_value' => $silverValue,
+            'sig_value' => $sigValue,
             'wallet_balance' => (float) ($this->assets['wallet_balance'] ?? 0),
             'total_assets_balance' => (float) ($this->assets['total_assets_balance'] ?? ($goldValue + $silverValue + $sigValue)),
             'assets' => [
@@ -116,7 +121,9 @@ class UserAssetsUpdated implements ShouldBroadcastNow
                     'wallet_amount' => $silverValue,
                 ],
                 'sig' => [
+                    'metal_type' => $sigMetal,
                     'grams' => $sigGrams,
+                    'rate_per_gram' => round($sigRate, 2),
                     'value' => $sigValue,
                     'wallet_amount' => $sigValue,
                 ],

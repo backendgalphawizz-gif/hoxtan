@@ -90,6 +90,9 @@ class MetalRateController extends Controller
                 'withdraw_assets' => $snapshot['withdraw_assets'],
                 'gold_holdings' => $snapshot['gold_holdings'],
                 'silver_holdings' => $snapshot['silver_holdings'],
+                'sig_holdings' => $snapshot['sig_holdings'],
+                'sig_metal_type' => $snapshot['sig_metal_type'],
+                'sig_value' => $snapshot['sig_value'],
             ]),
             'rates_push',
         );
@@ -110,13 +113,18 @@ class MetalRateController extends Controller
             'total_assets_balance_display' => $snapshot['total_assets_balance_display'],
             'gold_holdings' => $snapshot['gold_holdings'],
             'silver_holdings' => $snapshot['silver_holdings'],
+            'sig_holdings' => $snapshot['sig_holdings'],
+            'sig_metal_type' => $snapshot['sig_metal_type'],
+            'sig_invested' => $snapshot['sig_invested'],
             'gold_value' => $snapshot['gold_value'],
             'silver_value' => $snapshot['silver_value'],
+            'sig_value' => $snapshot['sig_value'],
             'gold_value_display' => $snapshot['gold_value_display'],
             'silver_value_display' => $snapshot['silver_value_display'],
+            'sig_value_display' => $snapshot['sig_value_display'],
             'authenticated' => true,
             'user_id' => $user->id,
-            'instruction' => 'Wallet values come from your DB holdings after buy-metal/purchase. Use gold_holdings/silver_holdings and withdraw_assets.assets[].total_grams / available_grams / wallet_amount.',
+            'instruction' => 'Wallet values from DB after buy-metal/purchase or sig/activate. Use gold_holdings, silver_holdings, sig_holdings and withdraw_assets.assets[].total_grams / wallet_amount.',
         ], $shouldBroadcast
             ? 'Rates pushed to WebSocket subscribers.'
             : 'Rates returned; WebSocket push debounced (another push ran recently).');

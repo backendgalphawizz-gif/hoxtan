@@ -184,6 +184,9 @@ class MetalPurchaseService
                 'withdraw_assets' => $result['withdraw_assets'],
                 'gold_holdings' => $result['gold_holdings'],
                 'silver_holdings' => $result['silver_holdings'],
+                'sig_holdings' => data_get($result, 'assets.sig.grams'),
+                'sig_metal_type' => data_get($result, 'assets.sig.metal_type'),
+                'sig_value' => data_get($result, 'assets.sig.value'),
             ]),
             'metal_purchase',
         );

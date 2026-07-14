@@ -85,11 +85,14 @@ class MetalWithdrawalService
             'input_modes' => config('withdraw.input_modes', []),
             'preset_amounts' => config('withdraw.preset_amounts', []),
             'auto_approve_hours' => (int) config('withdraw.auto_approve_hours', 2),
-            // Top-level wallet (updated on every gold/silver purchase).
+            // Top-level wallet (updated on every gold/silver/SIG credit).
             'gold_holdings' => (float) data_get($balances, 'gold.grams', 0),
             'silver_holdings' => (float) data_get($balances, 'silver.grams', 0),
+            'sig_holdings' => (float) data_get($balances, 'sig.grams', 0),
+            'sig_metal_type' => (string) data_get($balances, 'sig.metal_type', 'gold'),
             'gold_value' => (float) data_get($balances, 'gold.value', 0),
             'silver_value' => (float) data_get($balances, 'silver.value', 0),
+            'sig_value' => (float) data_get($balances, 'sig.value', 0),
             'total_assets_balance' => (float) data_get($balances, 'total_assets_balance', 0),
             'total_assets_balance_display' => (string) data_get($balances, 'total_assets_balance_display', '₹0.00'),
             'assets' => $assets,

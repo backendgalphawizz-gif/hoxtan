@@ -36,21 +36,37 @@ class SigPlanService
     {
         $rate = $this->metalRates->getCurrentRatePerGram($metalType);
         $gstPercent = $this->gst->ratePercent();
-        $taxableAmount = round($amount / (1 + $this->gst->rate()), 2);
-        $gstAmount = round($amount - $taxableAmount, 2);
+        $gstIncluded = (bool) config('buy_metal.gst_included_for_currency_mode', false);
+
+        if ($gstIncluded) {
+            $totalAmount = round($amount, 2);
+            $taxableAmount = round($totalAmount / (1 + $this->gst->rate()), 2);
+            $gstAmount = round($totalAmount - $taxableAmount, 2);
+        } else {
+            // Entered amount credits SIG wallet value; GST added on payment.
+            $taxableAmount = round($amount, 2);
+            $gstBreakup = $this->gst->calculateGstAmount($taxableAmount);
+            $gstAmount = $gstBreakup['gst_amount'];
+            $totalAmount = $gstBreakup['total'];
+        }
+
         $grams = $rate > 0 ? round($taxableAmount / $rate, 4) : 0.0;
 
         return [
             'metal_type' => $metalType,
-            'amount' => $amount,
-            'amount_display' => '₹'.number_format($amount, 0),
+            'amount' => $taxableAmount,
+            'amount_display' => '₹'.number_format($taxableAmount, 0),
             'rate_per_gram' => round($rate, 2),
             'rate_per_gram_display' => '₹'.number_format($rate, 0).' / gm',
             'gst_percent' => $gstPercent,
-            'gst_included' => true,
-            'gst_note' => 'GST included '.$gstPercent.'%',
+            'gst_included' => $gstIncluded,
+            'gst_note' => $gstIncluded
+                ? 'GST included '.$gstPercent.'%'
+                : 'GST '.$gstPercent.'% added on metal value',
             'taxable_amount' => $taxableAmount,
             'gst_amount' => $gstAmount,
+            'amount_with_gst' => $totalAmount,
+            'amount_with_gst_display' => '₹'.number_format($totalAmount, 2),
             'gold_grams' => $grams,
             'gold_grams_display' => rtrim(rtrim(number_format($grams, 3, '.', ''), '0'), '.').' g Gold',
             'metal_grams' => $grams,
@@ -84,7 +100,7 @@ class SigPlanService
 
                 $this->recordInstallment($plan, [
                     'amount' => $data['amount'],
-                    'quantity_grams' => $estimate['gold_grams'],
+                    'quantity_grams' => $estimate['metal_grams'],
                     'rate_per_gram' => $estimate['rate_per_gram'],
                     'status' => 'success',
                     'scheduled_at' => now(),
