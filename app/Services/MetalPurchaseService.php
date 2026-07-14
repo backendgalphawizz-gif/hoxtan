@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\Investment;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\AssetsBalancePayload;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class MetalPurchaseService
 {
@@ -50,12 +52,31 @@ class MetalPurchaseService
             isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
         );
 
-        return DB::transaction(function () use ($user, $estimate, $data): array {
+        $grams = round((float) ($estimate['weight_grams'] ?? 0), 4);
+        $rate = round((float) ($estimate['rate_per_gram'] ?? 0), 2);
+
+        if ($rate <= 0) {
+            throw ValidationException::withMessages([
+                'metal_type' => ['Metal rate is unavailable. Please try again later.'],
+            ]);
+        }
+
+        if ($grams <= 0) {
+            throw ValidationException::withMessages([
+                $data['input_mode'] === 'weight' ? 'weight_grams' : 'amount' => [
+                    'Purchase quantity must be greater than zero.',
+                ],
+            ]);
+        }
+
+        $result = DB::transaction(function () use ($user, $estimate, $data, $grams): array {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+
             $investmentData = [
-                'user_id' => $user->id,
+                'user_id' => $lockedUser->id,
                 'metal_type' => $estimate['metal_type'],
                 'type' => 'buy',
-                'quantity_grams' => $estimate['weight_grams'],
+                'quantity_grams' => $grams,
                 'rate_per_gram' => $estimate['rate_per_gram'],
                 'amount' => $estimate['taxable_amount'],
                 'gst_amount' => $estimate['gst_amount'],
@@ -72,7 +93,7 @@ class MetalPurchaseService
 
             $payment = Payment::query()->create([
                 'reference_id' => 'PAY-'.strtoupper(uniqid()),
-                'user_id' => $user->id,
+                'user_id' => $lockedUser->id,
                 'payable_type' => Investment::class,
                 'payable_id' => $investment->id,
                 'amount' => $estimate['total_amount'],
@@ -82,19 +103,33 @@ class MetalPurchaseService
                 'paid_at' => now(),
             ]);
 
-            $this->holdings->recalculateForUser($user->id);
-            $user->refresh();
+            // Credit metal holdings immediately (cash wallet_balance is separate).
+            if ($estimate['metal_type'] === 'gold') {
+                $lockedUser->gold_holdings = round((float) $lockedUser->gold_holdings + $grams, 4);
+            } else {
+                $lockedUser->silver_holdings = round((float) $lockedUser->silver_holdings + $grams, 4);
+            }
+            $lockedUser->role = 'investor';
+            $lockedUser->save();
+
+            // Reconcile from ledger so buys/sells stay consistent.
+            $this->holdings->recalculateForUser($lockedUser->id);
+
+            $fresh = $lockedUser->fresh();
 
             return [
                 'investment' => $investment->fresh(),
                 'payment' => $payment->fresh(),
                 'estimate' => $estimate,
-                'wallet_balance' => (float) $user->wallet_balance,
-                'gold_holdings' => (float) $user->gold_holdings,
-                'silver_holdings' => (float) $user->silver_holdings,
+                'wallet_balance' => (float) $fresh->wallet_balance,
+                'gold_holdings' => (float) $fresh->gold_holdings,
+                'silver_holdings' => (float) $fresh->silver_holdings,
+                'assets' => AssetsBalancePayload::make($fresh, $this->metalRates),
                 'already_completed' => false,
             ];
         });
+
+        return $result;
     }
 
     /**

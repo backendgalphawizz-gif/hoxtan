@@ -73,9 +73,12 @@ class MetalPurchasePayload
             'wallet_balance_display' => '₹'.number_format((float) $result['wallet_balance'], 2),
             'gold_holdings' => $result['gold_holdings'],
             'silver_holdings' => $result['silver_holdings'],
+            'assets' => $result['assets'] ?? null,
             'success' => [
                 'title' => 'Purchase Successful',
-                'message' => 'Your '.ucfirst($investment->metal_type).' purchase has been completed.',
+                'message' => 'Your '.ucfirst($investment->metal_type).' purchase has been completed. '
+                    .number_format((float) $investment->quantity_grams, 4).'g credited to your '
+                    .ucfirst($investment->metal_type).' holdings.',
             ],
         ];
     }
