@@ -17,9 +17,31 @@ class AccountActivityService
     /**
      * @return array{transactions: list<array<string, mixed>>, pagination: array<string, int|bool>}
      */
-    public function listTransactions(User $user, string $filter = 'all', int $page = 1, int $perPage = 20): array
-    {
-        $transactions = $this->collectTransactions($user, $filter)
+    public function listTransactions(
+        User $user,
+        string $filter = 'all',
+        int $page = 1,
+        int $perPage = 20,
+        ?string $metalType = null,
+    ): array {
+        $categoryFilter = in_array($filter, ['gold', 'silver'], true) ? 'all' : $filter;
+        $metalFilter = $metalType
+            ?? (in_array($filter, ['gold', 'silver'], true) ? $filter : null);
+
+        // Metal filters skip pure wallet rows (no metal_type).
+        if ($metalFilter !== null && $categoryFilter === 'all') {
+            $transactions = $this->collectTransactions($user, 'all', includeWallet: false);
+        } else {
+            $transactions = $this->collectTransactions($user, $categoryFilter);
+        }
+
+        if ($metalFilter !== null) {
+            $transactions = $transactions
+                ->filter(fn (array $item) => ($item['metal_type'] ?? null) === $metalFilter)
+                ->values();
+        }
+
+        $transactions = $transactions
             ->sortByDesc(fn (array $item) => $item['occurred_at'] ?? '')
             ->values();
 
@@ -29,6 +51,8 @@ class AccountActivityService
 
         return [
             'transactions' => $slice->all(),
+            'filter' => $filter,
+            'metal_type' => $metalFilter,
             'pagination' => [
                 'current_page' => $page,
                 'per_page' => $perPage,
@@ -62,7 +86,7 @@ class AccountActivityService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    protected function collectTransactions(User $user, string $filter): Collection
+    protected function collectTransactions(User $user, string $filter, bool $includeWallet = true): Collection
     {
         $items = collect();
 
@@ -84,7 +108,7 @@ class AccountActivityService
             }
         }
 
-        if ($this->includesFilter($filter, ['all', 'wallet'])) {
+        if ($includeWallet && $this->includesFilter($filter, ['all', 'wallet'])) {
             $user->walletTransactions()->latest('id')->limit(100)->get()
                 ->each(fn (WalletTransaction $transaction) => $items->push(
                     AccountTransactionPayload::fromWallet($transaction),

@@ -40,6 +40,8 @@ return [
         ['value' => 'sig', 'label' => 'SIG'],
         ['value' => 'jewellery', 'label' => 'Jewellery'],
         ['value' => 'redemption', 'label' => 'Redemption'],
+        ['value' => 'gold', 'label' => 'Gold'],
+        ['value' => 'silver', 'label' => 'Silver'],
     ],
 
     'investment_statuses' => [

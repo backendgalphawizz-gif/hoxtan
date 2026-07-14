@@ -16,11 +16,12 @@ class ApiResponse
     }
 
     /**
-     * Success with a JSON array under data (including empty []).
+     * Success with a JSON array under data, plus optional top-level meta (pagination, filters).
      *
      * @param  list<mixed>  $items
+     * @param  array<string, mixed>  $meta
      */
-    public static function successList(array $items, string $message = '', int $status = 200): JsonResponse
+    public static function successList(array $items, string $message = '', int $status = 200, array $meta = []): JsonResponse
     {
         $previous = ini_get('serialize_precision');
         ini_set('serialize_precision', '-1');
@@ -32,19 +33,26 @@ class ApiResponse
                 512,
                 JSON_THROW_ON_ERROR,
             );
+            $metaNormalized = $meta === [] ? [] : json_decode(
+                json_encode($meta, JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
         } catch (\Throwable) {
             $normalized = array_values($items);
+            $metaNormalized = $meta;
         } finally {
             if ($previous !== false) {
                 ini_set('serialize_precision', (string) $previous);
             }
         }
 
-        return response()->json([
+        return response()->json(array_merge([
             'success' => true,
             'message' => $message,
             'data' => $normalized,
-        ], $status);
+        ], is_array($metaNormalized) ? $metaNormalized : []), $status);
     }
 
     public static function error(string $message, mixed $data = [], int $status = 400): JsonResponse

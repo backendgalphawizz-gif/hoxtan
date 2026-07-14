@@ -24,17 +24,33 @@ class TransactionController extends Controller
     public function index(Request $request, AccountActivityService $activity): JsonResponse
     {
         $data = $request->validate([
-            'filter' => ['nullable', 'string', Rule::in(['all', 'buy', 'sell', 'wallet', 'sig', 'jewellery', 'redemption'])],
+            'filter' => ['nullable', 'string', Rule::in([
+                'all', 'buy', 'sell', 'wallet', 'sig', 'jewellery', 'redemption', 'gold', 'silver',
+            ])],
+            'metal_type' => ['nullable', 'string', Rule::in(['gold', 'silver'])],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
-        return ApiResponse::success($activity->listTransactions(
+        $result = $activity->listTransactions(
             $request->user(),
             $data['filter'] ?? 'all',
             (int) ($data['page'] ?? 1),
             (int) ($data['per_page'] ?? 20),
-        ));
+            $data['metal_type'] ?? null,
+        );
+
+        // List lives directly under data (not data.transactions).
+        return ApiResponse::successList(
+            $result['transactions'],
+            '',
+            200,
+            [
+                'filter' => $result['filter'] ?? ($data['filter'] ?? 'all'),
+                'metal_type' => $result['metal_type'] ?? null,
+                'pagination' => $result['pagination'] ?? [],
+            ],
+        );
     }
 
     public function show(Request $request, string $transaction, AccountActivityService $activity): JsonResponse
@@ -47,8 +63,7 @@ class TransactionController extends Controller
             ])->status(404);
         }
 
-        return ApiResponse::success([
-            'transaction' => $payload,
-        ]);
+        // Detail object lives directly under data (not data.transaction).
+        return ApiResponse::success($payload);
     }
 }
