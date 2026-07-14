@@ -7,12 +7,15 @@ return [
     'min_amount' => 1000,
 
     // Metal can be withdrawn only after this many hours from purchase/credit.
-    'holding_period_hours' => 48,
+    // Set 0 so purchases reflect immediately in available_grams / withdraw/assets (and wallet UI).
+    'holding_period_hours' => (int) env('WITHDRAW_HOLDING_PERIOD_HOURS', 0),
 
     // Shown on withdraw + holdings screens (encourage holding).
     'hold_bonus_percent' => 1,
     'hold_bonus_message' => 'If you continue to hold, you get 1% extra on your holdings.',
-    'holding_period_message' => 'Withdrawal is available only after 48 hours from purchase.',
+    'holding_period_message' => env('WITHDRAW_HOLDING_PERIOD_HOURS', 0) > 0
+        ? 'Withdrawal is available only after '.env('WITHDRAW_HOLDING_PERIOD_HOURS', 0).' hours from purchase.'
+        : 'Your purchased gold/silver is available in wallet immediately.',
 
     'auto_approve_hours' => 2,
 

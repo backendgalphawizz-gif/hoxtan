@@ -43,13 +43,23 @@ class MetalWithdrawalService
             $breakdown = $this->availabilityBreakdown($user, $key);
             $rate = (float) ($row['rate_per_gram'] ?? 0);
             $availableValue = round($availableGrams * $rate, 2);
+            $totalGrams = (float) ($breakdown['total_grams'] ?? 0);
+            $walletAmount = round($totalGrams * $rate, 2);
 
             $assets[] = [
                 'value' => $key,
                 'label' => $asset['label'] ?? ucfirst($key),
                 'screen_title' => $asset['screen_title'] ?? ('Withdraw '.($asset['label'] ?? ucfirst($key))),
                 'metal_type' => $key === 'sig' ? ($row['metal_type'] ?? 'gold') : $key,
-                'total_grams' => $breakdown['total_grams'],
+                // Wallet holdings (always reflects purchases immediately).
+                'total_grams' => $totalGrams,
+                'total_grams_display' => number_format($totalGrams, 2).'g',
+                'holdings_grams' => $totalGrams,
+                'holdings_grams_display' => number_format($totalGrams, 2).'g',
+                'balance_grams' => $totalGrams,
+                'wallet_amount' => $walletAmount,
+                'wallet_amount_display' => '₹'.number_format($walletAmount, 2),
+                // Withdrawal eligibility (may be lower for 48h lock).
                 'locked_grams' => $breakdown['locked_grams'],
                 'locked_grams_display' => number_format($breakdown['locked_grams'], 2).'g',
                 'available_grams' => $availableGrams,
@@ -75,6 +85,13 @@ class MetalWithdrawalService
             'input_modes' => config('withdraw.input_modes', []),
             'preset_amounts' => config('withdraw.preset_amounts', []),
             'auto_approve_hours' => (int) config('withdraw.auto_approve_hours', 2),
+            // Top-level wallet (updated on every gold/silver purchase).
+            'gold_holdings' => (float) data_get($balances, 'gold.grams', 0),
+            'silver_holdings' => (float) data_get($balances, 'silver.grams', 0),
+            'gold_value' => (float) data_get($balances, 'gold.value', 0),
+            'silver_value' => (float) data_get($balances, 'silver.value', 0),
+            'total_assets_balance' => (float) data_get($balances, 'total_assets_balance', 0),
+            'total_assets_balance_display' => (string) data_get($balances, 'total_assets_balance_display', '₹0.00'),
             'assets' => $assets,
             'balances' => $balances,
             'bank' => $bank,
@@ -84,7 +101,7 @@ class MetalWithdrawalService
                 'event' => (string) config('metal_rates.broadcast_event', 'rates.updated'),
                 'channel' => (string) config('metal_rates.broadcast_channel', 'metal-rates'),
                 'field' => 'withdraw_assets',
-                'instruction' => 'On rates.updated: overwrite withdraw_assets from the socket payload (replace:true). Keep available_grams, locked_grams, bank from this HTTP response; update rate_per_gram and available_value = available_grams × rate. Do not append events into a list.',
+                'instruction' => 'On public rates.updated: update rate_per_gram only; keep available_grams/total_grams/locked_grams/bank from this HTTP response (or from authenticated rates/push). available_value = available_grams × rate; wallet_amount = total_grams × rate. Do not overwrite grams with null.',
             ],
         ];
     }

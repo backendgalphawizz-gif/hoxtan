@@ -28,7 +28,10 @@ use App\Http\Controllers\Api\SellJewelleryController;
 use App\Http\Controllers\Api\SigController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\TransactionController;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
+
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/app/config', [AppConfigController::class, 'index']);

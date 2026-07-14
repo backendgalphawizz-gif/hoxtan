@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use App\Support\AssetsBalancePayload;
 use App\Support\MetalRateRealtimeConfig;
 use App\Support\WithdrawAssetsBroadcastPayload;
 use Illuminate\Broadcasting\Channel;
@@ -54,13 +53,17 @@ class MetalRatesUpdated implements ShouldBroadcastNow
     {
         $payload = array_merge($this->rates, [
             'replace' => true,
-            'message' => 'Overwrite previous rates. Do not append. Keep grams + wallet_balance from authenticated /rates/push; recalculate wallet_amount = grams × rate_per_gram.',
+            'message' => 'Overwrite previous rates only. Do NOT replace user gold/silver grams or wallet_balance from this public event. Recalculate wallet_amount = cached_grams × rate_per_gram. After buy/sell, listen to private user.{id} event assets.updated or refresh POST /api/v1/rates/push with Bearer token.',
             'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($this->rates),
-            'assets' => AssetsBalancePayload::broadcastShellFromRates($this->rates),
+            // Rate-only — never send null grams here (mobile was wiping wallet after purchase).
+            'assets_rates' => [
+                'gold' => data_get($this->rates, 'gold.rate_per_gram'),
+                'silver' => data_get($this->rates, 'silver.rate_per_gram'),
+            ],
             'data_format' => [
                 'wire' => 'pusher',
                 'data_is_json_string' => true,
-                'instruction' => 'Outer message.data is a JSON string (Pusher protocol). Parse it once: payload = jsonDecode(message.data). Then use payload.gold / payload.silver / payload.assets.',
+                'instruction' => 'Parse message.data once. Update rates from payload.gold/silver. Keep local assets.grams + wallet_balance. value = grams × rate_per_gram.',
             ],
         ]);
 

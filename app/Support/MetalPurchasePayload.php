@@ -54,10 +54,31 @@ class MetalPurchasePayload
     {
         /** @var Investment $investment */
         $investment = $result['investment'];
+        $estimate = is_array($result['estimate'] ?? null) ? $result['estimate'] : [];
+        $paymentMethod = (string) (
+            $result['payment_method']
+            ?? (isset($result['payment']) ? $result['payment']->gateway : null)
+            ?? ($estimate['payment_method'] ?? 'direct')
+        );
+
+        $gstPercent = (float) ($estimate['gst_percent'] ?? 0);
+        $amount = (float) ($estimate['amount'] ?? $investment->amount);
+        $amountWithGst = (float) ($estimate['total_amount'] ?? $investment->total_amount);
+        $weightGrams = (float) ($estimate['weight_grams'] ?? $investment->quantity_grams);
 
         return [
+            // Flat fields matching the mobile purchase request / confirm screen.
+            'metal_type' => (string) ($estimate['metal_type'] ?? $investment->metal_type),
+            'input_mode' => (string) ($estimate['input_mode'] ?? 'currency'),
+            'weight_grams' => $weightGrams,
+            'amount' => $amount,
+            'gst_percent' => rtrim(rtrim(number_format($gstPercent, 2, '.', ''), '0'), '.').'%',
+            'gst_percent_value' => $gstPercent,
+            'amount_with_gst' => $amountWithGst,
+            'payment_method' => $paymentMethod,
             'transaction_id' => $investment->reference_id,
             'Transaction_id' => $investment->reference_id,
+
             'purchase' => self::investment($investment),
             'payment' => isset($result['payment']) ? [
                 'id' => $result['payment']->id,
@@ -66,14 +87,20 @@ class MetalPurchasePayload
                 'currency' => $result['payment']->currency,
                 'status' => $result['payment']->status,
                 'gateway' => $result['payment']->gateway,
+                'payment_method' => $result['payment']->gateway,
                 'paid_at' => optional($result['payment']->paid_at)?->toIso8601String(),
             ] : null,
-            'estimate' => $result['estimate'],
+            'estimate' => $estimate,
             'wallet_balance' => $result['wallet_balance'],
             'wallet_balance_display' => '₹'.number_format((float) $result['wallet_balance'], 2),
             'gold_holdings' => $result['gold_holdings'],
             'silver_holdings' => $result['silver_holdings'],
+            'gold_value' => $result['gold_value'] ?? data_get($result, 'assets.gold.value'),
+            'silver_value' => $result['silver_value'] ?? data_get($result, 'assets.silver.value'),
+            'total_assets_balance' => data_get($result, 'assets.total_assets_balance'),
+            'total_assets_balance_display' => data_get($result, 'assets.total_assets_balance_display'),
             'assets' => $result['assets'] ?? null,
+            'withdraw_assets' => $result['withdraw_assets'] ?? null,
             'success' => [
                 'title' => 'Purchase Successful',
                 'message' => 'Your '.ucfirst($investment->metal_type).' purchase has been completed. '

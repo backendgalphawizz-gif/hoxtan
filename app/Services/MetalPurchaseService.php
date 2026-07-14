@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
+use App\Events\UserAssetsUpdated;
 use App\Models\Investment;
 use App\Models\Payment;
 use App\Models\User;
-use App\Support\AssetsBalancePayload;
+use App\Support\WalletHoldingsSnapshot;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -103,31 +104,40 @@ class MetalPurchaseService
                 'paid_at' => now(),
             ]);
 
-            // Credit metal holdings immediately (cash wallet_balance is separate).
-            if ($estimate['metal_type'] === 'gold') {
-                $lockedUser->gold_holdings = round((float) $lockedUser->gold_holdings + $grams, 4);
-            } else {
-                $lockedUser->silver_holdings = round((float) $lockedUser->silver_holdings + $grams, 4);
-            }
+            // Ledger row is source of truth — recalculate gold/silver holdings from investments.
             $lockedUser->role = 'investor';
             $lockedUser->save();
-
-            // Reconcile from ledger so buys/sells stay consistent.
             $this->holdings->recalculateForUser($lockedUser->id);
 
             $fresh = $lockedUser->fresh();
+            $wallet = WalletHoldingsSnapshot::make($fresh, $this->metalRates);
 
             return [
                 'investment' => $investment->fresh(),
                 'payment' => $payment->fresh(),
                 'estimate' => $estimate,
-                'wallet_balance' => (float) $fresh->wallet_balance,
-                'gold_holdings' => (float) $fresh->gold_holdings,
-                'silver_holdings' => (float) $fresh->silver_holdings,
-                'assets' => AssetsBalancePayload::make($fresh, $this->metalRates),
+                'payment_method' => (string) ($data['payment_method'] ?? 'direct'),
+                'wallet_balance' => $wallet['wallet_balance'],
+                'gold_holdings' => $wallet['gold_holdings'],
+                'silver_holdings' => $wallet['silver_holdings'],
+                'gold_value' => $wallet['gold_value'],
+                'silver_value' => $wallet['silver_value'],
+                'assets' => $wallet['assets'],
+                'withdraw_assets' => $wallet['withdraw_assets'],
                 'already_completed' => false,
             ];
         });
+
+        // After commit: push updated wallet on private WebSocket so app/home refreshes.
+        UserAssetsUpdated::dispatch(
+            (int) $user->id,
+            array_merge($result['assets'], [
+                'withdraw_assets' => $result['withdraw_assets'],
+                'gold_holdings' => $result['gold_holdings'],
+                'silver_holdings' => $result['silver_holdings'],
+            ]),
+            'metal_purchase',
+        );
 
         return $result;
     }
@@ -233,6 +243,8 @@ class MetalPurchaseService
             'gst_note' => $gstIncluded
                 ? 'GST included '.$gstPercent.'%'
                 : 'GST '.$gstPercent.'% added on metal value',
+            'amount_with_gst' => $totalAmount,
+            'amount_with_gst_display' => '₹'.number_format($totalAmount, 2),
             'total_amount' => $totalAmount,
             'total_amount_display' => '₹'.number_format($totalAmount, 2),
             'weight_grams' => $weightGrams,

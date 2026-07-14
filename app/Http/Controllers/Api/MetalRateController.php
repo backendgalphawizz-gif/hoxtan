@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\UserAssetsUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\MetalRateService;
 use App\Support\ApiResponse;
 use App\Support\AssetsBalancePayload;
 use App\Support\MetalRateRealtimeConfig;
+use App\Support\WalletHoldingsSnapshot;
 use App\Support\WithdrawAssetsBroadcastPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -19,6 +22,8 @@ class MetalRateController extends Controller
 {
     public function index(Request $request, MetalRateService $rates): JsonResponse
     {
+        $this->authenticateFromBearer($request);
+
         $data = $request->validate([
             'metal_type' => ['nullable', 'string', Rule::in(['gold', 'silver'])],
         ]);
@@ -27,38 +32,42 @@ class MetalRateController extends Controller
             filled($data['metal_type'] ?? null) ? $data['metal_type'] : null,
         );
 
+        $wallet = $this->walletForRequest($request, $rates);
+
         return ApiResponse::success(array_merge($payload, [
             'realtime' => MetalRateRealtimeConfig::make(),
-            'assets' => $this->assetsForRequest($request, $rates, $payload),
+            'assets' => $wallet['assets'],
+            'withdraw_assets' => $wallet['withdraw_assets'],
+            'gold_holdings' => $wallet['gold_holdings'],
+            'silver_holdings' => $wallet['silver_holdings'],
+            'authenticated' => $wallet['authenticated'],
         ]));
     }
 
-    /**
-     * WebSocket connection details for live rates.
-     * Mobile should connect to `realtime.websocket_url` and listen for rate events —
-     * do not poll GET /rates for live prices.
-     */
     public function realtimeConfig(Request $request, MetalRateService $rates): JsonResponse
     {
+        $this->authenticateFromBearer($request);
         $ratesPayload = $rates->getApiRates();
+        $wallet = $this->walletForRequest($request, $rates);
 
         return ApiResponse::success([
             'realtime' => MetalRateRealtimeConfig::make(),
-            // One-time bootstrap only (optional). Prefer WebSocket event after connect.
             'rates' => $ratesPayload,
-            'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($ratesPayload),
-            'assets' => $this->assetsForRequest($request, $rates, $ratesPayload),
+            'withdraw_assets' => $wallet['withdraw_assets'],
+            'assets' => $wallet['assets'],
+            'gold_holdings' => $wallet['gold_holdings'],
+            'silver_holdings' => $wallet['silver_holdings'],
+            'authenticated' => $wallet['authenticated'],
         ]);
     }
 
     /**
-     * Call immediately after WebSocket subscribe for an instant rates.updated push.
-     * Send Bearer token so response includes wallet + gold/silver amounts.
-     * Scheduler continues pushing every 30 seconds afterward.
+     * Instant rates + (with Bearer token) full gold/silver wallet after purchases.
      */
     public function push(Request $request, MetalRateService $rates): JsonResponse
     {
-        // Debounce floods from many clients opening the app at once.
+        $this->authenticateFromBearer($request);
+
         $shouldBroadcast = Cache::add('metal_rates:push_lock', 1, now()->addSeconds(2));
 
         if ($shouldBroadcast) {
@@ -66,43 +75,106 @@ class MetalRateController extends Controller
         }
 
         $ratesPayload = $rates->getApiRates();
-        $assets = $this->assetsForRequest($request, $rates, $ratesPayload);
+        $wallet = $this->walletForRequest($request, $rates);
         $user = $this->resolveUser($request);
+
+        if ($user instanceof User) {
+            UserAssetsUpdated::dispatch(
+                (int) $user->id,
+                array_merge($wallet['assets'], [
+                    'withdraw_assets' => $wallet['withdraw_assets'],
+                    'gold_holdings' => $wallet['gold_holdings'],
+                    'silver_holdings' => $wallet['silver_holdings'],
+                ]),
+                'rates_push',
+            );
+        }
 
         return ApiResponse::success([
             'pushed' => $shouldBroadcast,
             'channel' => (string) config('metal_rates.broadcast_channel', 'metal-rates'),
             'event' => (string) config('metal_rates.broadcast_event', 'rates.updated'),
+            'user_channel' => $user ? 'private-user.'.$user->id : null,
+            'user_event' => 'assets.updated',
             'next_broadcast_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 30),
             'rates' => $ratesPayload,
-            'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($ratesPayload),
-            'assets' => $assets,
-            'wallet_balance' => $assets['wallet_balance'] ?? null,
-            'wallet_balance_display' => $assets['wallet_balance_display'] ?? null,
-            'total_assets_balance' => $assets['total_assets_balance'] ?? null,
-            'total_assets_balance_display' => $assets['total_assets_balance_display'] ?? null,
-            'authenticated' => $user !== null,
-            'instruction' => $user
-                ? 'Use data.assets (wallet + gold/silver amounts). On WebSocket rates.updated: keep grams/wallet_balance, refresh rate_per_gram, recalculate wallet_amount/value.'
-                : 'Send Authorization: Bearer {token} with this call to receive wallet_balance + gold/silver wallet amounts in data.assets.',
+            'withdraw_assets' => $wallet['withdraw_assets'],
+            'assets' => $wallet['assets'],
+            'wallet_balance' => $wallet['wallet_balance'],
+            'wallet_balance_display' => $wallet['wallet_balance_display'],
+            'total_assets_balance' => $wallet['total_assets_balance'],
+            'total_assets_balance_display' => $wallet['total_assets_balance_display'],
+            'gold_holdings' => $wallet['gold_holdings'],
+            'silver_holdings' => $wallet['silver_holdings'],
+            'gold_value' => $wallet['gold_value'],
+            'silver_value' => $wallet['silver_value'],
+            'gold_value_display' => $wallet['gold_value_display'],
+            'silver_value_display' => $wallet['silver_value_display'],
+            'authenticated' => $wallet['authenticated'],
+            'instruction' => $wallet['authenticated']
+                ? 'Wallet updated from DB after buy-metal/purchase. Use gold_holdings/silver_holdings and withdraw_assets.total_grams / wallet_amount for UI. available_grams may be lower for 48h lock. Public rates.updated is rates-only.'
+                : 'Send Authorization: Bearer {token} to receive gold/silver wallet after purchase.',
         ], $shouldBroadcast
             ? 'Rates pushed to WebSocket subscribers.'
             : 'Rates returned; WebSocket push debounced (another push ran recently).');
     }
 
     /**
-     * @param  array<string, mixed>  $ratesPayload
-     * @return array<string, mixed>
+     * @return array{
+     *     authenticated: bool,
+     *     gold_holdings: float|null,
+     *     silver_holdings: float|null,
+     *     gold_value: float|null,
+     *     silver_value: float|null,
+     *     gold_value_display: string|null,
+     *     silver_value_display: string|null,
+     *     wallet_balance: float|null,
+     *     wallet_balance_display: string|null,
+     *     total_assets_balance: float|null,
+     *     total_assets_balance_display: string|null,
+     *     assets: array<string, mixed>,
+     *     withdraw_assets: array<string, mixed>
+     * }
      */
-    protected function assetsForRequest(Request $request, MetalRateService $rates, array $ratesPayload): array
+    protected function walletForRequest(Request $request, MetalRateService $rates): array
     {
         $user = $this->resolveUser($request);
+        $ratesPayload = $rates->getApiRates();
 
-        if ($user instanceof User) {
-            return AssetsBalancePayload::make($user->fresh(), $rates);
+        if (! $user instanceof User) {
+            return [
+                'authenticated' => false,
+                'gold_holdings' => null,
+                'silver_holdings' => null,
+                'gold_value' => null,
+                'silver_value' => null,
+                'gold_value_display' => null,
+                'silver_value_display' => null,
+                'wallet_balance' => null,
+                'wallet_balance_display' => null,
+                'total_assets_balance' => null,
+                'total_assets_balance_display' => null,
+                'assets' => AssetsBalancePayload::broadcastShellFromRates($ratesPayload),
+                'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($ratesPayload),
+            ];
         }
 
-        return AssetsBalancePayload::broadcastShellFromRates($ratesPayload);
+        $snapshot = WalletHoldingsSnapshot::make($user, $rates);
+
+        return array_merge($snapshot, ['authenticated' => true]);
+    }
+
+    protected function authenticateFromBearer(Request $request): void
+    {
+        if ($request->user() instanceof User) {
+            return;
+        }
+
+        $user = $this->resolveUser($request);
+        if ($user instanceof User) {
+            Auth::guard('sanctum')->setUser($user);
+            $request->setUserResolver(static fn () => $user);
+        }
     }
 
     protected function resolveUser(Request $request): ?User
