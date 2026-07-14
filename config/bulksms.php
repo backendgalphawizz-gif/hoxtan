@@ -15,12 +15,47 @@ return [
     'country' => env('BULKSMS_COUNTRY', '91'),
 
     /*
-    | DLT template ID from your SMS provider approval.
+    | Default DLT template ID (register / forgot / fallback).
     */
     'dlt_te_id' => env('BULKSMS_DLT_TE_ID', ''),
 
     /*
-    | Message body. Use {otp} placeholder.
+    | Purpose-specific DLT template IDs.
+    | login + resend-otp use templates.login
+    */
+    'templates' => [
+        'login' => [
+            'dlt_te_id' => env('BULKSMS_LOGIN_DLT_TE_ID', '1707178288608375575'),
+            'message' => env(
+                'BULKSMS_LOGIN_OTP_MESSAGE',
+                env('BULKSMS_OTP_MESSAGE', 'Your OTP is {otp}. Do not share it with anyone.')
+            ),
+        ],
+        'register' => [
+            'dlt_te_id' => env('BULKSMS_REGISTER_DLT_TE_ID', env('BULKSMS_DLT_TE_ID', '')),
+            'message' => env(
+                'BULKSMS_REGISTER_OTP_MESSAGE',
+                env('BULKSMS_OTP_MESSAGE', 'Your OTP is {otp}. Do not share it with anyone.')
+            ),
+        ],
+        'forgot-mpin' => [
+            'dlt_te_id' => env('BULKSMS_FORGOT_MPIN_DLT_TE_ID', env('BULKSMS_DLT_TE_ID', '')),
+            'message' => env(
+                'BULKSMS_FORGOT_MPIN_OTP_MESSAGE',
+                env('BULKSMS_OTP_MESSAGE', 'Your OTP is {otp}. Do not share it with anyone.')
+            ),
+        ],
+        'driver-login' => [
+            'dlt_te_id' => env('BULKSMS_DRIVER_LOGIN_DLT_TE_ID', env('BULKSMS_DLT_TE_ID', '')),
+            'message' => env(
+                'BULKSMS_DRIVER_LOGIN_OTP_MESSAGE',
+                env('BULKSMS_OTP_MESSAGE', 'Your OTP is {otp}. Do not share it with anyone.')
+            ),
+        ],
+    ],
+
+    /*
+    | Default message body. Use {otp} placeholder.
     | Must match your DLT-approved template text.
     */
     'otp_message' => env(
