@@ -90,9 +90,8 @@ class SigController extends Controller
 
         $transactions = $query->limit($limit)->get();
 
-        return ApiResponse::success([
-            'transactions' => SigPayload::installmentCollection($transactions),
-        ]);
+        // List goes directly under data (not data.transactions).
+        return ApiResponse::successList(SigPayload::installmentCollection($transactions));
     }
 
     public function activate(Request $request, SigPlanService $service): JsonResponse

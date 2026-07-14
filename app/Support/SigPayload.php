@@ -66,11 +66,15 @@ class SigPayload
             'frequency' => $plan?->frequency,
             'amount' => (float) $installment->amount,
             'amount_display' => '₹'.number_format((float) $installment->amount, 2),
-            'quantity_grams' => $installment->quantity_grams !== null ? (float) $installment->quantity_grams : null,
-            'quantity_display' => $installment->quantity_grams !== null
-                ? rtrim(rtrim(number_format((float) $installment->quantity_grams, 4, '.', ''), '0'), '.').' g'
+            'quantity_grams' => $installment->quantity_grams !== null
+                ? round((float) $installment->quantity_grams, 6)
                 : null,
-            'rate_per_gram' => $installment->rate_per_gram !== null ? (float) $installment->rate_per_gram : null,
+            'quantity_display' => $installment->quantity_grams !== null
+                ? rtrim(rtrim(number_format((float) $installment->quantity_grams, 6, '.', ''), '0'), '.').' g'
+                : null,
+            'rate_per_gram' => $installment->rate_per_gram !== null
+                ? round((float) $installment->rate_per_gram, 2)
+                : null,
             'status' => $installment->status,
             'status_label' => self::installmentStatusLabel($installment->status),
             'scheduled_at' => $installment->scheduled_at?->toIso8601String(),

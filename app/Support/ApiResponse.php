@@ -15,6 +15,38 @@ class ApiResponse
         ], $status);
     }
 
+    /**
+     * Success with a JSON array under data (including empty []).
+     *
+     * @param  list<mixed>  $items
+     */
+    public static function successList(array $items, string $message = '', int $status = 200): JsonResponse
+    {
+        $previous = ini_get('serialize_precision');
+        ini_set('serialize_precision', '-1');
+
+        try {
+            $normalized = json_decode(
+                json_encode(array_values($items), JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
+        } catch (\Throwable) {
+            $normalized = array_values($items);
+        } finally {
+            if ($previous !== false) {
+                ini_set('serialize_precision', (string) $previous);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'data' => $normalized,
+        ], $status);
+    }
+
     public static function error(string $message, mixed $data = [], int $status = 400): JsonResponse
     {
         return response()->json([
