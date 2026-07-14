@@ -34,10 +34,13 @@ class MetalRateController extends Controller
      */
     public function realtimeConfig(MetalRateService $rates): JsonResponse
     {
+        $ratesPayload = $rates->getApiRates();
+
         return ApiResponse::success([
             'realtime' => MetalRateRealtimeConfig::make(),
             // One-time bootstrap only (optional). Prefer WebSocket event after connect.
-            'rates' => $rates->getApiRates(),
+            'rates' => $ratesPayload,
+            'withdraw_assets' => \App\Support\WithdrawAssetsBroadcastPayload::fromRates($ratesPayload),
         ]);
     }
 }

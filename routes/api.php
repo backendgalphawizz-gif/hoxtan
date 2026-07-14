@@ -12,12 +12,14 @@ use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ForgotMpinController;
 use App\Http\Controllers\Api\GoalController;
+use App\Http\Controllers\Api\HoldingsController;
 use App\Http\Controllers\Api\JewelleryCheckoutController;
 use App\Http\Controllers\Api\JewelleryController;
 use App\Http\Controllers\Api\KycController;
 use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\MetalPurchaseController;
 use App\Http\Controllers\Api\MetalRateController;
+use App\Http\Controllers\Api\MetalWithdrawalController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -107,6 +109,8 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/profile', [ProfileController::class, 'show']);
+        Route::get('/profile/assets', [ProfileController::class, 'assets']);
+        Route::get('/assets/balance', [ProfileController::class, 'assets']);
         Route::put('/profile', [ProfileController::class, 'update']);
         Route::post('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
@@ -174,6 +178,16 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/buy-metal/config', [MetalPurchaseController::class, 'config']);
         Route::post('/buy-metal/estimate', [MetalPurchaseController::class, 'estimate']);
         Route::post('/buy-metal/purchase', [MetalPurchaseController::class, 'purchase']);
+
+        Route::get('/holdings/config', [HoldingsController::class, 'config']);
+        Route::get('/holdings/performance', [HoldingsController::class, 'performance']);
+
+        Route::get('/withdraw/assets', [MetalWithdrawalController::class, 'assets']);
+        Route::get('/withdraw/{asset}/screen', [MetalWithdrawalController::class, 'screen']);
+        Route::post('/withdraw/estimate', [MetalWithdrawalController::class, 'estimate']);
+        Route::post('/withdraw', [MetalWithdrawalController::class, 'store']);
+        Route::get('/withdrawals', [MetalWithdrawalController::class, 'index']);
+        Route::get('/withdrawals/{withdrawal}', [MetalWithdrawalController::class, 'show']);
 
         Route::get('/goals/config', [GoalController::class, 'config']);
         Route::get('/goals', [GoalController::class, 'index']);

@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Investment;
 use App\Models\JewelleryOrder;
 use App\Models\KycDetail;
+use App\Models\MetalWithdrawal;
 use App\Models\OldGoldBooking;
 use App\Models\Redemption;
 use App\Models\User;
@@ -86,6 +87,13 @@ class NavigationBadgeCounts
             ->count());
     }
 
+    public static function pendingMetalWithdrawals(): int
+    {
+        return Cache::remember('nav.pending_metal_withdrawals', self::TTL_SECONDS, fn (): int => MetalWithdrawal::query()
+            ->where('status', 'pending')
+            ->count());
+    }
+
     public static function pendingSellJewelleryRequests(): int
     {
         return Cache::remember('nav.pending_sell_jewellery_requests', self::TTL_SECONDS, fn (): int => OldGoldBooking::query()
@@ -106,6 +114,7 @@ class NavigationBadgeCounts
             'nav.pending_jewellery_orders',
             'nav.pending_sell_jewellery_requests',
             'nav.pending_jewellery_emi_refunds',
+            'nav.pending_metal_withdrawals',
         ] as $key) {
             Cache::forget($key);
         }

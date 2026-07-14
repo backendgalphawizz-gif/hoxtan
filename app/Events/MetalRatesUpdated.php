@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Support\MetalRateRealtimeConfig;
+use App\Support\WithdrawAssetsBroadcastPayload;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -39,13 +40,17 @@ class MetalRatesUpdated implements ShouldBroadcastNow
     }
 
     /**
-     * Same shape as the old GET /api/v1/rates `data` payload (without realtime).
-     * Mobile should read gold/silver from this event only.
+     * Overwrite-friendly payload for mobile.
+     * Mobile must REPLACE previous rates state — never append into a list.
      *
      * @return array<string, mixed>
      */
     public function broadcastWith(): array
     {
-        return $this->rates;
+        return array_merge($this->rates, [
+            'replace' => true,
+            'message' => 'Overwrite previous rates. Do not append. Recalculate assets = holdings_grams × rate_per_gram.',
+            'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($this->rates),
+        ]);
     }
 }

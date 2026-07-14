@@ -20,3 +20,6 @@ Schedule::command('metals:broadcast-rates')->everyMinute();
 
 // EMI jewellery cancel refunds: auto-approve if admin does not act within 2 hours.
 Schedule::command('jewellery:auto-approve-emi-refunds')->everyMinute();
+
+// Metal cash withdrawals: auto-approve if admin does not act within SLA (default 2 hours).
+Schedule::command('withdrawals:auto-approve')->everyMinute();

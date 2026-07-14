@@ -34,9 +34,12 @@ class MetalRateRealtimeConfig
             'instructions' => [
                 'Connect to websocket_url (Pusher protocol).',
                 'After pusher:connection_established, send subscribe JSON (see subscribe_message).',
-                'Listen for event — payload contains gold/silver rates.',
+                'Listen for rates.updated — payload has replace:true. OVERWRITE previous rates object; do not append {},{},{}.',
+                'Wallet / total assets: load once from GET /api/v1/profile/assets (grams + wallet). On each rates.updated, overwrite rates and recalculate values = grams × new rate.',
+                'Withdraw screen: load once from GET /api/v1/withdraw/assets. On each rates.updated, overwrite withdraw_assets (same shape), keep available_grams/bank from cache, recalculate available_value = available_grams × rate_per_gram.',
                 'Do not call GET /api/v1/rates for live prices; use this socket only.',
             ],
+            'withdraw_assets_api' => '/api/v1/withdraw/assets',
             'subscribe_message' => [
                 'event' => 'pusher:subscribe',
                 'data' => [

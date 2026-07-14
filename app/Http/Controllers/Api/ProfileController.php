@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\User;
 use App\Services\InvoiceService;
 use App\Support\ApiResponse;
+use App\Support\AssetsBalancePayload;
 use App\Support\MpinRules;
 use App\Support\ProfilePhotoStorage;
 use App\Support\UserProfilePayload;
@@ -23,6 +24,13 @@ class ProfileController extends Controller
     {
         return ApiResponse::success([
             'user' => UserProfilePayload::make($request->user()),
+        ]);
+    }
+
+    public function assets(Request $request): JsonResponse
+    {
+        return ApiResponse::success([
+            'assets' => AssetsBalancePayload::make($request->user()->fresh()),
         ]);
     }
 

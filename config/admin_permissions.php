@@ -62,6 +62,10 @@ return [
             'label' => 'Sell Transactions',
             'group' => 'Investment Management',
         ],
+        'metal_withdrawals' => [
+            'label' => 'Metal Withdrawals',
+            'group' => 'Investment Management',
+        ],
         'investment_goals' => [
             'label' => 'Goal Management',
             'group' => 'Investment Management',
