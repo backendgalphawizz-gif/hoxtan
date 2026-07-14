@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\UserAssetsUpdated;
 use App\Models\Investment;
 use App\Models\Payment;
 use App\Models\User;
@@ -116,6 +117,7 @@ class MetalPurchaseService
             $this->holdings->recalculateForUser($lockedUser->id);
 
             $fresh = $lockedUser->fresh();
+            $assets = AssetsBalancePayload::make($fresh, $this->metalRates);
 
             return [
                 'investment' => $investment->fresh(),
@@ -124,10 +126,17 @@ class MetalPurchaseService
                 'wallet_balance' => (float) $fresh->wallet_balance,
                 'gold_holdings' => (float) $fresh->gold_holdings,
                 'silver_holdings' => (float) $fresh->silver_holdings,
-                'assets' => AssetsBalancePayload::make($fresh, $this->metalRates),
+                'assets' => $assets,
                 'already_completed' => false,
             ];
         });
+
+        // After commit: push updated gold/silver wallet to the user's private channel.
+        UserAssetsUpdated::dispatch(
+            (int) $user->id,
+            $result['assets'],
+            'metal_purchase',
+        );
 
         return $result;
     }

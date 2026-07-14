@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\UserAssetsUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\MetalRateService;
@@ -69,10 +70,17 @@ class MetalRateController extends Controller
         $assets = $this->assetsForRequest($request, $rates, $ratesPayload);
         $user = $this->resolveUser($request);
 
+        // Push fresh wallet to this user's private WebSocket channel.
+        if ($user instanceof User) {
+            UserAssetsUpdated::dispatch((int) $user->id, $assets, 'rates_push');
+        }
+
         return ApiResponse::success([
             'pushed' => $shouldBroadcast,
             'channel' => (string) config('metal_rates.broadcast_channel', 'metal-rates'),
             'event' => (string) config('metal_rates.broadcast_event', 'rates.updated'),
+            'user_channel' => $user ? 'private-user.'.$user->id : null,
+            'user_event' => 'assets.updated',
             'next_broadcast_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 30),
             'rates' => $ratesPayload,
             'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($ratesPayload),
@@ -81,10 +89,12 @@ class MetalRateController extends Controller
             'wallet_balance_display' => $assets['wallet_balance_display'] ?? null,
             'total_assets_balance' => $assets['total_assets_balance'] ?? null,
             'total_assets_balance_display' => $assets['total_assets_balance_display'] ?? null,
+            'gold_holdings' => data_get($assets, 'gold.grams'),
+            'silver_holdings' => data_get($assets, 'silver.grams'),
             'authenticated' => $user !== null,
             'instruction' => $user
-                ? 'Use data.assets (wallet + gold/silver amounts). On WebSocket rates.updated: keep grams/wallet_balance, refresh rate_per_gram, recalculate wallet_amount/value.'
-                : 'Send Authorization: Bearer {token} with this call to receive wallet_balance + gold/silver wallet amounts in data.assets.',
+                ? 'HTTP data.assets has your gold/silver wallet. Also subscribe to private-user.{id} and listen for assets.updated. Public metal-rates only updates rates — do not overwrite grams from it.'
+                : 'Send Authorization: Bearer {token} to receive wallet amounts in data.assets.',
         ], $shouldBroadcast
             ? 'Rates pushed to WebSocket subscribers.'
             : 'Rates returned; WebSocket push debounced (another push ran recently).');
