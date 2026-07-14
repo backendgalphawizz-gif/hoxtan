@@ -70,7 +70,7 @@ class MetalPurchaseController extends Controller
      */
     protected function validatedEstimateRequest(Request $request): array
     {
-        $data = $request->validate([
+        return $request->validate([
             'metal_type' => ['required', Rule::in(['gold', 'silver'])],
             'input_mode' => ['required', Rule::in(['currency', 'weight'])],
             'amount' => ['required_if:input_mode,currency', 'nullable', 'numeric', 'min:'.config('buy_metal.min_amount', 100)],
@@ -82,8 +82,6 @@ class MetalPurchaseController extends Controller
                 'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
         ]);
-
-        return $data;
     }
 
     /**
@@ -92,11 +90,18 @@ class MetalPurchaseController extends Controller
      *     input_mode: string,
      *     amount?: float,
      *     weight_grams?: float,
-     *     payment_method?: string
+     *     payment_method?: string,
+     *     transaction_id?: string|null
      * }
      */
     protected function validatedPurchaseRequest(Request $request): array
     {
+        if ($request->filled('Transaction_id') && ! $request->filled('transaction_id')) {
+            $request->merge([
+                'transaction_id' => $request->input('Transaction_id'),
+            ]);
+        }
+
         $data = $request->validate([
             'metal_type' => ['required', Rule::in(['gold', 'silver'])],
             'input_mode' => ['required', Rule::in(['currency', 'weight'])],
@@ -108,10 +113,16 @@ class MetalPurchaseController extends Controller
                 'min:'.config('buy_metal.min_weight_grams', 0.001),
                 'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
-            'payment_method' => ['nullable', Rule::in(['wallet'])],
+            'payment_method' => ['nullable', 'string', 'max:40'],
+            'transaction_id' => ['nullable', 'string', 'max:64', 'unique:investments,reference_id'],
+            'Transaction_id' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $data['payment_method'] = $data['payment_method'] ?? 'wallet';
+        $data['payment_method'] = $data['payment_method'] ?? 'direct';
+        $data['transaction_id'] = $data['transaction_id']
+            ?? $data['Transaction_id']
+            ?? null;
+        unset($data['Transaction_id']);
 
         return $data;
     }

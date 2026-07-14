@@ -56,7 +56,18 @@ class MetalPurchasePayload
         $investment = $result['investment'];
 
         return [
+            'transaction_id' => $investment->reference_id,
+            'Transaction_id' => $investment->reference_id,
             'purchase' => self::investment($investment),
+            'payment' => isset($result['payment']) ? [
+                'id' => $result['payment']->id,
+                'reference_id' => $result['payment']->reference_id,
+                'amount' => (float) $result['payment']->amount,
+                'currency' => $result['payment']->currency,
+                'status' => $result['payment']->status,
+                'gateway' => $result['payment']->gateway,
+                'paid_at' => optional($result['payment']->paid_at)?->toIso8601String(),
+            ] : null,
             'estimate' => $result['estimate'],
             'wallet_balance' => $result['wallet_balance'],
             'wallet_balance_display' => '₹'.number_format((float) $result['wallet_balance'], 2),
@@ -76,6 +87,8 @@ class MetalPurchasePayload
     {
         return [
             'id' => $investment->id,
+            'transaction_id' => $investment->reference_id,
+            'Transaction_id' => $investment->reference_id,
             'reference_id' => $investment->reference_id,
             'metal_type' => $investment->metal_type,
             'type' => $investment->type,

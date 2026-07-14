@@ -3,16 +3,15 @@
 namespace App\Services;
 
 use App\Models\Investment;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class MetalPurchaseService
 {
     public function __construct(
         protected MetalRateService $metalRates,
         protected GstService $gst,
-        protected WalletService $wallet,
         protected UserHoldingsService $holdings,
     ) {}
 
@@ -29,23 +28,20 @@ class MetalPurchaseService
     }
 
     /**
+     * Simple buy insert (no Razorpay) — creates completed investment and credits holdings.
+     *
      * @param  array{
      *     metal_type: string,
      *     input_mode: string,
      *     amount?: float,
      *     weight_grams?: float,
-     *     payment_method?: string
+     *     payment_method?: string,
+     *     transaction_id?: string|null
      * }  $data
      * @return array<string, mixed>
      */
     public function purchase(User $user, array $data): array
     {
-        if (($data['payment_method'] ?? 'wallet') !== 'wallet') {
-            throw ValidationException::withMessages([
-                'payment_method' => ['Only wallet payment is supported right now.'],
-            ]);
-        }
-
         $estimate = $this->estimate(
             $user,
             $data['metal_type'],
@@ -54,22 +50,8 @@ class MetalPurchaseService
             isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
         );
 
-        if (! $estimate['can_purchase']) {
-            throw ValidationException::withMessages([
-                'wallet_balance' => ['Insufficient wallet balance to complete this purchase.'],
-            ]);
-        }
-
-        return DB::transaction(function () use ($user, $estimate): array {
-            $user->refresh();
-
-            if ((float) $user->wallet_balance < (float) $estimate['total_amount']) {
-                throw ValidationException::withMessages([
-                    'wallet_balance' => ['Insufficient wallet balance to complete this purchase.'],
-                ]);
-            }
-
-            $investment = Investment::query()->create([
+        return DB::transaction(function () use ($user, $estimate, $data): array {
+            $investmentData = [
                 'user_id' => $user->id,
                 'metal_type' => $estimate['metal_type'],
                 'type' => 'buy',
@@ -79,26 +61,38 @@ class MetalPurchaseService
                 'gst_amount' => $estimate['gst_amount'],
                 'total_amount' => $estimate['total_amount'],
                 'status' => 'completed',
-                'notes' => 'Mobile buy metal ('.$estimate['input_mode'].')',
-            ]);
+                'notes' => 'Mobile buy metal (direct insert, '.$estimate['input_mode'].')',
+            ];
 
-            $this->wallet->debit(
-                $user,
-                (float) $estimate['total_amount'],
-                'investment',
-                'Purchased '.rtrim(rtrim(number_format((float) $estimate['weight_grams'], 4, '.', ''), '0'), '.')
-                    .' g '.ucfirst($estimate['metal_type']).' ('.$investment->reference_id.')',
-            );
+            if (! empty($data['transaction_id'])) {
+                $investmentData['reference_id'] = (string) $data['transaction_id'];
+            }
+
+            $investment = Investment::query()->create($investmentData);
+
+            $payment = Payment::query()->create([
+                'reference_id' => 'PAY-'.strtoupper(uniqid()),
+                'user_id' => $user->id,
+                'payable_type' => Investment::class,
+                'payable_id' => $investment->id,
+                'amount' => $estimate['total_amount'],
+                'currency' => 'INR',
+                'status' => 'completed',
+                'gateway' => $data['payment_method'] ?? 'direct',
+                'paid_at' => now(),
+            ]);
 
             $this->holdings->recalculateForUser($user->id);
             $user->refresh();
 
             return [
                 'investment' => $investment->fresh(),
+                'payment' => $payment->fresh(),
                 'estimate' => $estimate,
                 'wallet_balance' => (float) $user->wallet_balance,
                 'gold_holdings' => (float) $user->gold_holdings,
                 'silver_holdings' => (float) $user->silver_holdings,
+                'already_completed' => false,
             ];
         });
     }
@@ -161,7 +155,8 @@ class MetalPurchaseService
         return array_merge($estimate, [
             'wallet_balance' => $walletBalance,
             'wallet_balance_display' => '₹'.number_format($walletBalance, 2),
-            'can_purchase' => $walletBalance >= (float) $estimate['total_amount'],
+            'can_purchase' => true,
+            'payment_method' => 'direct',
         ]);
     }
 
