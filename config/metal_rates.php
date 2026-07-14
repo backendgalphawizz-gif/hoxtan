@@ -5,7 +5,7 @@ return [
     'broadcast_event' => 'rates.updated',
 
     // How often the scheduler pushes DB rates to the WebSocket (does not call Metals-API).
-    'broadcast_interval_seconds' => 60,
+    'broadcast_interval_seconds' => 30,
 
     // Emergency fallback only when Metals-API is unavailable (not editable in admin).
     'fallback_rates' => [

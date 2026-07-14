@@ -36,6 +36,8 @@ Route::prefix('v1')->group(function (): void {
 
     Route::get('/rates', [MetalRateController::class, 'index']);
     Route::get('/rates/realtime-config', [MetalRateController::class, 'realtimeConfig']);
+    Route::post('/rates/push', [MetalRateController::class, 'push']);
+    Route::get('/rates/push', [MetalRateController::class, 'push']);
 
     Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);

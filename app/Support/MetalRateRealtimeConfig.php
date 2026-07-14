@@ -30,14 +30,22 @@ class MetalRateRealtimeConfig
             'scheme' => null,
             'use_tls' => false,
             'cluster' => null,
-            'broadcast_interval_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 60),
+            'broadcast_interval_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 30),
             'instructions' => [
                 'Connect to websocket_url (Pusher protocol).',
                 'After pusher:connection_established, send subscribe JSON (see subscribe_message).',
+                'After pusher_internal:subscription_succeeded, call POST /api/v1/rates/push once for an INSTANT rates.updated on the socket.',
+                'Then keep listening — server pushes rates.updated every 30 seconds automatically.',
                 'Listen for rates.updated — payload has replace:true. OVERWRITE previous rates object; do not append {},{},{}.',
                 'Wallet / total assets: load once from GET /api/v1/profile/assets (grams + wallet). On each rates.updated, overwrite rates and recalculate values = grams × new rate.',
                 'Withdraw screen: load once from GET /api/v1/withdraw/assets. On each rates.updated, overwrite withdraw_assets (same shape), keep available_grams/bank from cache, recalculate available_value = available_grams × rate_per_gram.',
                 'Do not call GET /api/v1/rates for live prices; use this socket only.',
+            ],
+            'instant_push' => [
+                'method' => 'POST',
+                'path' => '/api/v1/rates/push',
+                'when' => 'Right after subscription_succeeded',
+                'why' => 'WebSocket cannot push on subscribe by itself; this triggers an immediate rates.updated to all subscribers.',
             ],
             'withdraw_assets_api' => '/api/v1/withdraw/assets',
             'subscribe_message' => [
