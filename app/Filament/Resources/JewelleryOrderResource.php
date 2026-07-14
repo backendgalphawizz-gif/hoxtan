@@ -20,6 +20,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 class JewelleryOrderResource extends Resource
 {
@@ -551,20 +552,51 @@ class JewelleryOrderResource extends Resource
                     ->schema([
                         Forms\Components\Placeholder::make('documents_list')
                             ->label('')
-                            ->content(function (?OldGoldBooking $record): string {
+                            ->content(function (?OldGoldBooking $record): HtmlString {
                                 if (! $record) {
-                                    return '—';
+                                    return new HtmlString('<p class="text-sm text-gray-500">—</p>');
                                 }
 
-                                return collect(SellJewelleryPayload::documents($record))
+                                $cards = collect(SellJewelleryPayload::documents($record))
                                     ->map(function (array $doc): string {
+                                        $label = e($doc['label']);
+
                                         if (! $doc['uploaded'] || blank($doc['url'])) {
-                                            return $doc['label'].': Not uploaded';
+                                            return <<<HTML
+                                                <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{$label}</p>
+                                                    <p class="text-sm text-gray-500">Not uploaded</p>
+                                                </div>
+                                            HTML;
                                         }
 
-                                        return $doc['label'].': '.$doc['url'];
+                                        $url = e($doc['url']);
+
+                                        return <<<HTML
+                                            <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                                                <p class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{$label}</p>
+                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" class="block">
+                                                    <img
+                                                        src="{$url}"
+                                                        alt="{$label}"
+                                                        class="h-40 w-full rounded-md object-cover border border-gray-100 dark:border-gray-600"
+                                                    />
+                                                </a>
+                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-xs text-primary-600 hover:underline">
+                                                    Open full image
+                                                </a>
+                                            </div>
+                                        HTML;
                                     })
-                                    ->implode("\n") ?: '—';
+                                    ->implode('');
+
+                                if ($cards === '') {
+                                    return new HtmlString('<p class="text-sm text-gray-500">—</p>');
+                                }
+
+                                return new HtmlString(
+                                    '<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">'.$cards.'</div>'
+                                );
                             })
                             ->columnSpanFull(),
                     ]),
