@@ -8,11 +8,11 @@ return [
 
     'authkey' => env('BULKSMS_AUTHKEY', ''),
 
-    'sender' => env('BULKSMS_SENDER', 'ABCDEF'),
+    'sender' => env('BULKSMS_SENDER', ''),
 
-    'route' => env('BULKSMS_ROUTE', '2'),
+    'route' => env('BULKSMS_ROUTE', '4'),
 
-    'country' => env('BULKSMS_COUNTRY', '0'),
+    'country' => env('BULKSMS_COUNTRY', '91'),
 
     /*
     | DLT template ID from your SMS provider approval.

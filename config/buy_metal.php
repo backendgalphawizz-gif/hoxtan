@@ -36,6 +36,6 @@ return [
     'gst_included_for_currency_mode' => true,
 
     'payment_methods' => [
-        ['value' => 'razorpay', 'label' => 'Razorpay'],
+        ['value' => 'direct', 'label' => 'Direct (temporary — no gateway)'],
     ],
 ];

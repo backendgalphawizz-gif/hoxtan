@@ -54,30 +54,9 @@ class MetalPurchaseController extends Controller
         $result = $service->purchase($user, $data);
 
         return ApiResponse::success(
-            MetalPurchasePayload::purchasePending($result),
-            'Razorpay order created. Complete payment to finish purchase.',
-            201,
-        );
-    }
-
-    public function verify(Request $request, MetalPurchaseService $service): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        $data = $request->validate([
-            'razorpay_order_id' => ['required', 'string', 'max:100'],
-            'razorpay_payment_id' => ['required', 'string', 'max:100'],
-            'razorpay_signature' => ['required', 'string', 'max:255'],
-        ]);
-
-        $result = $service->verify($user, $data);
-
-        return ApiResponse::success(
             MetalPurchasePayload::purchase($result),
-            ($result['already_completed'] ?? false)
-                ? 'Purchase already completed.'
-                : 'Metal purchased successfully.',
+            'Metal purchased successfully.',
+            201,
         );
     }
 
@@ -91,7 +70,7 @@ class MetalPurchaseController extends Controller
      */
     protected function validatedEstimateRequest(Request $request): array
     {
-        $data = $request->validate([
+        return $request->validate([
             'metal_type' => ['required', Rule::in(['gold', 'silver'])],
             'input_mode' => ['required', Rule::in(['currency', 'weight'])],
             'amount' => ['required_if:input_mode,currency', 'nullable', 'numeric', 'min:'.config('buy_metal.min_amount', 100)],
@@ -103,8 +82,6 @@ class MetalPurchaseController extends Controller
                 'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
         ]);
-
-        return $data;
     }
 
     /**
@@ -114,7 +91,7 @@ class MetalPurchaseController extends Controller
      *     amount?: float,
      *     weight_grams?: float,
      *     payment_method?: string,
-     *     transaction_id?: string
+     *     transaction_id?: string|null
      * }
      */
     protected function validatedPurchaseRequest(Request $request): array
@@ -136,12 +113,12 @@ class MetalPurchaseController extends Controller
                 'min:'.config('buy_metal.min_weight_grams', 0.001),
                 'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
-            'payment_method' => ['nullable', Rule::in(['razorpay'])],
+            'payment_method' => ['nullable', 'string', 'max:40'],
             'transaction_id' => ['nullable', 'string', 'max:64', 'unique:investments,reference_id'],
             'Transaction_id' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $data['payment_method'] = $data['payment_method'] ?? 'razorpay';
+        $data['payment_method'] = $data['payment_method'] ?? 'direct';
         $data['transaction_id'] = $data['transaction_id']
             ?? $data['Transaction_id']
             ?? null;

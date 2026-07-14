@@ -187,15 +187,21 @@ class OtpService
 
         Cache::put($resendKey, now()->addSeconds($resendAfter)->timestamp, $resendAfter);
 
-        $this->dispatchOtp($phone, $code, $purpose);
+        $smsSent = $this->dispatchOtp($phone, $code, $purpose);
 
         $payload = array_merge([
-            'message' => 'OTP sent successfully.',
+            'message' => $smsSent ? 'OTP sent successfully.' : 'OTP generated. SMS delivery pending — check BulkSMS config.',
+            'sms_sent' => $smsSent,
             'resend_after_seconds' => $resendAfter,
             'expires_in_seconds' => $expiresIn,
         ], $extra);
 
-        if (config('otp.expose_in_response')) {
+        if (! $smsSent) {
+            $payload['sms_warning'] = $this->sms->configurationError()
+                ?? 'BulkSMS API did not accept the message. Check authkey, sender, DLT template and message text.';
+        }
+
+        if (config('otp.expose_in_response') || ! $smsSent) {
             $payload['otp'] = $code;
         }
 
@@ -245,15 +251,15 @@ class OtpService
         Cache::forget($this->otpCacheKey($phone, $purpose));
     }
 
-    protected function dispatchOtp(string $phone, string $code, string $purpose = 'register'): void
+    protected function dispatchOtp(string $phone, string $code, string $purpose = 'register'): bool
     {
         Log::info('OTP generated.', [
             'purpose' => $purpose,
             'phone' => $phone,
-            'otp' => config('otp.expose_in_response') ? $code : '[hidden]',
+            'otp' => config('otp.expose_in_response') || ! $this->sms->isEnabled() ? $code : '[hidden]',
         ]);
 
-        $this->sms->sendOtp($phone, $code, $purpose);
+        return $this->sms->sendOtp($phone, $code, $purpose);
     }
 
     protected function generateCode(): string

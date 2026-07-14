@@ -50,39 +50,6 @@ class MetalPurchasePayload
      * @param  array<string, mixed>  $result
      * @return array<string, mixed>
      */
-    public static function purchasePending(array $result): array
-    {
-        /** @var Investment $investment */
-        $investment = $result['investment'];
-        $payment = $result['payment'];
-
-        return [
-            'transaction_id' => $investment->reference_id,
-            'Transaction_id' => $investment->reference_id,
-            'purchase' => self::investment($investment),
-            'payment' => [
-                'id' => $payment->id,
-                'reference_id' => $payment->reference_id,
-                'amount' => (float) $payment->amount,
-                'currency' => $payment->currency,
-                'status' => $payment->status,
-                'gateway' => $payment->gateway,
-                'razorpay_order_id' => $payment->gateway_reference,
-            ],
-            'razorpay' => $result['razorpay'],
-            'estimate' => $result['estimate'],
-            'wallet_balance' => $result['wallet_balance'],
-            'wallet_balance_display' => '₹'.number_format((float) $result['wallet_balance'], 2),
-            'gold_holdings' => $result['gold_holdings'],
-            'silver_holdings' => $result['silver_holdings'],
-            'next_step' => 'Open Razorpay checkout with razorpay payload, then call /buy-metal/verify.',
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $result
-     * @return array<string, mixed>
-     */
     public static function purchase(array $result): array
     {
         /** @var Investment $investment */
@@ -99,8 +66,7 @@ class MetalPurchasePayload
                 'currency' => $result['payment']->currency,
                 'status' => $result['payment']->status,
                 'gateway' => $result['payment']->gateway,
-                'razorpay_order_id' => $result['payment']->gateway_reference,
-                'razorpay_payment_id' => $result['payment']->gateway_payment_id,
+                'paid_at' => optional($result['payment']->paid_at)?->toIso8601String(),
             ] : null,
             'estimate' => $result['estimate'],
             'wallet_balance' => $result['wallet_balance'],
