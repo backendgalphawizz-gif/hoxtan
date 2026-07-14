@@ -15,8 +15,8 @@ class WithdrawAssetsBroadcastPayload
      */
     public static function fromRates(array $ratesPayload): array
     {
-        $goldRate = (float) data_get($ratesPayload, 'gold.rate_per_gram', 0);
-        $silverRate = (float) data_get($ratesPayload, 'silver.rate_per_gram', 0);
+        $goldRate = self::cleanMoney(data_get($ratesPayload, 'gold.rate_per_gram', 0));
+        $silverRate = self::cleanMoney(data_get($ratesPayload, 'silver.rate_per_gram', 0));
 
         $assets = [];
         foreach (config('withdraw.assets', []) as $asset) {
@@ -34,7 +34,7 @@ class WithdrawAssetsBroadcastPayload
                 // User-specific — keep from GET /withdraw/assets; only rates/values update on socket.
                 'available_grams' => null,
                 'available_value' => null,
-                'rate_per_gram' => round($rate, 2),
+                'rate_per_gram' => $rate,
                 'rate_per_gram_display' => '₹'.number_format($rate, 2).' / gm',
             ];
         }
@@ -60,6 +60,11 @@ class WithdrawAssetsBroadcastPayload
             'source_api' => '/api/v1/withdraw/assets',
             'instruction' => 'Load once from GET /api/v1/withdraw/assets (grams, bank, locked). On rates.updated: overwrite this withdraw_assets object (replace:true), keep available_grams/locked_grams/bank from cache, set rate_per_gram from rates, available_value = available_grams × rate_per_gram. Do not append events.',
         ];
+    }
+
+    protected static function cleanMoney(mixed $value): float
+    {
+        return (float) number_format((float) $value, 2, '.', '');
     }
 
     /**

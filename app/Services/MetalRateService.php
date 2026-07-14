@@ -177,20 +177,28 @@ class MetalRateService
         return [
             'metal_type' => $metalType,
             'label' => $metalType === 'gold' ? 'Gold' : 'Silver',
-            'rate_per_gram' => round((float) $rate, 2),
-            'previous_rate_per_gram' => $previous,
+            'rate_per_gram' => $this->cleanMoney($rate),
+            'previous_rate_per_gram' => $previous !== null ? $this->cleanMoney($previous) : null,
             'change_amount' => $change['change_amount'],
             'change_percent' => $change['change_percent'],
             'change_percent_display' => $change['change_percent_display'],
             'change_direction' => $change['change_direction'],
-            'day_high' => $dayRange['high'],
-            'day_low' => $dayRange['low'],
+            'day_high' => $dayRange['high'] !== null ? $this->cleanMoney($dayRange['high']) : null,
+            'day_low' => $dayRange['low'] !== null ? $this->cleanMoney($dayRange['low']) : null,
             'currency' => 'INR',
             'unit' => 'gram',
             'source' => $source,
             'updated_at' => $updatedAt->toIso8601String(),
             'updated_at_display' => $updatedAt->format('d M Y, h:i A'),
         ];
+    }
+
+    /**
+     * Round money/rate values so JSON does not emit long binary floats (e.g. 178.669999...).
+     */
+    protected function cleanMoney(float|int|string $value): float
+    {
+        return (float) number_format((float) $value, 2, '.', '');
     }
 
     /**
@@ -207,7 +215,7 @@ class MetalRateService
             ->value('rate_per_gram');
 
         if ($previousDay !== null) {
-            return round((float) $previousDay, 2);
+            return $this->cleanMoney($previousDay);
         }
 
         $previousRow = MetalRate::query()
@@ -216,7 +224,7 @@ class MetalRateService
             ->latest('id')
             ->value('rate_per_gram');
 
-        return $previousRow !== null ? round((float) $previousRow, 2) : null;
+        return $previousRow !== null ? $this->cleanMoney($previousRow) : null;
     }
 
     /**
@@ -238,14 +246,14 @@ class MetalRateService
             ];
         }
 
-        $amount = round($current - $previous, 2);
+        $amount = $this->cleanMoney($current - $previous);
         $percent = round(($amount / $previous) * 100, 2);
         $direction = $percent > 0 ? 'up' : ($percent < 0 ? 'down' : 'flat');
         $sign = $percent > 0 ? '+' : '';
 
         return [
             'change_amount' => $amount,
-            'change_percent' => $percent,
+            'change_percent' => (float) number_format($percent, 2, '.', ''),
             'change_percent_display' => $sign.number_format($percent, 1).'%',
             'change_direction' => $direction,
         ];
@@ -268,14 +276,14 @@ class MetalRateService
             $current = $this->getCurrentRatePerGram($metalType);
 
             return [
-                'high' => round($current, 2),
-                'low' => round($current, 2),
+                'high' => $this->cleanMoney($current),
+                'low' => $this->cleanMoney($current),
             ];
         }
 
         return [
-            'high' => round((float) $high, 2),
-            'low' => round((float) $low, 2),
+            'high' => $this->cleanMoney($high),
+            'low' => $this->cleanMoney($low),
         ];
     }
 
