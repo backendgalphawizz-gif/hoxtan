@@ -11,7 +11,7 @@ class Payment extends Model
 {
     protected $fillable = [
         'reference_id', 'user_id', 'payable_type', 'payable_id', 'amount', 'currency',
-        'status', 'gateway', 'gateway_reference', 'failure_reason', 'paid_at',
+        'status', 'gateway', 'gateway_reference', 'gateway_payment_id', 'failure_reason', 'paid_at',
     ];
 
     protected function casts(): array

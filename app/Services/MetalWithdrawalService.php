@@ -18,6 +18,7 @@ class MetalWithdrawalService
     public function __construct(
         protected MetalRateService $metalRates,
         protected UserHoldingsService $holdings,
+        protected NotificationInboxService $notifications,
     ) {}
 
     /**
@@ -208,10 +209,37 @@ class MetalWithdrawalService
 
         NavigationBadgeCounts::clearCache();
 
+        $this->notifyAdminsOfNewRequest($user, $withdrawal);
+
         return [
             'withdrawal' => $withdrawal->fresh(),
             'estimate' => $estimate,
         ];
+    }
+
+    private function notifyAdminsOfNewRequest(User $user, MetalWithdrawal $withdrawal): void
+    {
+        $asset = strtoupper((string) $withdrawal->asset_source);
+        $amount = '₹'.number_format((float) $withdrawal->amount, 2);
+        $grams = number_format((float) $withdrawal->quantity_grams, 4).'g';
+        $reference = (string) ($withdrawal->reference_id ?? '#'.$withdrawal->id);
+
+        $this->notifications->notifyAdmins(
+            'New withdrawal request',
+            "{$user->name} requested {$asset} withdrawal of {$amount} ({$grams}). Ref: {$reference}.",
+            'metal_withdrawal',
+            [
+                'metal_withdrawal_id' => (string) $withdrawal->id,
+                'reference_id' => $reference,
+                'user_id' => (string) $user->id,
+                'user_name' => (string) $user->name,
+                'asset_source' => (string) $withdrawal->asset_source,
+                'metal_type' => (string) $withdrawal->metal_type,
+                'amount' => (string) $withdrawal->amount,
+                'quantity_grams' => (string) $withdrawal->quantity_grams,
+                'status' => (string) $withdrawal->status,
+            ],
+        );
     }
 
     public function approve(MetalWithdrawal $withdrawal, ?int $adminId = null, ?string $payoutReference = null, bool $auto = false): MetalWithdrawal

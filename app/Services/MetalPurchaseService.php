@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Investment;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,7 @@ class MetalPurchaseService
         protected GstService $gst,
         protected WalletService $wallet,
         protected UserHoldingsService $holdings,
+        protected RazorpayService $razorpay,
     ) {}
 
     /**
@@ -29,6 +31,8 @@ class MetalPurchaseService
     }
 
     /**
+     * Create a pending buy + Razorpay order for the mobile SDK.
+     *
      * @param  array{
      *     metal_type: string,
      *     input_mode: string,
@@ -40,9 +44,11 @@ class MetalPurchaseService
      */
     public function purchase(User $user, array $data): array
     {
-        if (($data['payment_method'] ?? 'wallet') !== 'wallet') {
+        $method = $data['payment_method'] ?? 'razorpay';
+
+        if ($method !== 'razorpay') {
             throw ValidationException::withMessages([
-                'payment_method' => ['Only wallet payment is supported right now.'],
+                'payment_method' => ['Only Razorpay payment is supported.'],
             ]);
         }
 
@@ -54,21 +60,7 @@ class MetalPurchaseService
             isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
         );
 
-        if (! $estimate['can_purchase']) {
-            throw ValidationException::withMessages([
-                'wallet_balance' => ['Insufficient wallet balance to complete this purchase.'],
-            ]);
-        }
-
         return DB::transaction(function () use ($user, $estimate): array {
-            $user->refresh();
-
-            if ((float) $user->wallet_balance < (float) $estimate['total_amount']) {
-                throw ValidationException::withMessages([
-                    'wallet_balance' => ['Insufficient wallet balance to complete this purchase.'],
-                ]);
-            }
-
             $investment = Investment::query()->create([
                 'user_id' => $user->id,
                 'metal_type' => $estimate['metal_type'],
@@ -78,27 +70,170 @@ class MetalPurchaseService
                 'amount' => $estimate['taxable_amount'],
                 'gst_amount' => $estimate['gst_amount'],
                 'total_amount' => $estimate['total_amount'],
-                'status' => 'completed',
-                'notes' => 'Mobile buy metal ('.$estimate['input_mode'].')',
+                'status' => 'pending',
+                'notes' => 'Mobile buy metal via Razorpay ('.$estimate['input_mode'].')',
             ]);
 
-            $this->wallet->debit(
-                $user,
+            $payment = Payment::query()->create([
+                'reference_id' => 'PAY-'.strtoupper(uniqid()),
+                'user_id' => $user->id,
+                'payable_type' => Investment::class,
+                'payable_id' => $investment->id,
+                'amount' => $estimate['total_amount'],
+                'currency' => 'INR',
+                'status' => 'pending',
+                'gateway' => 'razorpay',
+            ]);
+
+            $order = $this->razorpay->createOrder(
                 (float) $estimate['total_amount'],
-                'investment',
-                'Purchased '.rtrim(rtrim(number_format((float) $estimate['weight_grams'], 4, '.', ''), '0'), '.')
-                    .' g '.ucfirst($estimate['metal_type']).' ('.$investment->reference_id.')',
+                $payment->reference_id,
+                [
+                    'investment_id' => (string) $investment->id,
+                    'payment_id' => (string) $payment->id,
+                    'user_id' => (string) $user->id,
+                    'metal_type' => (string) $estimate['metal_type'],
+                ],
             );
+
+            $payment->update([
+                'gateway_reference' => $order['id'],
+                'status' => 'processing',
+            ]);
+
+            $user->refresh();
+
+            return [
+                'investment' => $investment->fresh(),
+                'payment' => $payment->fresh(),
+                'estimate' => $estimate,
+                'razorpay' => [
+                    'key' => $this->razorpay->keyId(),
+                    'order_id' => $order['id'],
+                    'amount' => $order['amount'],
+                    'currency' => $order['currency'],
+                    'name' => config('app.name', 'Hoxtan'),
+                    'description' => 'Buy '.ucfirst($estimate['metal_type']).' — '.$investment->reference_id,
+                    'prefill' => [
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'contact' => $user->phone,
+                    ],
+                    'notes' => [
+                        'investment_id' => (string) $investment->id,
+                        'payment_reference' => $payment->reference_id,
+                    ],
+                ],
+                'wallet_balance' => (float) $user->wallet_balance,
+                'gold_holdings' => (float) $user->gold_holdings,
+                'silver_holdings' => (float) $user->silver_holdings,
+            ];
+        });
+    }
+
+    /**
+     * Verify Razorpay payment and credit metal holdings.
+     *
+     * @param  array{
+     *     razorpay_order_id: string,
+     *     razorpay_payment_id: string,
+     *     razorpay_signature: string
+     * }  $data
+     * @return array<string, mixed>
+     */
+    public function verify(User $user, array $data): array
+    {
+        $this->razorpay->verifyPaymentSignature(
+            $data['razorpay_order_id'],
+            $data['razorpay_payment_id'],
+            $data['razorpay_signature'],
+        );
+
+        $remote = $this->razorpay->fetchPayment($data['razorpay_payment_id']);
+
+        if (! in_array($remote['status'], ['captured', 'authorized'], true)) {
+            throw ValidationException::withMessages([
+                'razorpay_payment_id' => ['Payment is not successful yet (status: '.$remote['status'].').'],
+            ]);
+        }
+
+        if ($remote['order_id'] !== $data['razorpay_order_id']) {
+            throw ValidationException::withMessages([
+                'razorpay_order_id' => ['Payment does not match the Razorpay order.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($user, $data, $remote): array {
+            $payment = Payment::query()
+                ->where('user_id', $user->id)
+                ->where('gateway', 'razorpay')
+                ->where('gateway_reference', $data['razorpay_order_id'])
+                ->lockForUpdate()
+                ->first();
+
+            if (! $payment) {
+                throw ValidationException::withMessages([
+                    'razorpay_order_id' => ['Payment order not found.'],
+                ]);
+            }
+
+            /** @var Investment|null $investment */
+            $investment = $payment->payable_type === Investment::class
+                ? Investment::query()->lockForUpdate()->find($payment->payable_id)
+                : null;
+
+            if (! $investment || $investment->user_id !== $user->id || $investment->type !== 'buy') {
+                throw ValidationException::withMessages([
+                    'payment' => ['Related metal purchase not found.'],
+                ]);
+            }
+
+            $expectedPaise = (int) round((float) $payment->amount * 100);
+            if ((int) $remote['amount'] !== $expectedPaise) {
+                throw ValidationException::withMessages([
+                    'amount' => ['Paid amount does not match the purchase amount.'],
+                ]);
+            }
+
+            if ($payment->status === 'completed' && $investment->status === 'completed') {
+                $user->refresh();
+
+                return [
+                    'investment' => $investment->fresh(),
+                    'payment' => $payment->fresh(),
+                    'estimate' => null,
+                    'wallet_balance' => (float) $user->wallet_balance,
+                    'gold_holdings' => (float) $user->gold_holdings,
+                    'silver_holdings' => (float) $user->silver_holdings,
+                    'already_completed' => true,
+                ];
+            }
+
+            $payment->update([
+                'status' => 'completed',
+                'paid_at' => now(),
+                'gateway_payment_id' => $data['razorpay_payment_id'],
+                'failure_reason' => null,
+            ]);
+
+            if ($investment->status !== 'completed') {
+                $investment->update([
+                    'status' => 'completed',
+                    'notes' => trim(($investment->notes ?? '').' | paid='.$data['razorpay_payment_id']),
+                ]);
+            }
 
             $this->holdings->recalculateForUser($user->id);
             $user->refresh();
 
             return [
                 'investment' => $investment->fresh(),
-                'estimate' => $estimate,
+                'payment' => $payment->fresh(),
+                'estimate' => null,
                 'wallet_balance' => (float) $user->wallet_balance,
                 'gold_holdings' => (float) $user->gold_holdings,
                 'silver_holdings' => (float) $user->silver_holdings,
+                'already_completed' => false,
             ];
         });
     }
@@ -161,7 +296,8 @@ class MetalPurchaseService
         return array_merge($estimate, [
             'wallet_balance' => $walletBalance,
             'wallet_balance_display' => '₹'.number_format($walletBalance, 2),
-            'can_purchase' => $walletBalance >= (float) $estimate['total_amount'],
+            'can_purchase' => true,
+            'payment_method' => 'razorpay',
         ]);
     }
 

@@ -182,6 +182,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/buy-metal/config', [MetalPurchaseController::class, 'config']);
         Route::post('/buy-metal/estimate', [MetalPurchaseController::class, 'estimate']);
         Route::post('/buy-metal/purchase', [MetalPurchaseController::class, 'purchase']);
+        Route::post('/buy-metal/verify', [MetalPurchaseController::class, 'verify']);
 
         Route::get('/holdings/config', [HoldingsController::class, 'config']);
         Route::get('/holdings/performance', [HoldingsController::class, 'performance']);

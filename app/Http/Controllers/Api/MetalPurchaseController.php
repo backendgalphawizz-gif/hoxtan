@@ -54,9 +54,30 @@ class MetalPurchaseController extends Controller
         $result = $service->purchase($user, $data);
 
         return ApiResponse::success(
-            MetalPurchasePayload::purchase($result),
-            'Metal purchased successfully.',
+            MetalPurchasePayload::purchasePending($result),
+            'Razorpay order created. Complete payment to finish purchase.',
             201,
+        );
+    }
+
+    public function verify(Request $request, MetalPurchaseService $service): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $data = $request->validate([
+            'razorpay_order_id' => ['required', 'string', 'max:100'],
+            'razorpay_payment_id' => ['required', 'string', 'max:100'],
+            'razorpay_signature' => ['required', 'string', 'max:255'],
+        ]);
+
+        $result = $service->verify($user, $data);
+
+        return ApiResponse::success(
+            MetalPurchasePayload::purchase($result),
+            ($result['already_completed'] ?? false)
+                ? 'Purchase already completed.'
+                : 'Metal purchased successfully.',
         );
     }
 
@@ -108,10 +129,10 @@ class MetalPurchaseController extends Controller
                 'min:'.config('buy_metal.min_weight_grams', 0.001),
                 'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
-            'payment_method' => ['nullable', Rule::in(['wallet'])],
+            'payment_method' => ['nullable', Rule::in(['razorpay'])],
         ]);
 
-        $data['payment_method'] = $data['payment_method'] ?? 'wallet';
+        $data['payment_method'] = $data['payment_method'] ?? 'razorpay';
 
         return $data;
     }

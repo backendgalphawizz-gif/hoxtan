@@ -10,6 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class OtpService
 {
+    public function __construct(
+        protected BulkSmsService $sms,
+    ) {}
+
     public function sendRegistrationOtp(string $phone): array
     {
         $phone = $this->normalizePhone($phone);
@@ -246,8 +250,10 @@ class OtpService
         Log::info('OTP generated.', [
             'purpose' => $purpose,
             'phone' => $phone,
-            'otp' => $code,
+            'otp' => config('otp.expose_in_response') ? $code : '[hidden]',
         ]);
+
+        $this->sms->sendOtp($phone, $code, $purpose);
     }
 
     protected function generateCode(): string

@@ -36,6 +36,6 @@ return [
     'gst_included_for_currency_mode' => true,
 
     'payment_methods' => [
-        ['value' => 'wallet', 'label' => 'Wallet Balance'],
+        ['value' => 'razorpay', 'label' => 'Razorpay'],
     ],
 ];
