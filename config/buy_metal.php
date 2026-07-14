@@ -33,7 +33,7 @@ return [
 
     'max_weight_grams' => 10000,
 
-    'gst_included_for_currency_mode' => true,
+    'gst_included_for_currency_mode' => false,
 
     'payment_methods' => [
         ['value' => 'razorpay', 'label' => 'Razorpay'],
