@@ -11,6 +11,7 @@ class DeviceToken extends Model
         'tokenable_type',
         'tokenable_id',
         'token',
+        'token_hash',
         'platform',
         'device_name',
         'last_used_at',

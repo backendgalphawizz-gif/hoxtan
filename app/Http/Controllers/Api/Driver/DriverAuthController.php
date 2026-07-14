@@ -8,10 +8,11 @@ use App\Services\FirebaseCloudMessagingService;
 use App\Services\OtpService;
 use App\Support\ApiResponse;
 use App\Support\DriverPayload;
+use App\Support\FcmTokenRequest;
 use App\Support\PhoneRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 
 class DriverAuthController extends Controller
 {
@@ -55,13 +56,10 @@ class DriverAuthController extends Controller
     {
         $otpLength = (int) config('otp.length', 4);
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'phone' => PhoneRules::rules(),
             'otp' => ['required', 'string', "digits:{$otpLength}", 'regex:/^\d+$/'],
-            'fcm_token' => ['nullable', 'string', 'max:512'],
-            'platform' => ['nullable', 'string', Rule::in(['android', 'ios', 'web'])],
-            'device_name' => ['nullable', 'string', 'max:120'],
-        ], array_merge(PhoneRules::messages(), [
+        ], FcmTokenRequest::validationRules()), array_merge(PhoneRules::messages(), [
             'otp.digits' => "OTP must be exactly {$otpLength} digits.",
             'otp.regex' => 'OTP must contain only numbers.',
         ]));
@@ -76,36 +74,47 @@ class DriverAuthController extends Controller
         $driver->tokens()->delete();
         $token = $driver->createToken('driver-app')->plainTextToken;
 
+        $fcmToken = FcmTokenRequest::from($request);
         $fcmRegistered = false;
-        if (filled($data['fcm_token'] ?? null)) {
-            $fcm->registerToken(
-                $driver,
-                (string) $data['fcm_token'],
-                $data['platform'] ?? null,
-                $data['device_name'] ?? null,
-            );
-            $fcmRegistered = true;
+        $deviceTokenId = null;
+
+        if ($fcmToken !== null) {
+            try {
+                $device = $fcm->registerToken(
+                    $driver,
+                    $fcmToken,
+                    $data['platform'] ?? null,
+                    $data['device_name'] ?? null,
+                );
+                $fcmRegistered = true;
+                $deviceTokenId = $device->id;
+            } catch (\Throwable $e) {
+                Log::error('Driver FCM token save failed', [
+                    'driver_id' => $driver->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return ApiResponse::success([
             'token' => $token,
             'token_type' => 'Bearer',
             'fcm_token_registered' => $fcmRegistered,
+            'device_token_id' => $deviceTokenId,
             'driver' => DriverPayload::make($driver->fresh()),
         ], 'Login successful.');
     }
 
     public function logout(Request $request, FirebaseCloudMessagingService $fcm): JsonResponse
     {
-        $data = $request->validate([
-            'fcm_token' => ['nullable', 'string', 'max:512'],
-        ]);
+        $request->validate(FcmTokenRequest::validationRules());
 
         /** @var Driver|null $driver */
         $driver = $request->user();
+        $fcmToken = FcmTokenRequest::from($request);
 
-        if ($driver instanceof Driver && filled($data['fcm_token'] ?? null)) {
-            $fcm->removeToken($driver, (string) $data['fcm_token']);
+        if ($driver instanceof Driver && $fcmToken !== null) {
+            $fcm->removeToken($driver, $fcmToken);
         }
 
         $driver?->currentAccessToken()?->delete();

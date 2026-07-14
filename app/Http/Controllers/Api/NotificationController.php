@@ -16,7 +16,7 @@ class NotificationController extends Controller
     public function registerDevice(Request $request, FirebaseCloudMessagingService $fcm): JsonResponse
     {
         $data = $request->validate([
-            'token' => ['required', 'string', 'max:512'],
+            'token' => ['required', 'string', 'max:4096'],
             'platform' => ['nullable', 'string', Rule::in(['android', 'ios', 'web'])],
             'device_name' => ['nullable', 'string', 'max:120'],
         ]);
@@ -41,7 +41,7 @@ class NotificationController extends Controller
     public function removeDevice(Request $request, FirebaseCloudMessagingService $fcm): JsonResponse
     {
         $data = $request->validate([
-            'token' => ['required', 'string', 'max:512'],
+            'token' => ['required', 'string', 'max:4096'],
         ]);
 
         $fcm->removeToken($request->user(), $data['token']);

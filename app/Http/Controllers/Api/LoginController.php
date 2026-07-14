@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\User;
+use App\Services\FirebaseCloudMessagingService;
 use App\Services\OtpService;
 use App\Support\ApiResponse;
+use App\Support\FcmTokenRequest;
 use App\Support\MpinRules;
 use App\Support\PhoneRules;
 use Illuminate\Http\JsonResponse;
@@ -51,16 +53,16 @@ class LoginController extends AuthController
         return $this->sendOtp($request, $otp);
     }
 
-    public function verifyOtp(Request $request, OtpService $otp): JsonResponse
+    public function verifyOtp(Request $request, OtpService $otp, FirebaseCloudMessagingService $fcm): JsonResponse
     {
         $otpLength = (int) config('otp.length', 4);
         $mpinLength = MpinRules::length();
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'phone' => PhoneRules::rules(),
             'otp' => ['required', 'string', "digits:{$otpLength}", 'regex:/^\d+$/'],
             'mpin' => ['nullable', 'string', "digits:{$mpinLength}", 'regex:/^\d+$/'],
-        ], array_merge(PhoneRules::messages(), MpinRules::validationMessages(), [
+        ], FcmTokenRequest::validationRules()), array_merge(PhoneRules::messages(), MpinRules::validationMessages(), [
             'otp.digits' => "OTP must be exactly {$otpLength} digits.",
             'otp.regex' => 'OTP must contain only numbers.',
         ]));
@@ -87,17 +89,17 @@ class LoginController extends AuthController
             ], 'OTP verified. Enter your M-PIN on the next screen to login.');
         }
 
-        return $this->loginWithMpin($user, $phone, $data['mpin'], $otp);
+        return $this->loginWithMpin($user, $phone, $data['mpin'], $otp, $request, $fcm);
     }
 
-    public function verifyMpin(Request $request, OtpService $otp): JsonResponse
+    public function verifyMpin(Request $request, OtpService $otp, FirebaseCloudMessagingService $fcm): JsonResponse
     {
         $mpinLength = MpinRules::length();
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'phone' => PhoneRules::rules(),
             'mpin' => ['required', 'string', "digits:{$mpinLength}", 'regex:/^\d+$/'],
-        ], array_merge(PhoneRules::messages(), MpinRules::validationMessages()));
+        ], FcmTokenRequest::validationRules()), array_merge(PhoneRules::messages(), MpinRules::validationMessages()));
 
         $phone = PhoneRules::normalize($data['phone']);
 
@@ -115,7 +117,7 @@ class LoginController extends AuthController
             ]);
         }
 
-        return $this->loginWithMpin($user, $phone, $data['mpin'], $otp);
+        return $this->loginWithMpin($user, $phone, $data['mpin'], $otp, $request, $fcm);
     }
 
     protected function findLoginUser(string $phone): User

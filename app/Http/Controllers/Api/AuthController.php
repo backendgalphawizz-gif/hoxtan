@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\FirebaseCloudMessagingService;
 use App\Services\UserRegistrationService;
 use App\Support\ApiResponse;
+use App\Support\FcmTokenRequest;
 use App\Support\MpinRules;
 use App\Support\PhoneRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -101,8 +104,14 @@ class AuthController extends Controller
         ];
     }
 
-    protected function loginWithMpin(User $user, string $phone, string $mpin, \App\Services\OtpService $otp): JsonResponse
-    {
+    protected function loginWithMpin(
+        User $user,
+        string $phone,
+        string $mpin,
+        \App\Services\OtpService $otp,
+        ?Request $request = null,
+        ?FirebaseCloudMessagingService $fcm = null,
+    ): JsonResponse {
         if ($user->is_blocked) {
             return ApiResponse::error('Your account has been blocked.', [], 403);
         }
@@ -117,11 +126,35 @@ class AuthController extends Controller
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 
+        $fcmRegistered = false;
+        $deviceTokenId = null;
+        $fcmToken = $request ? FcmTokenRequest::from($request) : null;
+
+        if ($fcmToken !== null && $fcm instanceof FirebaseCloudMessagingService) {
+            try {
+                $device = $fcm->registerToken(
+                    $user,
+                    $fcmToken,
+                    $request?->input('platform'),
+                    $request?->input('device_name'),
+                );
+                $fcmRegistered = true;
+                $deviceTokenId = $device->id;
+            } catch (\Throwable $e) {
+                Log::error('User FCM token save failed', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return ApiResponse::success([
             'phone' => $phone,
             'mpin' => $mpin,
             'mpin_length' => MpinRules::length(),
             'token' => $token,
+            'fcm_token_registered' => $fcmRegistered,
+            'device_token_id' => $deviceTokenId,
             'user' => $this->userPayload($user),
         ], 'Login successful.');
     }

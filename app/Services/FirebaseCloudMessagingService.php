@@ -57,14 +57,20 @@ class FirebaseCloudMessagingService
     }
 
     /**
-     * Register or refresh an FCM device token for a user or admin.
+     * Register or refresh an FCM device token for user / admin / driver.
      */
     public function registerToken(Model $owner, string $token, ?string $platform = null, ?string $deviceName = null): DeviceToken
     {
         $token = trim($token);
+        if ($token === '') {
+            throw new \InvalidArgumentException('FCM token is empty.');
+        }
 
+        $hash = hash('sha256', $token);
+
+        // One physical device token belongs to one owner.
         DeviceToken::query()
-            ->where('token', $token)
+            ->where('token_hash', $hash)
             ->where(function ($q) use ($owner) {
                 $q->where('tokenable_type', '!=', $owner::class)
                     ->orWhere('tokenable_id', '!=', $owner->getKey());
@@ -75,9 +81,10 @@ class FirebaseCloudMessagingService
             [
                 'tokenable_type' => $owner::class,
                 'tokenable_id' => $owner->getKey(),
-                'token' => $token,
+                'token_hash' => $hash,
             ],
             [
+                'token' => $token,
                 'platform' => $platform,
                 'device_name' => $deviceName,
                 'last_used_at' => now(),
@@ -87,10 +94,15 @@ class FirebaseCloudMessagingService
 
     public function removeToken(Model $owner, string $token): void
     {
+        $token = trim($token);
+        $hash = hash('sha256', $token);
+
         DeviceToken::query()
             ->where('tokenable_type', $owner::class)
             ->where('tokenable_id', $owner->getKey())
-            ->where('token', trim($token))
+            ->where(function ($q) use ($token, $hash) {
+                $q->where('token_hash', $hash)->orWhere('token', $token);
+            })
             ->delete();
     }
 
