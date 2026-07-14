@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Support\AssetsBalancePayload;
 use App\Support\MetalRateRealtimeConfig;
 use App\Support\WithdrawAssetsBroadcastPayload;
 use Illuminate\Broadcasting\Channel;
@@ -53,12 +54,13 @@ class MetalRatesUpdated implements ShouldBroadcastNow
     {
         $payload = array_merge($this->rates, [
             'replace' => true,
-            'message' => 'Overwrite previous rates. Do not append. Recalculate assets = holdings_grams × rate_per_gram. Use change_percent_display for +/- vs previous day/rate; day_high/day_low for today range.',
+            'message' => 'Overwrite previous rates. Do not append. Keep grams + wallet_balance from authenticated /rates/push; recalculate wallet_amount = grams × rate_per_gram.',
             'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($this->rates),
+            'assets' => AssetsBalancePayload::broadcastShellFromRates($this->rates),
             'data_format' => [
                 'wire' => 'pusher',
                 'data_is_json_string' => true,
-                'instruction' => 'Outer message.data is a JSON string (Pusher protocol). Parse it once: payload = jsonDecode(message.data). Then use payload.gold / payload.silver.',
+                'instruction' => 'Outer message.data is a JSON string (Pusher protocol). Parse it once: payload = jsonDecode(message.data). Then use payload.gold / payload.silver / payload.assets.',
             ],
         ]);
 
