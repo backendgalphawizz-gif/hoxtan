@@ -43,14 +43,53 @@ class MetalRatesUpdated implements ShouldBroadcastNow
      * Overwrite-friendly payload for mobile.
      * Mobile must REPLACE previous rates state — never append into a list.
      *
+     * Note (Pusher protocol): the wire frame is always
+     *   { "event": "rates.updated", "data": "<JSON STRING>", "channel": "metal-rates" }
+     * Parse `data` once with jsonDecode to get this object.
+     *
      * @return array<string, mixed>
      */
     public function broadcastWith(): array
     {
-        return array_merge($this->rates, [
+        $payload = array_merge($this->rates, [
             'replace' => true,
             'message' => 'Overwrite previous rates. Do not append. Recalculate assets = holdings_grams × rate_per_gram. Use change_percent_display for +/- vs previous day/rate; day_high/day_low for today range.',
             'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($this->rates),
+            'data_format' => [
+                'wire' => 'pusher',
+                'data_is_json_string' => true,
+                'instruction' => 'Outer message.data is a JSON string (Pusher protocol). Parse it once: payload = jsonDecode(message.data). Then use payload.gold / payload.silver.',
+            ],
         ]);
+
+        return $this->normalizeForJson($payload);
+    }
+
+    /**
+     * Clean float encoding (avoid 178.669999...) for the Pusher data JSON string.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function normalizeForJson(array $payload): array
+    {
+        $previous = ini_get('serialize_precision');
+        ini_set('serialize_precision', '-1');
+
+        try {
+            /** @var array<string, mixed> $normalized */
+            $normalized = json_decode(
+                json_encode($payload, JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
+
+            return $normalized;
+        } finally {
+            if ($previous !== false) {
+                ini_set('serialize_precision', (string) $previous);
+            }
+        }
     }
 }
