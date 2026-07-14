@@ -2,14 +2,19 @@
 
 namespace App\Support;
 
+use App\Models\User;
+use App\Services\MetalWithdrawalService;
+
 /**
- * Public WebSocket-friendly slice of GET /api/v1/withdraw/assets.
- * Grams / bank are user-specific — load once from the HTTP API, then overwrite
- * rate_per_gram + available_value on each rates.updated (replace: true).
+ * Withdraw-assets slice for rates.push / WebSocket.
+ * User grams come from authenticated HTTP; public socket is rate-only.
  */
 class WithdrawAssetsBroadcastPayload
 {
     /**
+     * Rate-only shell for public metal-rates channel.
+     * Do NOT send available_grams:null — mobile was wiping wallet after purchase.
+     *
      * @param  array<string, mixed>  $ratesPayload  from MetalRateService::getApiRates()
      * @return array<string, mixed>
      */
@@ -23,7 +28,6 @@ class WithdrawAssetsBroadcastPayload
             $key = (string) ($asset['value'] ?? '');
             $rate = match ($key) {
                 'silver' => $silverRate,
-                // SIG uses gold by default on the public channel; mobile overwrites with user's sig metal_type after first HTTP load.
                 default => $goldRate,
             };
 
@@ -31,9 +35,6 @@ class WithdrawAssetsBroadcastPayload
                 'value' => $key,
                 'label' => $asset['label'] ?? ucfirst($key),
                 'screen_title' => $asset['screen_title'] ?? ('Withdraw '.($asset['label'] ?? ucfirst($key))),
-                // User-specific — keep from GET /withdraw/assets; only rates/values update on socket.
-                'available_grams' => null,
-                'available_value' => null,
                 'rate_per_gram' => $rate,
                 'rate_per_gram_display' => '₹'.number_format($rate, 2).' / gm',
             ];
@@ -42,24 +43,76 @@ class WithdrawAssetsBroadcastPayload
         return [
             'title' => config('withdraw.select_title', 'Select Assets to Withdraw'),
             'min_amount' => (float) config('withdraw.min_amount', 1000),
-            'min_amount_note' => config('withdraw.min_amount_note'),
-            'note' => config('withdraw.note'),
             'holding_period_hours' => (int) config('withdraw.holding_period_hours', 48),
-            'holding_period_message' => config('withdraw.holding_period_message'),
-            'hold_bonus_percent' => (float) config('withdraw.hold_bonus_percent', 1),
-            'hold_bonus_message' => config('withdraw.hold_bonus_message'),
-            'input_modes' => config('withdraw.input_modes', []),
-            'preset_amounts' => config('withdraw.preset_amounts', []),
-            'auto_approve_hours' => (int) config('withdraw.auto_approve_hours', 2),
             'assets' => $assets,
             'rates' => [
                 'gold' => $goldRate,
                 'silver' => $silverRate,
             ],
-            'replace' => true,
+            'replace_rates_only' => true,
             'source_api' => '/api/v1/withdraw/assets',
-            'instruction' => 'Load once from GET /api/v1/withdraw/assets (grams, bank, locked). On rates.updated: overwrite this withdraw_assets object (replace:true), keep available_grams/locked_grams/bank from cache, set rate_per_gram from rates, available_value = available_grams × rate_per_gram. Do not append events.',
+            'instruction' => 'Public socket: update rate_per_gram only. Keep available_grams/total_grams/locked_grams/bank from authenticated POST /api/v1/rates/push or GET /api/v1/withdraw/assets. Then available_value = available_grams × rate_per_gram. Never set grams to null.',
         ];
+    }
+
+    /**
+     * Full user withdraw wallet for authenticated rates/push + private assets.updated.
+     *
+     * @return array<string, mixed>
+     */
+    public static function forUser(User $user, ?MetalWithdrawalService $withdrawals = null): array
+    {
+        $withdrawals ??= app(MetalWithdrawalService::class);
+
+        try {
+            $payload = $withdrawals->assets($user);
+
+            return array_merge($payload, [
+                'replace' => true,
+                'authenticated' => true,
+                'source_api' => '/api/v1/withdraw/assets',
+            ]);
+        } catch (\Throwable $e) {
+            // e.g. withdrawal hold / blocked — still show holdings from balances.
+            $balances = \App\Support\AssetsBalancePayload::make($user);
+            $goldRate = (float) data_get($balances, 'gold.rate_per_gram', 0);
+            $silverRate = (float) data_get($balances, 'silver.rate_per_gram', 0);
+
+            $assets = [];
+            foreach (['gold', 'silver'] as $key) {
+                $row = $balances[$key] ?? [];
+                $grams = (float) ($row['grams'] ?? 0);
+                $rate = (float) ($row['rate_per_gram'] ?? 0);
+                $value = round($grams * $rate, 2);
+                $assets[] = [
+                    'value' => $key,
+                    'label' => ucfirst($key),
+                    'screen_title' => 'Withdraw '.ucfirst($key),
+                    'metal_type' => $key,
+                    'total_grams' => $grams,
+                    'locked_grams' => $grams,
+                    'available_grams' => 0.0,
+                    'available_value' => 0.0,
+                    'available_value_display' => '₹0.00',
+                    'wallet_amount' => $value,
+                    'wallet_amount_display' => '₹'.number_format($value, 2),
+                    'rate_per_gram' => $rate,
+                    'rate_per_gram_display' => '₹'.number_format($rate, 2).' / gm',
+                    'can_withdraw' => false,
+                ];
+            }
+
+            return [
+                'title' => config('withdraw.select_title', 'Select Assets to Withdraw'),
+                'assets' => $assets,
+                'balances' => $balances,
+                'rates' => ['gold' => $goldRate, 'silver' => $silverRate],
+                'replace' => true,
+                'authenticated' => true,
+                'warning' => $e->getMessage(),
+                'source_api' => '/api/v1/withdraw/assets',
+            ];
+        }
     }
 
     protected static function cleanMoney(mixed $value): float
@@ -83,15 +136,19 @@ class WithdrawAssetsBroadcastPayload
             $key = (string) ($asset['value'] ?? '');
             $metalType = (string) ($asset['metal_type'] ?? $key);
             $rate = ($key === 'silver' || $metalType === 'silver') ? $silverRate : $goldRate;
-            $grams = (float) ($asset['available_grams'] ?? 0);
-            $value = round($grams * $rate, 2);
+            $availableGrams = (float) ($asset['available_grams'] ?? 0);
+            $totalGrams = (float) ($asset['total_grams'] ?? $availableGrams);
+            $availableValue = round($availableGrams * $rate, 2);
+            $walletAmount = round($totalGrams * $rate, 2);
 
             return array_merge($asset, [
                 'rate_per_gram' => round($rate, 2),
                 'rate_per_gram_display' => '₹'.number_format($rate, 2).' / gm',
-                'available_value' => $value,
-                'available_value_display' => '₹'.number_format($value, 2),
-                'can_withdraw' => $value >= (float) config('withdraw.min_amount', 1000),
+                'available_value' => $availableValue,
+                'available_value_display' => '₹'.number_format($availableValue, 2),
+                'wallet_amount' => $walletAmount,
+                'wallet_amount_display' => '₹'.number_format($walletAmount, 2),
+                'can_withdraw' => $availableValue >= (float) config('withdraw.min_amount', 1000),
             ]);
         }, $cachedAssets);
     }

@@ -7,6 +7,7 @@ use App\Models\Investment;
 use App\Models\Payment;
 use App\Models\User;
 use App\Support\AssetsBalancePayload;
+use App\Support\WithdrawAssetsBroadcastPayload;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -132,11 +133,14 @@ class MetalPurchaseService
         });
 
         // After commit: push updated gold/silver wallet to the user's private channel.
+        $withdrawAssets = WithdrawAssetsBroadcastPayload::forUser($user->fresh());
         UserAssetsUpdated::dispatch(
             (int) $user->id,
-            $result['assets'],
+            array_merge($result['assets'], ['withdraw_assets' => $withdrawAssets]),
             'metal_purchase',
         );
+
+        $result['withdraw_assets'] = $withdrawAssets;
 
         return $result;
     }

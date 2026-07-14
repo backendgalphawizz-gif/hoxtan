@@ -43,19 +43,25 @@ class MetalWithdrawalService
             $breakdown = $this->availabilityBreakdown($user, $key);
             $rate = (float) ($row['rate_per_gram'] ?? 0);
             $availableValue = round($availableGrams * $rate, 2);
+            $totalGrams = (float) ($breakdown['total_grams'] ?? 0);
+            $walletAmount = round($totalGrams * $rate, 2);
 
             $assets[] = [
                 'value' => $key,
                 'label' => $asset['label'] ?? ucfirst($key),
                 'screen_title' => $asset['screen_title'] ?? ('Withdraw '.($asset['label'] ?? ucfirst($key))),
                 'metal_type' => $key === 'sig' ? ($row['metal_type'] ?? 'gold') : $key,
-                'total_grams' => $breakdown['total_grams'],
+                'total_grams' => $totalGrams,
+                'total_grams_display' => number_format($totalGrams, 2).'g',
                 'locked_grams' => $breakdown['locked_grams'],
                 'locked_grams_display' => number_format($breakdown['locked_grams'], 2).'g',
                 'available_grams' => $availableGrams,
                 'available_grams_display' => number_format($availableGrams, 2).'g',
                 'available_value' => $availableValue,
                 'available_value_display' => '₹'.number_format($availableValue, 2),
+                // Full holdings value (includes 48h locked grams) — use this for wallet UI.
+                'wallet_amount' => $walletAmount,
+                'wallet_amount_display' => '₹'.number_format($walletAmount, 2),
                 'rate_per_gram' => $rate,
                 'rate_per_gram_display' => '₹'.number_format($rate, 2).' / gm',
                 'can_withdraw' => $availableValue >= (float) config('withdraw.min_amount', 1000),
@@ -84,7 +90,7 @@ class MetalWithdrawalService
                 'event' => (string) config('metal_rates.broadcast_event', 'rates.updated'),
                 'channel' => (string) config('metal_rates.broadcast_channel', 'metal-rates'),
                 'field' => 'withdraw_assets',
-                'instruction' => 'On rates.updated: overwrite withdraw_assets from the socket payload (replace:true). Keep available_grams, locked_grams, bank from this HTTP response; update rate_per_gram and available_value = available_grams × rate. Do not append events into a list.',
+                'instruction' => 'On public rates.updated: update rate_per_gram only; keep available_grams/total_grams/locked_grams/bank from this HTTP response (or from authenticated rates/push). available_value = available_grams × rate; wallet_amount = total_grams × rate. Do not overwrite grams with null.',
             ],
         ];
     }

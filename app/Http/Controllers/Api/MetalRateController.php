@@ -31,35 +31,27 @@ class MetalRateController extends Controller
         return ApiResponse::success(array_merge($payload, [
             'realtime' => MetalRateRealtimeConfig::make(),
             'assets' => $this->assetsForRequest($request, $rates, $payload),
+            'withdraw_assets' => $this->withdrawAssetsForRequest($request, $payload),
         ]));
     }
 
-    /**
-     * WebSocket connection details for live rates.
-     * Mobile should connect to `realtime.websocket_url` and listen for rate events —
-     * do not poll GET /rates for live prices.
-     */
     public function realtimeConfig(Request $request, MetalRateService $rates): JsonResponse
     {
         $ratesPayload = $rates->getApiRates();
 
         return ApiResponse::success([
             'realtime' => MetalRateRealtimeConfig::make(),
-            // One-time bootstrap only (optional). Prefer WebSocket event after connect.
             'rates' => $ratesPayload,
-            'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($ratesPayload),
+            'withdraw_assets' => $this->withdrawAssetsForRequest($request, $ratesPayload),
             'assets' => $this->assetsForRequest($request, $rates, $ratesPayload),
         ]);
     }
 
     /**
-     * Call immediately after WebSocket subscribe for an instant rates.updated push.
-     * Send Bearer token so response includes wallet + gold/silver amounts.
-     * Scheduler continues pushing every 30 seconds afterward.
+     * Instant rates + (with Bearer token) full gold/silver wallet + withdrawable assets.
      */
     public function push(Request $request, MetalRateService $rates): JsonResponse
     {
-        // Debounce floods from many clients opening the app at once.
         $shouldBroadcast = Cache::add('metal_rates:push_lock', 1, now()->addSeconds(2));
 
         if ($shouldBroadcast) {
@@ -67,12 +59,16 @@ class MetalRateController extends Controller
         }
 
         $ratesPayload = $rates->getApiRates();
-        $assets = $this->assetsForRequest($request, $rates, $ratesPayload);
         $user = $this->resolveUser($request);
+        $assets = $this->assetsForRequest($request, $rates, $ratesPayload);
+        $withdrawAssets = $this->withdrawAssetsForRequest($request, $ratesPayload);
 
-        // Push fresh wallet to this user's private WebSocket channel.
         if ($user instanceof User) {
-            UserAssetsUpdated::dispatch((int) $user->id, $assets, 'rates_push');
+            UserAssetsUpdated::dispatch(
+                (int) $user->id,
+                array_merge($assets, ['withdraw_assets' => $withdrawAssets]),
+                'rates_push',
+            );
         }
 
         return ApiResponse::success([
@@ -83,7 +79,7 @@ class MetalRateController extends Controller
             'user_event' => 'assets.updated',
             'next_broadcast_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 30),
             'rates' => $ratesPayload,
-            'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($ratesPayload),
+            'withdraw_assets' => $withdrawAssets,
             'assets' => $assets,
             'wallet_balance' => $assets['wallet_balance'] ?? null,
             'wallet_balance_display' => $assets['wallet_balance_display'] ?? null,
@@ -93,8 +89,8 @@ class MetalRateController extends Controller
             'silver_holdings' => data_get($assets, 'silver.grams'),
             'authenticated' => $user !== null,
             'instruction' => $user
-                ? 'HTTP data.assets has your gold/silver wallet. Also subscribe to private-user.{id} and listen for assets.updated. Public metal-rates only updates rates — do not overwrite grams from it.'
-                : 'Send Authorization: Bearer {token} to receive wallet amounts in data.assets.',
+                ? 'Use data.assets + data.withdraw_assets (grams/values). On public rates.updated: update rates only; keep grams. Prefer wallet_amount/total_grams for wallet UI; available_grams may be lower for 48h lock.'
+                : 'Send Authorization: Bearer {token} — required to receive available_grams / wallet amounts (otherwise null/rate-only).',
         ], $shouldBroadcast
             ? 'Rates pushed to WebSocket subscribers.'
             : 'Rates returned; WebSocket push debounced (another push ran recently).');
@@ -113,6 +109,21 @@ class MetalRateController extends Controller
         }
 
         return AssetsBalancePayload::broadcastShellFromRates($ratesPayload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ratesPayload
+     * @return array<string, mixed>
+     */
+    protected function withdrawAssetsForRequest(Request $request, array $ratesPayload): array
+    {
+        $user = $this->resolveUser($request);
+
+        if ($user instanceof User) {
+            return WithdrawAssetsBroadcastPayload::forUser($user->fresh());
+        }
+
+        return WithdrawAssetsBroadcastPayload::fromRates($ratesPayload);
     }
 
     protected function resolveUser(Request $request): ?User

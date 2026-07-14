@@ -74,6 +74,7 @@ class MetalPurchasePayload
             'gold_holdings' => $result['gold_holdings'],
             'silver_holdings' => $result['silver_holdings'],
             'assets' => $result['assets'] ?? null,
+            'withdraw_assets' => $result['withdraw_assets'] ?? null,
             'success' => [
                 'title' => 'Purchase Successful',
                 'message' => 'Your '.ucfirst($investment->metal_type).' purchase has been completed. '
