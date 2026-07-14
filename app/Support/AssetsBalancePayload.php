@@ -31,7 +31,7 @@ class AssetsBalancePayload
             ->latest('id')
             ->first();
 
-        $sigGrams = round((float) ($sigPlan?->metal_accumulated_grams ?? 0), 4);
+        $sigGrams = round((float) ($sigPlan?->metal_accumulated_grams ?? 0), 6);
         $sigMetal = $sigPlan?->metal_type ?? 'gold';
         $sigRate = $sigMetal === 'silver' ? $silverRate : $goldRate;
 
@@ -70,7 +70,7 @@ class AssetsBalancePayload
                 'label' => 'SIG',
                 'metal_type' => $sigMetal,
                 'grams' => $sigGrams,
-                'grams_display' => number_format($sigGrams, 2).'g',
+                'grams_display' => rtrim(rtrim(number_format($sigGrams, 6, '.', ''), '0'), '.').'g',
                 'rate_per_gram' => $sigRate,
                 'value' => $sigValue,
                 'value_display' => '₹'.number_format($sigValue, 2),

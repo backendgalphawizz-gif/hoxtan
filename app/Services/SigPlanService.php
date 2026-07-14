@@ -32,25 +32,23 @@ class SigPlanService
      *     gold_grams_display: string
      * }
      */
-    public function estimate(float $amount, string $metalType): array
+    public function estimate(float $amount, string $metalType, ?float $weightGrams = null): array
     {
         $rate = $this->metalRates->getCurrentRatePerGram($metalType);
         $gstPercent = $this->gst->ratePercent();
-        $gstIncluded = (bool) config('buy_metal.gst_included_for_currency_mode', false);
 
-        if ($gstIncluded) {
-            $totalAmount = round($amount, 2);
-            $taxableAmount = round($totalAmount / (1 + $this->gst->rate()), 2);
-            $gstAmount = round($totalAmount - $taxableAmount, 2);
+        // SIG wallet credits full entered amount as metal value (GST is on payment only).
+        $taxableAmount = round($amount, 2);
+        $gstBreakup = $this->gst->calculateGstAmount($taxableAmount);
+        $gstAmount = $gstBreakup['gst_amount'];
+        $totalAmount = $gstBreakup['total'];
+
+        if ($weightGrams !== null && $weightGrams > 0) {
+            $grams = round($weightGrams, 6);
         } else {
-            // Entered amount credits SIG wallet value; GST added on payment.
-            $taxableAmount = round($amount, 2);
-            $gstBreakup = $this->gst->calculateGstAmount($taxableAmount);
-            $gstAmount = $gstBreakup['gst_amount'];
-            $totalAmount = $gstBreakup['total'];
+            // 6dp so ₹100 ≈ grams×rate (4dp caused ~₹96 after GST bugs / rounding).
+            $grams = $rate > 0 ? round($taxableAmount / $rate, 6) : 0.0;
         }
-
-        $grams = $rate > 0 ? round($taxableAmount / $rate, 4) : 0.0;
 
         return [
             'metal_type' => $metalType,
@@ -59,18 +57,18 @@ class SigPlanService
             'rate_per_gram' => round($rate, 2),
             'rate_per_gram_display' => '₹'.number_format($rate, 0).' / gm',
             'gst_percent' => $gstPercent,
-            'gst_included' => $gstIncluded,
-            'gst_note' => $gstIncluded
-                ? 'GST included '.$gstPercent.'%'
-                : 'GST '.$gstPercent.'% added on metal value',
+            'gst_included' => false,
+            'gst_note' => 'GST '.$gstPercent.'% added on metal value',
             'taxable_amount' => $taxableAmount,
             'gst_amount' => $gstAmount,
             'amount_with_gst' => $totalAmount,
             'amount_with_gst_display' => '₹'.number_format($totalAmount, 2),
             'gold_grams' => $grams,
-            'gold_grams_display' => rtrim(rtrim(number_format($grams, 3, '.', ''), '0'), '.').' g Gold',
+            'gold_grams_display' => rtrim(rtrim(number_format($grams, 6, '.', ''), '0'), '.').' g Gold',
             'metal_grams' => $grams,
-            'metal_grams_display' => rtrim(rtrim(number_format($grams, 3, '.', ''), '0'), '.').' g '.ucfirst($metalType),
+            'metal_grams_display' => rtrim(rtrim(number_format($grams, 6, '.', ''), '0'), '.').' g '.ucfirst($metalType),
+            'wallet_amount' => $taxableAmount,
+            'wallet_amount_display' => '₹'.number_format($taxableAmount, 2),
         ];
     }
 
@@ -96,7 +94,11 @@ class SigPlanService
             ]);
 
             if ($data['record_initial_installment'] ?? true) {
-                $estimate = $this->estimate((float) $data['amount'], $plan->metal_type);
+                $estimate = $this->estimate(
+                    (float) $data['amount'],
+                    $plan->metal_type,
+                    isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
+                );
 
                 $this->recordInstallment($plan, [
                     'amount' => $data['amount'],

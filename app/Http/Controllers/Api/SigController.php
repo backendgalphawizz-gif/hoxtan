@@ -28,10 +28,8 @@ class SigController extends Controller
             'preset_amounts' => config('sig.preset_amounts', []),
             'min_amount' => config('sig.min_amount', 100),
             'gst_percent' => $settings->gstRatePercent(),
-            'gst_included' => (bool) config('buy_metal.gst_included_for_currency_mode', false),
-            'gst_note' => (bool) config('buy_metal.gst_included_for_currency_mode', false)
-                ? 'GST included '.$settings->gstRatePercent().'%'
-                : 'GST '.$settings->gstRatePercent().'% added on metal value',
+            'gst_included' => false,
+            'gst_note' => 'GST '.$settings->gstRatePercent().'% added on metal value',
             'rates' => $metalRates,
             'gold_rate' => $metalRates['gold'] ?? null,
             'silver_rate' => $metalRates['silver'] ?? null,
@@ -103,6 +101,7 @@ class SigController extends Controller
             'metal_type' => ['required', Rule::in(['gold', 'silver'])],
             'frequency' => ['required', Rule::in(['daily', 'weekly', 'monthly'])],
             'amount' => ['required', 'numeric', 'min:'.config('sig.min_amount', 100)],
+            'weight_grams' => ['nullable', 'numeric', 'min:0.000001', 'max:10000'],
             'linked_bank_name' => ['nullable', 'string', 'max:100'],
             'linked_bank_last4' => ['nullable', 'string', 'size:4'],
         ]);
@@ -125,12 +124,17 @@ class SigController extends Controller
             'metal_type' => $data['metal_type'],
             'frequency' => $data['frequency'],
             'amount' => $data['amount'],
+            'weight_grams' => $data['weight_grams'] ?? null,
             'linked_bank_name' => $data['linked_bank_name'] ?? null,
             'linked_bank_last4' => $data['linked_bank_last4'] ?? null,
         ]);
 
         $plan->load('installments');
-        $estimate = $service->estimate((float) $data['amount'], $data['metal_type']);
+        $estimate = $service->estimate(
+            (float) $data['amount'],
+            $data['metal_type'],
+            isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
+        );
 
         // Refresh gold/silver/SIG wallet for rates/push + withdraw/assets + private WS.
         $wallet = WalletHoldingsSnapshot::make($request->user()->fresh());

@@ -33,7 +33,7 @@ class SigPayload
             'total_invested' => (float) $plan->total_invested,
             'total_invested_display' => '₹'.number_format((float) $plan->total_invested, 0),
             'metal_accumulated_grams' => (float) $plan->metal_accumulated_grams,
-            'metal_accumulated_display' => rtrim(rtrim(number_format((float) $plan->metal_accumulated_grams, 3, '.', ''), '0'), '.').'g',
+            'metal_accumulated_display' => rtrim(rtrim(number_format((float) $plan->metal_accumulated_grams, 6, '.', ''), '0'), '.').'g',
             'completed_installments' => (int) $plan->completed_installments,
             'total_installments' => $plan->total_installments !== null ? (int) $plan->total_installments : null,
             'progress_label' => $plan->progress_label,
