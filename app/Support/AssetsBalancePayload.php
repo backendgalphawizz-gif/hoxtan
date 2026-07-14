@@ -102,39 +102,27 @@ class AssetsBalancePayload
         $goldRate = self::cleanMoney(data_get($ratesPayload, 'gold.rate_per_gram', 0));
         $silverRate = self::cleanMoney(data_get($ratesPayload, 'silver.rate_per_gram', 0));
 
+        // Rate-only — omit grams/value so clients cannot overwrite wallet with nulls.
         return [
-            'wallet_balance' => null,
-            'wallet_balance_display' => null,
-            'total_assets_balance' => null,
-            'total_assets_balance_display' => null,
             'gold' => [
                 'label' => 'Gold',
-                'grams' => null,
                 'rate_per_gram' => $goldRate,
-                'value' => null,
-                'wallet_amount' => null,
             ],
             'silver' => [
                 'label' => 'Silver',
-                'grams' => null,
                 'rate_per_gram' => $silverRate,
-                'value' => null,
-                'wallet_amount' => null,
             ],
             'sig' => [
                 'label' => 'SIG',
-                'grams' => null,
                 'rate_per_gram' => $goldRate,
-                'value' => null,
-                'wallet_amount' => null,
             ],
             'rates' => [
                 'gold' => $goldRate,
                 'silver' => $silverRate,
             ],
-            'replace' => true,
+            'replace_rates_only' => true,
             'source_api' => '/api/v1/profile/assets',
-            'instruction' => 'User grams + wallet_balance come from authenticated POST /api/v1/rates/push (Bearer token) or GET /api/v1/profile/assets. On each rates.updated: keep cached grams/wallet_balance, set rate_per_gram from this payload, then value/wallet_amount = grams × rate_per_gram; total_assets_balance = gold+silver+sig values.',
+            'instruction' => 'Public rates only. Keep grams/wallet from authenticated POST /api/v1/rates/push or GET /api/v1/withdraw/assets. value = grams × rate_per_gram.',
         ];
     }
 

@@ -51,9 +51,11 @@ class UserAssetsUpdated implements ShouldBroadcastNow
             'wallet_balance_display' => $this->assets['wallet_balance_display'] ?? null,
             'total_assets_balance' => $this->assets['total_assets_balance'] ?? null,
             'total_assets_balance_display' => $this->assets['total_assets_balance_display'] ?? null,
-            'gold_holdings' => data_get($this->assets, 'gold.grams'),
-            'silver_holdings' => data_get($this->assets, 'silver.grams'),
-            'instruction' => 'Replace local gold/silver wallet with assets + withdraw_assets. Public metal-rates is rates-only — never null out grams from it.',
+            'gold_holdings' => $this->assets['gold_holdings'] ?? data_get($this->assets, 'gold.grams'),
+            'silver_holdings' => $this->assets['silver_holdings'] ?? data_get($this->assets, 'silver.grams'),
+            'gold_value' => data_get($this->assets, 'gold.value'),
+            'silver_value' => data_get($this->assets, 'silver.value'),
+            'instruction' => 'Replace local gold/silver wallet with assets + withdraw_assets (DB values after purchase). Public metal-rates is rates-only — never null out grams from it.',
         ];
     }
 }

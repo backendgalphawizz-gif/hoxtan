@@ -113,16 +113,18 @@ class MetalPurchaseController extends Controller
                 'min:'.config('buy_metal.min_weight_grams', 0.001),
                 'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
-            'payment_method' => ['nullable', 'string', 'max:40'],
+            'payment_method' => ['nullable', 'string', Rule::in(['direct', 'razorpay', 'wallet'])],
+            'gst_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'amount_with_gst' => ['nullable', 'numeric', 'min:0'],
             'transaction_id' => ['nullable', 'string', 'max:64', 'unique:investments,reference_id'],
             'Transaction_id' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $data['payment_method'] = $data['payment_method'] ?? 'direct';
+        $data['payment_method'] = $data['payment_method'] ?? 'razorpay';
         $data['transaction_id'] = $data['transaction_id']
             ?? $data['Transaction_id']
             ?? null;
-        unset($data['Transaction_id']);
+        unset($data['Transaction_id'], $data['gst_percent'], $data['amount_with_gst']);
 
         return $data;
     }
