@@ -10,7 +10,7 @@
     --gs-page-bg: #f3f4f6;
     --gs-card-border: #e5e7eb;
     --gs-text-muted:  #434343;
-    /* --gs-text-muted: #E2E5E6; */
+    /* --gs-text-muted: #434343; */
 
    
     --gs-text-dark: #111827;
@@ -582,7 +582,7 @@ body,
 .gs-brand-logo__subtitle {
     font-size: 0.625rem;
     font-weight: 500;
-    color: #E2E5E6;
+    color: #434343;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -824,7 +824,7 @@ body,
 
 .fi-ta-actions .fi-icon-btn.fi-color-gray,
 .fi-ta-actions .fi-icon-btn.fi-color-gray .fi-icon-btn-icon {
-    color: #E2E5E6 !important;
+    color: #434343 !important;
 }
 
 .fi-ta-actions .fi-icon-btn.fi-color-primary,
@@ -1088,7 +1088,7 @@ body,
     max-width: 16rem;
     font-size: 0.8125rem;
     line-height: 1.6;
-    color: #E2E5E6;
+    color: #434343;
 }
 
 .gs-auth-card__form {
@@ -1126,7 +1126,7 @@ body,
 .gs-auth-card__form-subtitle {
     margin: 0;
     font-size: 0.875rem;
-    color: #E2E5E6;
+    color: #434343;
 }
 
 .gs-auth-alert {
@@ -1147,7 +1147,7 @@ body,
     font-weight: 600 !important;
     letter-spacing: 0.06em !important;
     text-transform: uppercase !important;
-    color: #E2E5E6 !important;
+    color: #434343 !important;
 }
 
 .gs-auth-form .fi-input-wrp {
@@ -1269,7 +1269,7 @@ body,
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #E2E5E6;
+    color: #434343;
     background: #f9fafb;
 }
 
@@ -1830,7 +1830,7 @@ body,
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: #E2E5E6;
+    color: #434343;
 }
 
 .gs-reports-hub__empty {
