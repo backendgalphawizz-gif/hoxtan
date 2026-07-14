@@ -3,12 +3,16 @@
 namespace App\Events;
 
 use App\Support\MetalRateRealtimeConfig;
-use App\Support\WithdrawAssetsBroadcastPayload;
+use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
+/**
+ * Compact public rates event — keep under Pusher payload limits (~10KB).
+ */
 class MetalRatesUpdated implements ShouldBroadcastNow
 {
     use Dispatchable;
@@ -40,39 +44,69 @@ class MetalRatesUpdated implements ShouldBroadcastNow
     }
 
     /**
-     * Overwrite-friendly payload for mobile.
-     * Mobile must REPLACE previous rates state — never append into a list.
-     *
-     * Note (Pusher protocol): the wire frame is always
-     *   { "event": "rates.updated", "data": "<JSON STRING>", "channel": "metal-rates" }
-     * Parse `data` once with jsonDecode to get this object.
-     *
      * @return array<string, mixed>
      */
     public function broadcastWith(): array
     {
-        $payload = array_merge($this->rates, [
+        $gold = round((float) data_get($this->rates, 'gold.rate_per_gram', 0), 2);
+        $silver = round((float) data_get($this->rates, 'silver.rate_per_gram', 0), 2);
+
+        $payload = [
             'replace' => true,
-            'message' => 'Overwrite previous rates only. Do NOT replace user gold/silver grams or wallet_balance from this public event. Recalculate wallet_amount = cached_grams × rate_per_gram. After buy/sell, listen to private user.{id} event assets.updated or refresh POST /api/v1/rates/push with Bearer token.',
-            'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($this->rates),
-            // Rate-only — never send null grams here (mobile was wiping wallet after purchase).
+            'replace_rates_only' => true,
+            'currency' => 'INR',
+            'unit' => 'gram',
+            'fetched_at' => data_get($this->rates, 'fetched_at'),
+            'gold' => [
+                'metal_type' => 'gold',
+                'rate_per_gram' => $gold,
+                'change_percent' => data_get($this->rates, 'gold.change_percent'),
+                'change_direction' => data_get($this->rates, 'gold.change_direction'),
+            ],
+            'silver' => [
+                'metal_type' => 'silver',
+                'rate_per_gram' => $silver,
+                'change_percent' => data_get($this->rates, 'silver.change_percent'),
+                'change_direction' => data_get($this->rates, 'silver.change_direction'),
+            ],
             'assets_rates' => [
-                'gold' => data_get($this->rates, 'gold.rate_per_gram'),
-                'silver' => data_get($this->rates, 'silver.rate_per_gram'),
+                'gold' => $gold,
+                'silver' => $silver,
             ],
-            'data_format' => [
-                'wire' => 'pusher',
-                'data_is_json_string' => true,
-                'instruction' => 'Parse message.data once. Update rates from payload.gold/silver. Keep local assets.grams + wallet_balance. value = grams × rate_per_gram.',
+            'withdraw_assets' => [
+                'replace_rates_only' => true,
+                'rates' => [
+                    'gold' => $gold,
+                    'silver' => $silver,
+                ],
+                'assets' => [
+                    ['value' => 'gold', 'rate_per_gram' => $gold],
+                    ['value' => 'silver', 'rate_per_gram' => $silver],
+                    ['value' => 'sig', 'rate_per_gram' => $gold],
+                ],
             ],
-        ]);
+        ];
 
         return $this->normalizeForJson($payload);
     }
 
     /**
-     * Clean float encoding (avoid 178.669999...) for the Pusher data JSON string.
+     * Safe dispatch — never break HTTP if Pusher rejects payload.
      *
+     * @param  array<string, mixed>  $rates
+     */
+    public static function dispatchSafe(array $rates): void
+    {
+        try {
+            event(new static($rates));
+        } catch (BroadcastException|\Throwable $e) {
+            Log::warning('MetalRatesUpdated broadcast skipped', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

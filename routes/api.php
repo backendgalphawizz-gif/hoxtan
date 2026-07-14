@@ -40,8 +40,7 @@ Route::prefix('v1')->group(function (): void {
 
     Route::get('/rates', [MetalRateController::class, 'index']);
     Route::get('/rates/realtime-config', [MetalRateController::class, 'realtimeConfig']);
-    Route::post('/rates/push', [MetalRateController::class, 'push']);
-    Route::get('/rates/push', [MetalRateController::class, 'push']);
+    // rates/push requires auth — moved into auth:sanctum group (returns wallet after purchase)
 
     Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
@@ -114,6 +113,10 @@ Route::prefix('v1')->group(function (): void {
     });
 
     Route::middleware('auth:sanctum')->group(function (): void {
+        // Wallet + live rates after purchase (Bearer token REQUIRED).
+        Route::post('/rates/push', [MetalRateController::class, 'push']);
+        Route::get('/rates/push', [MetalRateController::class, 'push']);
+
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::get('/profile/assets', [ProfileController::class, 'assets']);

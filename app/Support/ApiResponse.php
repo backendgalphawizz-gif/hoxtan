@@ -30,6 +30,23 @@ class ApiResponse
             return (object) [];
         }
 
-        return $data;
+        // Avoid JSON long floats like 178.66999999999999 from PHP binary floats.
+        $previous = ini_get('serialize_precision');
+        ini_set('serialize_precision', '-1');
+
+        try {
+            return json_decode(
+                json_encode($data, JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            );
+        } catch (\Throwable) {
+            return $data;
+        } finally {
+            if ($previous !== false) {
+                ini_set('serialize_precision', (string) $previous);
+            }
+        }
     }
 }

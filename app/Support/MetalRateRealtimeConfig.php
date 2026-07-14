@@ -35,7 +35,7 @@ class MetalRateRealtimeConfig
                 'Connect to websocket_url (Pusher protocol).',
                 'After pusher:connection_established, send subscribe JSON (see subscribe_message).',
                 'Listen for rates.updated. Pusher sends data as a JSON STRING — parse with jsonDecode(event.data) to get the rates object (replace:true).',
-                'After pusher_internal:subscription_succeeded, call POST /api/v1/rates/push WITH Bearer token for instant rates + your gold/silver wallet in HTTP data.assets.',
+                'After pusher_internal:subscription_succeeded, call POST /api/v1/rates/push WITH Authorization: Bearer {token} (auth required — returns gold/silver wallet from DB).',
                 'Also subscribe to private-user.{userId} (see user_assets_channel) and listen for assets.updated after buy metal — this updates gold/silver wallet on socket.',
                 'Public metal-rates updates RATES only. Never overwrite assets.grams / wallet_balance from public rates.updated.',
                 'Then keep listening — server pushes rates.updated every 30 seconds automatically.',

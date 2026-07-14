@@ -62,79 +62,68 @@ class MetalRateController extends Controller
     }
 
     /**
-     * Instant rates + (with Bearer token) full gold/silver wallet after purchases.
+     * Auth required (sanctum). Returns live rates + this user's gold/silver wallet from DB.
      */
     public function push(Request $request, MetalRateService $rates): JsonResponse
     {
-        $this->authenticateFromBearer($request);
+        /** @var User $user */
+        $user = $request->user();
 
         $shouldBroadcast = Cache::add('metal_rates:push_lock', 1, now()->addSeconds(2));
 
         if ($shouldBroadcast) {
-            $rates->broadcastCurrentRates();
+            try {
+                $rates->broadcastCurrentRates();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('rates/push public broadcast skipped', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $ratesPayload = $rates->getApiRates();
-        $wallet = $this->walletForRequest($request, $rates);
-        $user = $this->resolveUser($request);
+        $snapshot = WalletHoldingsSnapshot::make($user->fresh(), $rates);
 
-        if ($user instanceof User) {
-            UserAssetsUpdated::dispatch(
-                (int) $user->id,
-                array_merge($wallet['assets'], [
-                    'withdraw_assets' => $wallet['withdraw_assets'],
-                    'gold_holdings' => $wallet['gold_holdings'],
-                    'silver_holdings' => $wallet['silver_holdings'],
-                ]),
-                'rates_push',
-            );
-        }
+        UserAssetsUpdated::dispatchSafe(
+            (int) $user->id,
+            array_merge($snapshot['assets'], [
+                'withdraw_assets' => $snapshot['withdraw_assets'],
+                'gold_holdings' => $snapshot['gold_holdings'],
+                'silver_holdings' => $snapshot['silver_holdings'],
+            ]),
+            'rates_push',
+        );
 
         return ApiResponse::success([
             'pushed' => $shouldBroadcast,
             'channel' => (string) config('metal_rates.broadcast_channel', 'metal-rates'),
             'event' => (string) config('metal_rates.broadcast_event', 'rates.updated'),
-            'user_channel' => $user ? 'private-user.'.$user->id : null,
+            'user_channel' => 'private-user.'.$user->id,
             'user_event' => 'assets.updated',
             'next_broadcast_seconds' => (int) config('metal_rates.broadcast_interval_seconds', 30),
             'rates' => $ratesPayload,
-            'withdraw_assets' => $wallet['withdraw_assets'],
-            'assets' => $wallet['assets'],
-            'wallet_balance' => $wallet['wallet_balance'],
-            'wallet_balance_display' => $wallet['wallet_balance_display'],
-            'total_assets_balance' => $wallet['total_assets_balance'],
-            'total_assets_balance_display' => $wallet['total_assets_balance_display'],
-            'gold_holdings' => $wallet['gold_holdings'],
-            'silver_holdings' => $wallet['silver_holdings'],
-            'gold_value' => $wallet['gold_value'],
-            'silver_value' => $wallet['silver_value'],
-            'gold_value_display' => $wallet['gold_value_display'],
-            'silver_value_display' => $wallet['silver_value_display'],
-            'authenticated' => $wallet['authenticated'],
-            'instruction' => $wallet['authenticated']
-                ? 'Wallet updated from DB after buy-metal/purchase. Use gold_holdings/silver_holdings and withdraw_assets.total_grams / wallet_amount for UI. available_grams may be lower for 48h lock. Public rates.updated is rates-only.'
-                : 'Send Authorization: Bearer {token} to receive gold/silver wallet after purchase.',
+            'withdraw_assets' => $snapshot['withdraw_assets'],
+            'assets' => $snapshot['assets'],
+            'wallet_balance' => $snapshot['wallet_balance'],
+            'wallet_balance_display' => $snapshot['wallet_balance_display'],
+            'total_assets_balance' => $snapshot['total_assets_balance'],
+            'total_assets_balance_display' => $snapshot['total_assets_balance_display'],
+            'gold_holdings' => $snapshot['gold_holdings'],
+            'silver_holdings' => $snapshot['silver_holdings'],
+            'gold_value' => $snapshot['gold_value'],
+            'silver_value' => $snapshot['silver_value'],
+            'gold_value_display' => $snapshot['gold_value_display'],
+            'silver_value_display' => $snapshot['silver_value_display'],
+            'authenticated' => true,
+            'user_id' => $user->id,
+            'instruction' => 'Wallet values come from your DB holdings after buy-metal/purchase. Use gold_holdings/silver_holdings and withdraw_assets.assets[].total_grams / available_grams / wallet_amount.',
         ], $shouldBroadcast
             ? 'Rates pushed to WebSocket subscribers.'
             : 'Rates returned; WebSocket push debounced (another push ran recently).');
     }
 
     /**
-     * @return array{
-     *     authenticated: bool,
-     *     gold_holdings: float|null,
-     *     silver_holdings: float|null,
-     *     gold_value: float|null,
-     *     silver_value: float|null,
-     *     gold_value_display: string|null,
-     *     silver_value_display: string|null,
-     *     wallet_balance: float|null,
-     *     wallet_balance_display: string|null,
-     *     total_assets_balance: float|null,
-     *     total_assets_balance_display: string|null,
-     *     assets: array<string, mixed>,
-     *     withdraw_assets: array<string, mixed>
-     * }
+     * @return array<string, mixed>
      */
     protected function walletForRequest(Request $request, MetalRateService $rates): array
     {
@@ -159,9 +148,7 @@ class MetalRateController extends Controller
             ];
         }
 
-        $snapshot = WalletHoldingsSnapshot::make($user, $rates);
-
-        return array_merge($snapshot, ['authenticated' => true]);
+        return array_merge(WalletHoldingsSnapshot::make($user, $rates), ['authenticated' => true]);
     }
 
     protected function authenticateFromBearer(Request $request): void
@@ -184,12 +171,16 @@ class MetalRateController extends Controller
             return $user;
         }
 
-        $plain = $request->bearerToken();
+        $plain = $request->bearerToken()
+            ?? $request->header('X-Access-Token')
+            ?? $request->input('token')
+            ?? $request->query('token');
+
         if (! filled($plain)) {
             return null;
         }
 
-        $accessToken = PersonalAccessToken::findToken($plain);
+        $accessToken = PersonalAccessToken::findToken((string) $plain);
         $tokenable = $accessToken?->tokenable;
 
         return $tokenable instanceof User ? $tokenable : null;

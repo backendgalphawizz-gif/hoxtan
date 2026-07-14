@@ -129,7 +129,7 @@ class MetalPurchaseService
         });
 
         // After commit: push updated wallet on private WebSocket so app/home refreshes.
-        UserAssetsUpdated::dispatch(
+        UserAssetsUpdated::dispatchSafe(
             (int) $user->id,
             array_merge($result['assets'], [
                 'withdraw_assets' => $result['withdraw_assets'],
