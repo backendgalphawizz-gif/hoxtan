@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Driver;
 use App\Models\JewelleryOrder;
 use App\Models\OldGoldBooking;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -29,7 +30,7 @@ class DriverAssignmentNotificationService
         $title = 'New delivery assigned';
         $body = 'You have been assigned jewellery delivery '.$ref.'. Open the app to view details.';
 
-        $this->push($driver, $title, $body, 'driver_delivery_assigned', [
+        $this->pushAfterCommit($driver, $title, $body, 'driver_delivery_assigned', [
             'task_type' => 'delivery',
             'order_id' => (string) $order->id,
             'order_number' => (string) $ref,
@@ -52,7 +53,7 @@ class DriverAssignmentNotificationService
         $title = 'New pickup assigned';
         $body = 'You have been assigned sell-jewellery pickup '.$ref.'. Open the app to view details.';
 
-        $this->push($driver, $title, $body, 'driver_pickup_assigned', [
+        $this->pushAfterCommit($driver, $title, $body, 'driver_pickup_assigned', [
             'task_type' => 'pickup',
             'booking_id' => (string) $booking->id,
             'booking_number' => (string) $ref,
@@ -63,16 +64,59 @@ class DriverAssignmentNotificationService
     /**
      * @param  array<string, mixed>  $data
      */
+    protected function pushAfterCommit(Driver $driver, string $title, string $body, string $type, array $data = []): void
+    {
+        $send = function () use ($driver, $title, $body, $type, $data): void {
+            $this->push($driver, $title, $body, $type, $data);
+        };
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($send);
+
+            return;
+        }
+
+        $send();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
     protected function push(Driver $driver, string $title, string $body, string $type, array $data = []): void
     {
         try {
+            $tokenCount = count($this->fcm->tokensFor($driver));
+
+            if ($tokenCount === 0) {
+                Log::warning('Driver assignment push skipped: driver has no fcm_token in device_tokens', [
+                    'driver_id' => $driver->id,
+                    'driver_phone' => $driver->phone,
+                    'type' => $type,
+                    'hint' => 'Driver app must call /api/v1/driver/login/verify-otp with fcm_token',
+                ]);
+
+                return;
+            }
+
+            if (! $this->fcm->isEnabled()) {
+                Log::warning('Driver assignment push skipped: Firebase not configured', [
+                    'driver_id' => $driver->id,
+                    'type' => $type,
+                    'credentials' => config('firebase.credentials'),
+                ]);
+
+                return;
+            }
+
             $result = $this->fcm->sendToOwners([$driver], $title, $body, $data, $type);
 
-            Log::info('Driver assignment push sent', [
+            Log::info('Driver assignment push result', [
                 'driver_id' => $driver->id,
                 'type' => $type,
+                'tokens' => $result['tokens'] ?? $tokenCount,
                 'success' => $result['success'] ?? 0,
                 'failure' => $result['failure'] ?? 0,
+                'firebase_ready' => $result['firebase_ready'] ?? false,
             ]);
         } catch (Throwable $e) {
             Log::warning('Driver assignment push failed', [

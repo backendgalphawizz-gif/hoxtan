@@ -393,6 +393,7 @@ class JewelleryOrderResource extends Resource
 
                         Notification::make()
                             ->title('Driver assigned')
+                            ->body('If the driver logged in with fcm_token, a push was sent.')
                             ->success()
                             ->send();
                     }),

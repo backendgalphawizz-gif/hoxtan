@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Models\Admin;
 use App\Models\DeviceToken;
+use App\Models\Driver;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Exception\MessagingException;
 use Kreait\Firebase\Factory;
@@ -34,9 +36,17 @@ class FirebaseCloudMessagingService
 
         $this->bootAttempted = true;
 
+        if (! (bool) config('firebase.enabled', true)) {
+            Log::warning('Firebase push disabled (FIREBASE_ENABLED=false)');
+
+            return null;
+        }
+
         $credentials = (string) config('firebase.credentials');
         if ($credentials === '' || ! is_file($credentials)) {
-            Log::warning('Firebase credentials file missing', ['path' => $credentials]);
+            Log::warning('Firebase credentials file missing — driver/user push will not send', [
+                'path' => $credentials,
+            ]);
 
             return null;
         }
@@ -68,7 +78,6 @@ class FirebaseCloudMessagingService
 
         $hash = hash('sha256', $token);
 
-        // One physical device token belongs to one owner.
         DeviceToken::query()
             ->where('token_hash', $hash)
             ->where(function ($q) use ($owner) {
@@ -77,18 +86,25 @@ class FirebaseCloudMessagingService
             })
             ->delete();
 
+        $payload = [
+            'platform' => $platform,
+            'device_name' => $deviceName,
+            'last_used_at' => now(),
+        ];
+
+        if ($this->hasFcmTokenColumn()) {
+            $payload['fcm_token'] = $token;
+        } else {
+            $payload['token'] = $token;
+        }
+
         return DeviceToken::query()->updateOrCreate(
             [
                 'tokenable_type' => $owner::class,
                 'tokenable_id' => $owner->getKey(),
                 'token_hash' => $hash,
             ],
-            [
-                'fcm_token' => $token,
-                'platform' => $platform,
-                'device_name' => $deviceName,
-                'last_used_at' => now(),
-            ]
+            $payload,
         );
     }
 
@@ -101,27 +117,48 @@ class FirebaseCloudMessagingService
             ->where('tokenable_type', $owner::class)
             ->where('tokenable_id', $owner->getKey())
             ->where(function ($q) use ($token, $hash) {
-                $q->where('token_hash', $hash)->orWhere('fcm_token', $token);
+                $q->where('token_hash', $hash);
+                if ($this->hasFcmTokenColumn()) {
+                    $q->orWhere('fcm_token', $token);
+                }
+                if (Schema::hasColumn('device_tokens', 'token')) {
+                    $q->orWhere('token', $token);
+                }
             })
             ->delete();
     }
 
     /**
-     * @param  Collection<int, User|Admin>|array<int, User|Admin>  $recipients
+     * @return list<string>
+     */
+    public function tokensFor(Model $owner): array
+    {
+        $query = DeviceToken::query()
+            ->where('tokenable_type', $owner::class)
+            ->where('tokenable_id', $owner->getKey());
+
+        if ($this->hasFcmTokenColumn()) {
+            return $query->pluck('fcm_token')->filter()->unique()->values()->all();
+        }
+
+        if (Schema::hasColumn('device_tokens', 'token')) {
+            return $query->pluck('token')->filter()->unique()->values()->all();
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  Collection<int, User|Admin|Driver>|array<int, User|Admin|Driver>  $recipients
      * @param  array<string, mixed>  $data
-     * @return array{success: int, failure: int}
+     * @return array{success: int, failure: int, tokens: int, firebase_ready: bool}
      */
     public function sendToOwners(iterable $recipients, string $title, string $body, array $data = [], ?string $type = null): array
     {
         $tokens = collect();
         foreach ($recipients as $recipient) {
             if ($recipient instanceof Model) {
-                $tokens = $tokens->merge(
-                    DeviceToken::query()
-                        ->where('tokenable_type', $recipient::class)
-                        ->where('tokenable_id', $recipient->getKey())
-                        ->pluck('fcm_token')
-                );
+                $tokens = $tokens->merge($this->tokensFor($recipient));
             }
         }
 
@@ -129,7 +166,21 @@ class FirebaseCloudMessagingService
             $data['type'] = $type;
         }
 
-        return $this->sendToTokens($tokens->unique()->values()->all(), $title, $body, $data);
+        $unique = $tokens->filter()->unique()->values()->all();
+
+        if ($unique === []) {
+            Log::warning('FCM skipped: no device tokens for recipients', [
+                'title' => $title,
+                'type' => $type,
+            ]);
+        }
+
+        $result = $this->sendToTokens($unique, $title, $body, $data);
+
+        return array_merge($result, [
+            'tokens' => count($unique),
+            'firebase_ready' => $this->messaging() !== null,
+        ]);
     }
 
     /**
@@ -146,6 +197,11 @@ class FirebaseCloudMessagingService
 
         $messaging = $this->messaging();
         if ($messaging === null) {
+            Log::warning('FCM skipped: Firebase not ready', [
+                'token_count' => count($tokens),
+                'title' => $title,
+            ]);
+
             return ['success' => 0, 'failure' => count($tokens)];
         }
 
@@ -174,7 +230,23 @@ class FirebaseCloudMessagingService
                 $invalid = array_merge($invalid, $report->unknownTokens(), $report->invalidTokens());
             } catch (MessagingException $e) {
                 Log::error('FCM multicast failed', ['error' => $e->getMessage()]);
-                $failure += count($chunk);
+                // Fallback: send one-by-one
+                foreach ($chunk as $registrationToken) {
+                    try {
+                        $messaging->send(
+                            CloudMessage::new()
+                                ->withToken($registrationToken)
+                                ->withNotification(Notification::create($title, $body))
+                                ->withData($stringData)
+                        );
+                        $success++;
+                    } catch (Throwable $inner) {
+                        $failure++;
+                        Log::warning('FCM single send failed', [
+                            'error' => $inner->getMessage(),
+                        ]);
+                    }
+                }
             } catch (Throwable $e) {
                 Log::error('FCM send failed', ['error' => $e->getMessage()]);
                 $failure += count($chunk);
@@ -182,9 +254,19 @@ class FirebaseCloudMessagingService
         }
 
         if ($invalid !== []) {
-            DeviceToken::query()->whereIn('fcm_token', array_values(array_unique($invalid)))->delete();
+            $invalid = array_values(array_unique($invalid));
+            if ($this->hasFcmTokenColumn()) {
+                DeviceToken::query()->whereIn('fcm_token', $invalid)->delete();
+            } elseif (Schema::hasColumn('device_tokens', 'token')) {
+                DeviceToken::query()->whereIn('token', $invalid)->delete();
+            }
         }
 
         return ['success' => $success, 'failure' => $failure];
+    }
+
+    protected function hasFcmTokenColumn(): bool
+    {
+        return Schema::hasColumn('device_tokens', 'fcm_token');
     }
 }
