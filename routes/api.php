@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\MetalPurchaseController;
 use App\Http\Controllers\Api\MetalRateController;
 use App\Http\Controllers\Api\MetalWithdrawalController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -199,5 +200,13 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/goals/{goal}', [GoalController::class, 'update']);
         Route::post('/goals/{goal}', [GoalController::class, 'update']);
         Route::delete('/goals/{goal}', [GoalController::class, 'destroy']);
+
+        Route::post('/device-token', [NotificationController::class, 'registerDevice']);
+        Route::delete('/device-token', [NotificationController::class, 'removeDevice']);
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])
+            ->whereNumber('notification');
     });
 });

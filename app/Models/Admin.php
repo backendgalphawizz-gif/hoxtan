@@ -9,6 +9,8 @@ use Filament\Models\Contracts\HasName;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -40,6 +42,16 @@ class Admin extends Authenticatable implements FilamentUser, HasAvatar, HasName
     public function role(): BelongsTo
     {
         return $this->belongsTo(AdminRole::class, 'admin_role_id');
+    }
+
+    public function deviceTokens(): MorphMany
+    {
+        return $this->morphMany(DeviceToken::class, 'tokenable');
+    }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(AdminNotification::class);
     }
 
     public function canAccessPanel(Panel $panel): bool

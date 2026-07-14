@@ -5,11 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class UserNotification extends Model
+class AdminNotification extends Model
 {
     protected $fillable = [
-        'user_id',
-        'push_notification_id',
+        'admin_id',
         'title',
         'body',
         'type',
@@ -25,14 +24,9 @@ class UserNotification extends Model
         ];
     }
 
-    public function user(): BelongsTo
+    public function admin(): BelongsTo
     {
-        return $this->belongsTo(User::class);
-    }
-
-    public function pushNotification(): BelongsTo
-    {
-        return $this->belongsTo(PushNotification::class);
+        return $this->belongsTo(Admin::class);
     }
 
     public function isUnread(): bool

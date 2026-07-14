@@ -16,6 +16,7 @@ class JewelleryOrderEmiInstallment extends Model
         'paid_at',
         'marked_paid_by',
         'notes',
+        'last_reminded_at',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class JewelleryOrderEmiInstallment extends Model
             'amount' => 'decimal:2',
             'due_date' => 'date',
             'paid_at' => 'datetime',
+            'last_reminded_at' => 'datetime',
             'installment_number' => 'integer',
         ];
     }

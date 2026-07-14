@@ -177,6 +177,10 @@ return [
             'label' => 'Push Notifications',
             'group' => 'Notification Management',
         ],
+        'admin_notifications' => [
+            'label' => 'Notification Inbox',
+            'group' => 'Notification Management',
+        ],
         'daily_reports' => [
             'label' => 'Daily Reports',
             'group' => 'Dashboard',

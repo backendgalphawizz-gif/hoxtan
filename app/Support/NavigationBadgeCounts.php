@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\AdminNotification;
 use App\Models\Investment;
 use App\Models\JewelleryOrder;
 use App\Models\KycDetail;
@@ -9,6 +10,7 @@ use App\Models\MetalWithdrawal;
 use App\Models\OldGoldBooking;
 use App\Models\Redemption;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Cache;
 
 class NavigationBadgeCounts
@@ -92,6 +94,29 @@ class NavigationBadgeCounts
         return Cache::remember('nav.pending_metal_withdrawals', self::TTL_SECONDS, fn (): int => MetalWithdrawal::query()
             ->where('status', 'pending')
             ->count());
+    }
+
+    public static function unreadAdminNotifications(): int
+    {
+        $admin = Filament::auth()->user();
+        if ($admin === null) {
+            return 0;
+        }
+
+        $key = 'nav.unread_admin_notifications.'.$admin->getKey();
+
+        return Cache::remember($key, self::TTL_SECONDS, fn (): int => AdminNotification::query()
+            ->where('admin_id', $admin->getKey())
+            ->whereNull('read_at')
+            ->count());
+    }
+
+    public static function forgetUnreadAdminNotifications(?int $adminId = null): void
+    {
+        $adminId ??= Filament::auth()->user()?->getKey();
+        if ($adminId) {
+            Cache::forget('nav.unread_admin_notifications.'.$adminId);
+        }
     }
 
     public static function pendingSellJewelleryRequests(): int
