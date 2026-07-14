@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DriverAssignmentNotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -89,6 +90,15 @@ class JewelleryOrder extends Model
             }
 
             $order->driver_assigned_at = null;
+        });
+
+        static::saved(function (JewelleryOrder $order): void {
+            if (! $order->wasChanged('driver_id') || blank($order->driver_id)) {
+                return;
+            }
+
+            app(DriverAssignmentNotificationService::class)
+                ->notifyJewelleryDeliveryAssigned($order);
         });
     }
 

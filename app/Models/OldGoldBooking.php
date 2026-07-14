@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DriverAssignmentNotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -77,6 +78,15 @@ class OldGoldBooking extends Model
             }
 
             $booking->driver_assigned_at = null;
+        });
+
+        static::saved(function (OldGoldBooking $booking): void {
+            if (! $booking->wasChanged('driver_id') || blank($booking->driver_id)) {
+                return;
+            }
+
+            app(DriverAssignmentNotificationService::class)
+                ->notifySellPickupAssigned($booking);
         });
     }
 
