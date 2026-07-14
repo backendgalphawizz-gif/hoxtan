@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\JewelleryOrder;
+use App\Services\JewelleryEmiCancellationService;
 use App\Support\ApiResponse;
 use App\Support\OrderPayload;
 use Illuminate\Http\JsonResponse;
@@ -76,6 +77,31 @@ class OrderController extends Controller
         return ApiResponse::success([
             'order' => OrderPayload::make($order, detailed: true),
         ]);
+    }
+
+    public function cancelEmiPreview(Request $request, JewelleryOrder $order, JewelleryEmiCancellationService $cancellation): JsonResponse
+    {
+        $this->ensureOwnedByUser($request, $order);
+
+        return ApiResponse::success([
+            'cancellation' => $cancellation->preview($order),
+        ]);
+    }
+
+    public function cancelEmi(Request $request, JewelleryOrder $order, JewelleryEmiCancellationService $cancellation): JsonResponse
+    {
+        $this->ensureOwnedByUser($request, $order);
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $result = $cancellation->cancel($order, $request->user(), $data['reason'] ?? null);
+
+        return ApiResponse::success([
+            'refund_request' => $result['refund_request'],
+            'order' => OrderPayload::make($result['order']->loadMissing(['items.product', 'payment', 'emiInstallments', 'emiRefundRequests']), detailed: true),
+        ], 'EMI order cancelled. Refund request sent for admin approval.');
     }
 
     protected function ensureOwnedByUser(Request $request, JewelleryOrder $order): void

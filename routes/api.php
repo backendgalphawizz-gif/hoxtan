@@ -122,6 +122,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/orders/config', [OrderController::class, 'config']);
         Route::get('/orders', [OrderController::class, 'index']);
         Route::get('/orders/{order}', [OrderController::class, 'show']);
+        Route::get('/orders/{order}/emi-cancel-preview', [OrderController::class, 'cancelEmiPreview']);
+        Route::post('/orders/{order}/emi-cancel', [OrderController::class, 'cancelEmi']);
 
         Route::get('/transactions/config', [TransactionController::class, 'config']);
         Route::get('/transactions', [TransactionController::class, 'index']);

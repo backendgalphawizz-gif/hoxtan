@@ -122,6 +122,10 @@ return [
             'label' => 'Buy Now Orders',
             'group' => 'Jewellery Management',
         ],
+        'jewellery_emi_refunds' => [
+            'label' => 'EMI Refund Requests',
+            'group' => 'Jewellery Management',
+        ],
         'offers' => [
             'label' => 'Offers Management',
             'group' => 'CMS Management',

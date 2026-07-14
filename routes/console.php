@@ -17,3 +17,6 @@ Schedule::command('metals:sync-live')->dailyAt('18:00');
 
 // Push stored DB rates to mobile continuously — does NOT call Metals-API.
 Schedule::command('metals:broadcast-rates')->everyMinute();
+
+// EMI jewellery cancel refunds: auto-approve if admin does not act within 2 hours.
+Schedule::command('jewellery:auto-approve-emi-refunds')->everyMinute();

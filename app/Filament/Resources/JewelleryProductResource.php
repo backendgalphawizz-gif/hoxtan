@@ -117,6 +117,12 @@ class JewelleryProductResource extends Resource
                         Forms\Components\TextInput::make('purity')
                             ->placeholder('22K')
                             ->maxLength(20),
+                        Forms\Components\Select::make('size')
+                            ->label('Size (optional)')
+                            ->options(JewelleryProduct::sizeOptions())
+                            ->searchable()
+                            ->nullable()
+                            ->placeholder('Select size'),
                         Forms\Components\TextInput::make('weight_grams')
                             ->label('Weight (grams)')
                             ->numeric()
@@ -212,6 +218,7 @@ class JewelleryProductResource extends Resource
                 Tables\Columns\TextColumn::make('subCategory.name')->label('Sub Category')->placeholder('—'),
                 Tables\Columns\TextColumn::make('subSubCategory.name')->label('Sub Sub Category')->placeholder('—'),
                 Tables\Columns\TextColumn::make('purity')->placeholder('—'),
+                Tables\Columns\TextColumn::make('size')->placeholder('—')->toggleable(),
                 Tables\Columns\TextColumn::make('weight_grams')->suffix(' g')->placeholder('—'),
                 Tables\Columns\TextColumn::make('price')->inr()->label('Total Price'),
                 Tables\Columns\TextColumn::make('making_charge_percent')

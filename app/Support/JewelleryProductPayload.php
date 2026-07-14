@@ -40,6 +40,7 @@ class JewelleryProductPayload
             'images' => $product->imageItems(),
             'metal_type' => $product->metal_type,
             'purity' => $product->purity,
+            'size' => $product->size,
             'weight_grams' => $product->weight_grams !== null ? (float) $product->weight_grams : null,
             'specification' => $product->specificationLabel(),
             'rate_per_gram' => $pricing['rate_per_gram'],

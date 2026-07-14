@@ -76,6 +76,12 @@ class JewelleryEmiPayload
                 : null,
             'paid_count' => $installments->where('status', 'paid')->count(),
             'total_count' => $installments->count(),
+            'paid_amount' => round((float) $installments->where('status', 'paid')->sum('amount'), 2),
+            'can_cancel' => $order->status !== 'cancelled'
+                && $order->status !== 'completed'
+                && blank($order->delivered_at)
+                && blank($order->driver_id)
+                && $installments->where('status', 'paid')->sum('amount') > 0,
             'delivery_eligible' => $order->isDeliveryEligible(),
             'delivery_hold_message' => $order->isDeliveryEligible()
                 ? null

@@ -117,6 +117,16 @@ class JewelleryOrder extends Model
         return $this->hasMany(JewelleryOrderEmiInstallment::class)->orderBy('installment_number');
     }
 
+    public function emiRefundRequests(): HasMany
+    {
+        return $this->hasMany(JewelleryEmiRefundRequest::class);
+    }
+
+    public function latestEmiRefundRequest(): ?JewelleryEmiRefundRequest
+    {
+        return $this->emiRefundRequests()->latest('id')->first();
+    }
+
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);

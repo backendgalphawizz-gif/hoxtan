@@ -25,6 +25,7 @@ class JewelleryProduct extends Model
         'weight_grams',
         'metal_type',
         'purity',
+        'size',
         'stock_status',
         'sort_order',
         'is_active',
@@ -205,9 +206,24 @@ class JewelleryProduct extends Model
     {
         $parts = array_filter([
             filled($this->purity) ? $this->purity : null,
+            filled($this->size) ? 'Size '.$this->size : null,
             $this->weight_grams !== null ? number_format((float) $this->weight_grams, 1).' gm' : null,
         ]);
 
         return implode(' | ', $parts);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function sizeOptions(): array
+    {
+        $options = ['Free Size' => 'Free Size'];
+
+        foreach (range(1, 30) as $size) {
+            $options[(string) $size] = (string) $size;
+        }
+
+        return $options;
     }
 }

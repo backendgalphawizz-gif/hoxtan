@@ -79,6 +79,13 @@ class NavigationBadgeCounts
             ->count());
     }
 
+    public static function pendingJewelleryEmiRefunds(): int
+    {
+        return Cache::remember('nav.pending_jewellery_emi_refunds', self::TTL_SECONDS, fn (): int => \App\Models\JewelleryEmiRefundRequest::query()
+            ->where('status', 'pending')
+            ->count());
+    }
+
     public static function pendingSellJewelleryRequests(): int
     {
         return Cache::remember('nav.pending_sell_jewellery_requests', self::TTL_SECONDS, fn (): int => OldGoldBooking::query()
@@ -98,6 +105,7 @@ class NavigationBadgeCounts
             'nav.pending_sell_transactions',
             'nav.pending_jewellery_orders',
             'nav.pending_sell_jewellery_requests',
+            'nav.pending_jewellery_emi_refunds',
         ] as $key) {
             Cache::forget($key);
         }
