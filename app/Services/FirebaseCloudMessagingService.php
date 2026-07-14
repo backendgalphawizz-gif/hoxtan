@@ -84,7 +84,7 @@ class FirebaseCloudMessagingService
                 'token_hash' => $hash,
             ],
             [
-                'token' => $token,
+                'fcm_token' => $token,
                 'platform' => $platform,
                 'device_name' => $deviceName,
                 'last_used_at' => now(),
@@ -101,7 +101,7 @@ class FirebaseCloudMessagingService
             ->where('tokenable_type', $owner::class)
             ->where('tokenable_id', $owner->getKey())
             ->where(function ($q) use ($token, $hash) {
-                $q->where('token_hash', $hash)->orWhere('token', $token);
+                $q->where('token_hash', $hash)->orWhere('fcm_token', $token);
             })
             ->delete();
     }
@@ -120,7 +120,7 @@ class FirebaseCloudMessagingService
                     DeviceToken::query()
                         ->where('tokenable_type', $recipient::class)
                         ->where('tokenable_id', $recipient->getKey())
-                        ->pluck('token')
+                        ->pluck('fcm_token')
                 );
             }
         }
@@ -182,7 +182,7 @@ class FirebaseCloudMessagingService
         }
 
         if ($invalid !== []) {
-            DeviceToken::query()->whereIn('token', array_values(array_unique($invalid)))->delete();
+            DeviceToken::query()->whereIn('fcm_token', array_values(array_unique($invalid)))->delete();
         }
 
         return ['success' => $success, 'failure' => $failure];

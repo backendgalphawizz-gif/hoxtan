@@ -10,7 +10,7 @@ class DeviceToken extends Model
     protected $fillable = [
         'tokenable_type',
         'tokenable_id',
-        'token',
+        'fcm_token',
         'token_hash',
         'platform',
         'device_name',

@@ -13,7 +13,7 @@ return new class extends Migration
             Schema::create('device_tokens', function (Blueprint $table): void {
                 $table->id();
                 $table->morphs('tokenable');
-                $table->text('token');
+                $table->text('fcm_token');
                 $table->string('token_hash', 64)->unique();
                 $table->string('platform', 20)->nullable();
                 $table->string('device_name')->nullable();
@@ -41,10 +41,14 @@ return new class extends Migration
             DB::statement('ALTER TABLE device_tokens MODIFY token TEXT NOT NULL');
         }
 
-        $rows = DB::table('device_tokens')->whereNull('token_hash')->orWhere('token_hash', '')->get(['id', 'token']);
+        $rows = DB::table('device_tokens')->whereNull('token_hash')->orWhere('token_hash', '')->get(['id', 'fcm_token', 'token']);
         foreach ($rows as $row) {
+            $value = $row->fcm_token ?? $row->token ?? null;
+            if ($value === null) {
+                continue;
+            }
             DB::table('device_tokens')->where('id', $row->id)->update([
-                'token_hash' => hash('sha256', (string) $row->token),
+                'token_hash' => hash('sha256', (string) $value),
             ]);
         }
 

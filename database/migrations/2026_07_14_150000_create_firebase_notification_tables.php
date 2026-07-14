@@ -11,7 +11,8 @@ return new class extends Migration
         Schema::create('device_tokens', function (Blueprint $table) {
             $table->id();
             $table->morphs('tokenable'); // user or admin
-            $table->string('token', 512)->unique();
+            $table->text('token');
+            $table->string('token_hash', 64)->unique();
             $table->string('platform', 20)->nullable(); // android|ios|web
             $table->string('device_name')->nullable();
             $table->timestamp('last_used_at')->nullable();
