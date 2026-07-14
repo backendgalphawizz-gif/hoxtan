@@ -49,7 +49,7 @@ class MetalRatesUpdated implements ShouldBroadcastNow
     {
         return array_merge($this->rates, [
             'replace' => true,
-            'message' => 'Overwrite previous rates. Do not append. Recalculate assets = holdings_grams × rate_per_gram.',
+            'message' => 'Overwrite previous rates. Do not append. Recalculate assets = holdings_grams × rate_per_gram. Use change_percent_display for +/- vs previous day/rate; day_high/day_low for today range.',
             'withdraw_assets' => WithdrawAssetsBroadcastPayload::fromRates($this->rates),
         ]);
     }

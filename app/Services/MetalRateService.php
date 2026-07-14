@@ -147,6 +147,13 @@ class MetalRateService
      *     metal_type: string,
      *     label: string,
      *     rate_per_gram: float,
+     *     previous_rate_per_gram: ?float,
+     *     change_amount: ?float,
+     *     change_percent: ?float,
+     *     change_percent_display: ?string,
+     *     change_direction: string,
+     *     day_high: ?float,
+     *     day_low: ?float,
      *     currency: string,
      *     unit: string,
      *     source: string,
@@ -163,15 +170,112 @@ class MetalRateService
         $source = $active?->source ?? 'fallback';
         $updatedAt = $active?->updated_at ?? now();
 
+        $previous = $this->resolvePreviousRate($metalType, $active?->id);
+        $change = $this->calculateRateChange($rate, $previous);
+        $dayRange = $this->dayHighLow($metalType);
+
         return [
             'metal_type' => $metalType,
             'label' => $metalType === 'gold' ? 'Gold' : 'Silver',
             'rate_per_gram' => round((float) $rate, 2),
+            'previous_rate_per_gram' => $previous,
+            'change_amount' => $change['change_amount'],
+            'change_percent' => $change['change_percent'],
+            'change_percent_display' => $change['change_percent_display'],
+            'change_direction' => $change['change_direction'],
+            'day_high' => $dayRange['high'],
+            'day_low' => $dayRange['low'],
             'currency' => 'INR',
             'unit' => 'gram',
             'source' => $source,
             'updated_at' => $updatedAt->toIso8601String(),
             'updated_at_display' => $updatedAt->format('d M Y, h:i A'),
+        ];
+    }
+
+    /**
+     * Previous reference rate: last rate recorded before today (preferred),
+     * else the previous rate row before the current active one.
+     */
+    protected function resolvePreviousRate(string $metalType, ?int $excludeId = null): ?float
+    {
+        $previousDay = MetalRate::query()
+            ->where('metal_type', $metalType)
+            ->where('created_at', '<', now()->startOfDay())
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+            ->latest('id')
+            ->value('rate_per_gram');
+
+        if ($previousDay !== null) {
+            return round((float) $previousDay, 2);
+        }
+
+        $previousRow = MetalRate::query()
+            ->where('metal_type', $metalType)
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+            ->latest('id')
+            ->value('rate_per_gram');
+
+        return $previousRow !== null ? round((float) $previousRow, 2) : null;
+    }
+
+    /**
+     * @return array{
+     *     change_amount: ?float,
+     *     change_percent: ?float,
+     *     change_percent_display: ?string,
+     *     change_direction: string
+     * }
+     */
+    protected function calculateRateChange(float $current, ?float $previous): array
+    {
+        if ($previous === null || $previous <= 0) {
+            return [
+                'change_amount' => null,
+                'change_percent' => null,
+                'change_percent_display' => null,
+                'change_direction' => 'flat',
+            ];
+        }
+
+        $amount = round($current - $previous, 2);
+        $percent = round(($amount / $previous) * 100, 2);
+        $direction = $percent > 0 ? 'up' : ($percent < 0 ? 'down' : 'flat');
+        $sign = $percent > 0 ? '+' : '';
+
+        return [
+            'change_amount' => $amount,
+            'change_percent' => $percent,
+            'change_percent_display' => $sign.number_format($percent, 1).'%',
+            'change_direction' => $direction,
+        ];
+    }
+
+    /**
+     * @return array{high: ?float, low: ?float}
+     */
+    protected function dayHighLow(string $metalType): array
+    {
+        $query = MetalRate::query()
+            ->where('metal_type', $metalType)
+            ->where('created_at', '>=', now()->startOfDay());
+
+        $high = (clone $query)->max('rate_per_gram');
+        $low = (clone $query)->min('rate_per_gram');
+
+        // If no rows yet today, use the current active rate as both high and low.
+        if ($high === null || $low === null) {
+            $current = $this->getCurrentRatePerGram($metalType);
+
+            return [
+                'high' => round($current, 2),
+                'low' => round($current, 2),
+            ];
+        }
+
+        return [
+            'high' => round((float) $high, 2),
+            'low' => round((float) $low, 2),
         ];
     }
 
