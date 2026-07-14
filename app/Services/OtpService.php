@@ -197,7 +197,8 @@ class OtpService
         ], $extra);
 
         if (! $smsSent) {
-            $payload['sms_warning'] = $this->sms->configurationError()
+            $payload['sms_warning'] = $this->sms->lastError()
+                ?? $this->sms->configurationError($purpose)
                 ?? 'BulkSMS API did not accept the message. Check authkey, sender, DLT template and message text.';
         }
 
