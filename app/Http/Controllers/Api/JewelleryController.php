@@ -101,28 +101,200 @@ class JewelleryController extends Controller
         ]);
     }
 
-    public function products(Request $request): JsonResponse
+    /**
+     * Filters sheet config + hierarchy helpers for category → sub → sub-sub.
+     */
+    public function filters(Request $request): JsonResponse
     {
         $data = $request->validate([
             'metal_type' => ['nullable', Rule::in(['gold', 'silver'])],
             'category_id' => ['nullable', 'integer', 'exists:jewellery_categories,id'],
             'sub_category_id' => ['nullable', 'integer', 'exists:jewellery_sub_categories,id'],
-            'sub_sub_category_id' => ['nullable', 'integer', 'exists:jewellery_sub_sub_categories,id'],
         ]);
 
-        $products = JewelleryProduct::query()
+        $metalType = $data['metal_type'] ?? null;
+
+        $categories = JewelleryCategory::query()
+            ->where('is_active', true)
+            ->when(
+                filled($metalType),
+                fn (Builder $query) => $query->where(function (Builder $inner) use ($metalType): void {
+                    $inner->where('metal_type', $metalType)->orWhere('metal_type', 'both');
+                })
+            )
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (JewelleryCategory $category) => $this->categoryPayload($category))
+            ->values()
+            ->all();
+
+        $subCategoriesQuery = JewellerySubCategory::query()
+            ->where('is_active', true)
+            ->when(
+                filled($data['category_id'] ?? null),
+                fn (Builder $q) => $q->where('jewellery_category_id', $data['category_id'])
+            )
+            ->when(
+                filled($metalType) && blank($data['category_id'] ?? null),
+                fn (Builder $q) => $q->whereHas('category', function (Builder $inner) use ($metalType): void {
+                    $inner->where('is_active', true)
+                        ->where(function (Builder $metal) use ($metalType): void {
+                            $metal->where('metal_type', $metalType)->orWhere('metal_type', 'both');
+                        });
+                })
+            )
+            ->orderBy('sort_order');
+
+        $subCategories = $subCategoriesQuery->get()->map(fn (JewellerySubCategory $sub) => [
+            'id' => $sub->id,
+            'category_id' => $sub->jewellery_category_id,
+            'name' => $sub->name,
+            'slug' => $sub->slug,
+        ])->values()->all();
+
+        $subSubCategories = [];
+        if (filled($data['sub_category_id'] ?? null)) {
+            $subSubCategories = JewellerySubSubCategory::query()
+                ->where('jewellery_sub_category_id', $data['sub_category_id'])
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->get()
+                ->map(fn (JewellerySubSubCategory $row) => [
+                    'id' => $row->id,
+                    'sub_category_id' => $row->jewellery_sub_category_id,
+                    'name' => $row->name,
+                    'slug' => $row->slug,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return ApiResponse::success([
+            'title' => 'Filters',
+            'search_placeholder' => config('jewellery.search_placeholder'),
+            'genders' => config('jewellery.genders', []),
+            'purities' => config('jewellery.purities', []),
+            'weight' => config('jewellery.weight', []),
+            'budget' => config('jewellery.budget', []),
+            'metal_type' => $metalType,
+            'hierarchy' => [
+                'category' => 'Category (admin) → product chips like Rings / Necklaces',
+                'sub_category' => 'Sub Category under a category',
+                'sub_sub_category' => 'Sub Sub Category under a sub category',
+                'gender' => "Men's / Women's on Filters screen maps to product gender",
+            ],
+            'categories' => $categories,
+            'sub_categories' => $subCategories,
+            'sub_sub_categories' => $subSubCategories,
+            'apply_endpoint' => '/api/v1/jewellery/products',
+            'reset_defaults' => [
+                'gender' => null,
+                'purity' => null,
+                'category_id' => null,
+                'sub_category_id' => null,
+                'sub_sub_category_id' => null,
+                'min_weight' => null,
+                'max_weight' => null,
+                'min_budget' => null,
+                'max_budget' => null,
+                'search' => null,
+            ],
+        ]);
+    }
+
+    public function products(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'metal_type' => ['nullable', Rule::in(['gold', 'silver'])],
+            'gender' => ['nullable', Rule::in(['men', 'women', 'unisex'])],
+            'category_id' => ['nullable', 'integer', 'exists:jewellery_categories,id'],
+            'sub_category_id' => ['nullable', 'integer', 'exists:jewellery_sub_categories,id'],
+            'sub_sub_category_id' => ['nullable', 'integer', 'exists:jewellery_sub_sub_categories,id'],
+            'purity' => ['nullable', 'string', 'max:20'],
+            'search' => ['nullable', 'string', 'max:120'],
+            'q' => ['nullable', 'string', 'max:120'],
+            'min_weight' => ['nullable', 'numeric', 'min:0'],
+            'max_weight' => ['nullable', 'numeric', 'min:0', 'gte:min_weight'],
+            'min_budget' => ['nullable', 'numeric', 'min:0'],
+            'max_budget' => ['nullable', 'numeric', 'min:0', 'gte:min_budget'],
+        ]);
+
+        $search = trim((string) ($data['search'] ?? $data['q'] ?? ''));
+
+        $query = JewelleryProduct::query()
             ->with(['category', 'subCategory', 'subSubCategory'])
             ->where('is_active', true)
             ->when(filled($data['metal_type'] ?? null), fn (Builder $q) => $q->where('metal_type', $data['metal_type']))
+            ->when(filled($data['gender'] ?? null), function (Builder $q) use ($data): void {
+                $q->where(function (Builder $inner) use ($data): void {
+                    $inner->where('gender', $data['gender']);
+                    if (in_array($data['gender'], ['men', 'women'], true)) {
+                        $inner->orWhere('gender', 'unisex');
+                    }
+                });
+            })
             ->when(filled($data['category_id'] ?? null), fn (Builder $q) => $q->where('jewellery_category_id', $data['category_id']))
             ->when(filled($data['sub_category_id'] ?? null), fn (Builder $q) => $q->where('jewellery_sub_category_id', $data['sub_category_id']))
             ->when(filled($data['sub_sub_category_id'] ?? null), fn (Builder $q) => $q->where('jewellery_sub_sub_category_id', $data['sub_sub_category_id']))
+            ->when(filled($data['purity'] ?? null), function (Builder $q) use ($data): void {
+                $normalized = strtoupper(str_replace([' ', '.'], '', (string) $data['purity']));
+                $q->whereRaw(
+                    "REPLACE(REPLACE(UPPER(COALESCE(purity, '')), ' ', ''), '.', '') = ?",
+                    [$normalized]
+                );
+            })
+            ->when($search !== '', function (Builder $q) use ($search): void {
+                $like = '%'.$search.'%';
+                $q->where(function (Builder $inner) use ($like): void {
+                    $inner->where('name', 'like', $like)
+                        ->orWhere('sku', 'like', $like)
+                        ->orWhere('description', 'like', $like);
+                });
+            })
+            ->when(isset($data['min_weight']), fn (Builder $q) => $q->where('weight_grams', '>=', (float) $data['min_weight']))
+            ->when(isset($data['max_weight']), fn (Builder $q) => $q->where('weight_grams', '<=', (float) $data['max_weight']))
             ->orderBy('sort_order')
-            ->orderByDesc('id')
-            ->get()
+            ->orderByDesc('id');
+
+        $products = $query->get()
             ->map(fn (JewelleryProduct $product) => JewelleryProductPayload::make($product));
 
-        return ApiResponse::success(['products' => $products]);
+        $minBudget = isset($data['min_budget']) ? (float) $data['min_budget'] : null;
+        $maxBudget = isset($data['max_budget']) ? (float) $data['max_budget'] : null;
+
+        if ($minBudget !== null || $maxBudget !== null) {
+            $products = $products->filter(function (array $row) use ($minBudget, $maxBudget): bool {
+                $price = (float) ($row['total_price'] ?? $row['price'] ?? 0);
+                if ($minBudget !== null && $price < $minBudget) {
+                    return false;
+                }
+                if ($maxBudget !== null && $price > $maxBudget) {
+                    return false;
+                }
+
+                return true;
+            })->values();
+        } else {
+            $products = $products->values();
+        }
+
+        return ApiResponse::success([
+            'products' => $products,
+            'filters_applied' => [
+                'metal_type' => $data['metal_type'] ?? null,
+                'gender' => $data['gender'] ?? null,
+                'category_id' => $data['category_id'] ?? null,
+                'sub_category_id' => $data['sub_category_id'] ?? null,
+                'sub_sub_category_id' => $data['sub_sub_category_id'] ?? null,
+                'purity' => $data['purity'] ?? null,
+                'search' => $search !== '' ? $search : null,
+                'min_weight' => isset($data['min_weight']) ? (float) $data['min_weight'] : null,
+                'max_weight' => isset($data['max_weight']) ? (float) $data['max_weight'] : null,
+                'min_budget' => $minBudget,
+                'max_budget' => $maxBudget,
+            ],
+            'count' => $products->count(),
+        ]);
     }
 
     public function show(Request $request, JewelleryProduct $product): JsonResponse

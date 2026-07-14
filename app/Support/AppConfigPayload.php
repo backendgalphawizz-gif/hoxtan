@@ -36,6 +36,7 @@ class AppConfigPayload
             ],
             'terms' => self::userTerms($settings),
             'privacy' => self::userPrivacy($settings),
+            'cancel_policy' => self::cancelPolicy($settings),
             'driver_privacy' => self::driverPrivacy($settings),
             'driver_terms' => self::driverTerms($settings),
             'driver' => self::driverLegal($settings),
@@ -113,6 +114,11 @@ class AppConfigPayload
         );
     }
 
+    protected static function cancelPolicy(AppSettingService $settings): array
+    {
+        return LegalPagePayload::make('cancel_policy', $settings);
+    }
+
     protected static function driverPrivacy(AppSettingService $settings): array
     {
         return LegalPagePayload::make('driver_privacy', $settings);
@@ -158,9 +164,11 @@ class AppConfigPayload
         return [
             'privacy_policy_url' => url($userPlayStore['privacy_policy_url'] ?? $playStore['privacy_policy_url'] ?? '/user-privacy-policy'),
             'terms_url' => url($userPlayStore['terms_url'] ?? '/user-terms-and-conditions'),
+            'cancel_policy_url' => url($userPlayStore['cancel_policy_url'] ?? '/cancel-policy'),
             'delete_account_url' => url($playStore['delete_account_url'] ?? '/delete-account'),
             'privacy_policy_embed_url' => url($userPlayStore['privacy_policy_embed_url'] ?? $playStore['privacy_policy_embed_url'] ?? '/embed/user-privacy-policy'),
             'terms_embed_url' => url($userPlayStore['terms_embed_url'] ?? '/embed/user-terms-and-conditions'),
+            'cancel_policy_embed_url' => url($userPlayStore['cancel_policy_embed_url'] ?? '/embed/cancel-policy'),
             'delete_account_embed_url' => url($playStore['delete_account_embed_url'] ?? '/embed/delete-account'),
             'driver_privacy_policy_url' => url(config('app_content.driver_play_store.privacy_policy_url', '/driver-privacy-policy')),
             'driver_terms_url' => url(config('app_content.driver_play_store.terms_url', '/driver-terms-and-conditions')),

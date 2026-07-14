@@ -8,7 +8,6 @@ use App\Models\SigInstallment;
 use App\Models\SigPlan;
 use App\Models\User;
 use App\Support\AssetsBalancePayload;
-use App\Support\MpinRules;
 use App\Support\NavigationBadgeCounts;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -123,19 +122,6 @@ class MetalWithdrawalService
             'bank' => $assetsPayload['bank'],
             'has_bank' => $assetsPayload['has_bank'],
             'withdraw_to_label' => 'Withdraw to',
-            'continue_label' => 'Continue',
-            'next_step' => 'mpin_confirm',
-            'mpin_confirm' => [
-                'title' => config('withdraw.mpin_confirm.title', 'Confirm Withdrawal'),
-                'message' => str_replace(
-                    '4-digit',
-                    MpinRules::length().'-digit',
-                    (string) config('withdraw.mpin_confirm.message', 'Enter your M-PIN to confirm withdrawal.'),
-                ),
-                'mpin_length' => MpinRules::length(),
-                'forgot_label' => config('withdraw.mpin_confirm.forgot_label', 'FORGET M-PIN'),
-                'forgot_endpoint' => config('withdraw.mpin_confirm.forgot_endpoint', '/api/v1/forgot-mpin/config'),
-            ],
         ];
     }
 

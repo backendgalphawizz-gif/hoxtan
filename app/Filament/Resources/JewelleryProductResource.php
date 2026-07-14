@@ -54,6 +54,15 @@ class JewelleryProductResource extends Resource
                             ->required()
                             ->live()
                             ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
+                        Forms\Components\Select::make('gender')
+                            ->label('Gender (Filters: Men\'s / Women\'s)')
+                            ->options([
+                                'men' => "Men's",
+                                'women' => "Women's",
+                                'unisex' => 'Unisex',
+                            ])
+                            ->nullable()
+                            ->placeholder('Select gender'),
                         Forms\Components\Select::make('jewellery_category_id')
                             ->label('Category')
                             ->options(function (Forms\Get $get): array {
@@ -114,9 +123,13 @@ class JewelleryProductResource extends Resource
                             ->maxLength(64)
                             ->hiddenOn('create')
                             ->unique(ignoreRecord: true),
-                        Forms\Components\TextInput::make('purity')
-                            ->placeholder('22K')
-                            ->maxLength(20),
+                        Forms\Components\Select::make('purity')
+                            ->options(collect(config('jewellery.purities', []))->mapWithKeys(
+                                fn (array $row) => [($row['value'] ?? '') => ($row['label'] ?? $row['value'] ?? '')]
+                            )->filter()->all())
+                            ->searchable()
+                            ->nullable()
+                            ->placeholder('Select purity'),
                         Forms\Components\Select::make('size')
                             ->label('Size (optional)')
                             ->options(JewelleryProduct::sizeOptions())

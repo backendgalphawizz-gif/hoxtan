@@ -24,6 +24,7 @@ class JewelleryProduct extends Model
         'discount_value',
         'weight_grams',
         'metal_type',
+        'gender',
         'purity',
         'size',
         'stock_status',

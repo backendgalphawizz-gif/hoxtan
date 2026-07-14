@@ -7,11 +7,9 @@ use App\Models\MetalWithdrawal;
 use App\Models\User;
 use App\Services\MetalWithdrawalService;
 use App\Support\ApiResponse;
-use App\Support\MpinRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class MetalWithdrawalController extends Controller
 {
@@ -45,27 +43,14 @@ class MetalWithdrawalController extends Controller
             isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
         );
 
-        return ApiResponse::success([
-            'estimate' => $estimate,
-            'next_step' => 'mpin_confirm',
-            'mpin_confirm' => $this->mpinConfirmPayload(),
-        ]);
+        return ApiResponse::success(['estimate' => $estimate]);
     }
 
-    /**
-     * Continue → MPIN screen → confirm withdrawal with M-PIN.
-     */
     public function store(Request $request, MetalWithdrawalService $service): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
-        $data = $this->validatedConfirmRequest($request);
-
-        if (! $user->verifyMpin($data['mpin'])) {
-            throw ValidationException::withMessages([
-                'mpin' => ['Incorrect M-PIN. Please try again.'],
-            ]);
-        }
+        $data = $this->validatedCreateRequest($request);
 
         $result = $service->create($user, $data);
 
@@ -76,7 +61,7 @@ class MetalWithdrawalController extends Controller
                 'title' => 'Withdrawal Requested',
                 'message' => 'Your withdrawal request has been submitted. Funds will be transferred to your registered bank account after approval.',
             ],
-        ], 'Withdrawal confirmed successfully.', 201);
+        ], 'Withdrawal requested successfully.', 201);
     }
 
     public function index(Request $request, MetalWithdrawalService $service): JsonResponse
@@ -124,37 +109,10 @@ class MetalWithdrawalController extends Controller
     }
 
     /**
-     * @return array{asset_source: string, input_mode: string, amount?: float, weight_grams?: float, mpin: string}
+     * @return array{asset_source: string, input_mode: string, amount?: float, weight_grams?: float}
      */
-    protected function validatedConfirmRequest(Request $request): array
+    protected function validatedCreateRequest(Request $request): array
     {
-        $length = MpinRules::length();
-
-        return $request->validate([
-            'asset_source' => ['required', Rule::in(['gold', 'silver', 'sig'])],
-            'input_mode' => ['required', Rule::in(['currency', 'weight'])],
-            'amount' => ['required_if:input_mode,currency', 'nullable', 'numeric', 'min:'.config('withdraw.min_amount', 1000)],
-            'weight_grams' => ['required_if:input_mode,weight', 'nullable', 'numeric', 'min:0.0001'],
-            'mpin' => ['required', 'string', "digits:{$length}", 'regex:/^\d+$/'],
-        ], array_merge(MpinRules::validationMessages(), [
-            'mpin.required' => 'Enter your M-PIN to confirm withdrawal.',
-        ]));
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function mpinConfirmPayload(): array
-    {
-        $config = config('withdraw.mpin_confirm', []);
-        $length = MpinRules::length();
-
-        return [
-            'title' => $config['title'] ?? 'Confirm Withdrawal',
-            'message' => str_replace('4-digit', "{$length}-digit", (string) ($config['message'] ?? 'Enter your M-PIN to confirm withdrawal.')),
-            'mpin_length' => $length,
-            'forgot_label' => $config['forgot_label'] ?? 'FORGET M-PIN',
-            'forgot_endpoint' => $config['forgot_endpoint'] ?? '/api/v1/forgot-mpin/config',
-        ];
+        return $this->validatedEstimateRequest($request);
     }
 }

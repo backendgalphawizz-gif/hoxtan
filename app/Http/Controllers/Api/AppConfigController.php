@@ -93,6 +93,10 @@ class AppConfigController extends Controller
             $payload = array_merge(config('app_content.driver_privacy', []), $payload);
         }
 
+        if ($slug === config('app_content.cancel_policy.slug')) {
+            $payload = array_merge(config('app_content.cancel_policy', []), $payload);
+        }
+
         if ($slug === config('app_content.delete_account.slug')) {
             $payload = array_merge(config('app_content.delete_account', []), $payload);
         }

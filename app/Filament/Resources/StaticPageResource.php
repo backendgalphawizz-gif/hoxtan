@@ -43,7 +43,7 @@ class StaticPageResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Page Details')
-                    ->description('Use fixed slugs for website/app legal pages. User app: user-privacy-policy, user-terms-and-conditions. Driver app: driver-privacy-policy, driver-terms-and-conditions.')
+                    ->description('Use fixed slugs for website/app legal pages. User app: user-privacy-policy, user-terms-and-conditions, cancel-policy. Driver app: driver-privacy-policy, driver-terms-and-conditions.')
                     ->schema([
                         Forms\Components\Select::make('website_preset')
                             ->label('Website Page Type')
@@ -73,7 +73,7 @@ class StaticPageResource extends Resource
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->alphaDash()
-                            ->helperText('Examples: user-privacy-policy, user-terms-and-conditions, driver-privacy-policy, driver-terms-and-conditions, privacy-policy, terms-and-conditions, delete-account.'),
+                            ->helperText('Examples: user-privacy-policy, user-terms-and-conditions, cancel-policy, driver-privacy-policy, driver-terms-and-conditions, privacy-policy, terms-and-conditions, delete-account.'),
                         Forms\Components\Toggle::make('is_published')
                             ->label('Published')
                             ->default(false),
@@ -100,7 +100,7 @@ class StaticPageResource extends Resource
                     ->getStateUsing(fn (StaticPage $record): string => match (true) {
                         str_starts_with($record->slug, 'driver-') => 'Driver',
                         str_starts_with($record->slug, 'user-') => 'User',
-                        in_array($record->slug, ['privacy-policy', 'terms-and-conditions', 'delete-account'], true) => 'User',
+                        in_array($record->slug, ['privacy-policy', 'terms-and-conditions', 'delete-account', 'cancel-policy'], true) => 'User',
                         default => 'Website',
                     })
                     ->color(fn (string $state): string => match ($state) {

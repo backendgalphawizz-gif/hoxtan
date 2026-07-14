@@ -18,6 +18,7 @@ return [
         ['key' => 'privacy', 'slug' => 'privacy-policy', 'label' => 'Privacy Policy'],
         ['key' => 'user_terms', 'slug' => 'user-terms-and-conditions', 'label' => 'User Terms & Conditions'],
         ['key' => 'user_privacy', 'slug' => 'user-privacy-policy', 'label' => 'User Privacy Policy'],
+        ['key' => 'cancel_policy', 'slug' => 'cancel-policy', 'label' => 'Cancel Policy'],
         ['key' => 'driver_terms', 'slug' => 'driver-terms-and-conditions', 'label' => 'Driver Terms & Conditions'],
         ['key' => 'driver_privacy', 'slug' => 'driver-privacy-policy', 'label' => 'Driver Privacy Policy'],
         ['key' => 'delete_account', 'slug' => 'delete-account', 'label' => 'Delete Account'],
@@ -36,8 +37,10 @@ return [
     'user_play_store' => [
         'privacy_policy_url' => '/user-privacy-policy',
         'terms_url' => '/user-terms-and-conditions',
+        'cancel_policy_url' => '/cancel-policy',
         'privacy_policy_embed_url' => '/embed/user-privacy-policy',
         'terms_embed_url' => '/embed/user-terms-and-conditions',
+        'cancel_policy_embed_url' => '/embed/cancel-policy',
     ],
 
     'driver_play_store' => [
@@ -68,6 +71,17 @@ return [
         'embed_url_path' => '/embed/user-terms-and-conditions',
         'version' => 'V.4.02',
         'acceptance_label' => 'I have read and agree to the Terms & Conditions.',
+        'accept_button_label' => 'Accept & Continue',
+    ],
+
+    'cancel_policy' => [
+        'slug' => 'cancel-policy',
+        'title' => 'Cancel Policy',
+        'url_path' => '/cancel-policy',
+        'embed_url_path' => '/embed/cancel-policy',
+        'version' => 'V.1.0',
+        'tagline' => 'Understand cancellation rules before you cancel an order or plan.',
+        'acceptance_label' => 'I have read and agree to the Cancel Policy.',
         'accept_button_label' => 'Accept & Continue',
     ],
 

@@ -40,6 +40,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
     Route::get('/jewellery/sub-sub-categories', [JewelleryController::class, 'subSubCategories']);
+    Route::get('/jewellery/filters', [JewelleryController::class, 'filters']);
     Route::get('/jewellery/emi-plans', [JewelleryController::class, 'emiPlans']);
     Route::get('/jewellery/products', [JewelleryController::class, 'products']);
     Route::get('/jewellery/products/{product}', [JewelleryController::class, 'show']);

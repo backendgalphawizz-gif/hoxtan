@@ -43,11 +43,4 @@ return [
 
     'note' => 'Your withdrawal amount is transferred instantly to your registered bank account.',
     'min_amount_note' => 'Minimum withdrawal amount is ₹1,000.',
-
-    'mpin_confirm' => [
-        'title' => 'Confirm Withdrawal',
-        'message' => 'Enter your 4-digit M-PIN to confirm withdrawal.',
-        'forgot_label' => 'FORGET M-PIN',
-        'forgot_endpoint' => '/api/v1/forgot-mpin/config',
-    ],
 ];
