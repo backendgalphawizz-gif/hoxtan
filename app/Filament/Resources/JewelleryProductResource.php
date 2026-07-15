@@ -53,7 +53,15 @@ class JewelleryProductResource extends Resource
                             ->options(['gold' => 'Gold', 'silver' => 'Silver'])
                             ->required()
                             ->live()
-                            ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
+                            ->afterStateUpdated(function (Set $set, Get $get): void {
+                                if ((bool) $get('has_size_variants')) {
+                                    static::syncVariantPrices($set, $get);
+
+                                    return;
+                                }
+
+                                static::syncSellingPrice($set, $get);
+                            }),
                         Forms\Components\Select::make('gender')
                             ->label('Gender (Filters: Men\'s / Women\'s)')
                             ->options([
@@ -130,19 +138,89 @@ class JewelleryProductResource extends Resource
                             ->searchable()
                             ->nullable()
                             ->placeholder('Select purity'),
+                        Forms\Components\Toggle::make('has_size_variants')
+                            ->label('Enable size variants')
+                            ->helperText('When enabled, set weight (and auto price) for each size. When off, use a single size/weight as before.')
+                            ->default(false)
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, Get $get, ?bool $state): void {
+                                if ($state) {
+                                    $set('size', null);
+                                    $set('weight_grams', null);
+                                    $set('price', 0);
+                                } else {
+                                    $set('variants', []);
+                                    static::syncSellingPrice($set, $get);
+                                }
+                            })
+                            ->columnSpanFull(),
                         Forms\Components\Select::make('size')
                             ->label('Size (optional)')
                             ->options(JewelleryProduct::sizeOptions())
                             ->searchable()
                             ->nullable()
-                            ->placeholder('Select size'),
+                            ->placeholder('Select size')
+                            ->visible(fn (Get $get): bool => ! (bool) $get('has_size_variants')),
                         Forms\Components\TextInput::make('weight_grams')
                             ->label('Weight (grams)')
                             ->numeric()
                             ->step(0.001)
                             ->suffix('g')
+                            ->required(fn (Get $get): bool => ! (bool) $get('has_size_variants'))
+                            ->visible(fn (Get $get): bool => ! (bool) $get('has_size_variants'))
                             ->live(debounce: 400)
                             ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
+                        Forms\Components\Repeater::make('variants')
+                            ->relationship()
+                            ->label('Size variants')
+                            ->helperText('Each size has its own weight. Price is calculated from live metal rate + making charge − discount.')
+                            ->visible(fn (Get $get): bool => (bool) $get('has_size_variants'))
+                            ->required(fn (Get $get): bool => (bool) $get('has_size_variants'))
+                            ->minItems(fn (Get $get): int => (bool) $get('has_size_variants') ? 1 : 0)
+                            ->defaultItems(0)
+                            ->collapsible()
+                            ->reorderable()
+                            ->orderColumn('sort_order')
+                            ->schema([
+                                Forms\Components\Select::make('size')
+                                    ->label('Size')
+                                    ->options(JewelleryProduct::sizeOptions())
+                                    ->searchable()
+                                    ->required()
+                                    ->distinct()
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems(),
+                                Forms\Components\TextInput::make('weight_grams')
+                                    ->label('Weight (grams)')
+                                    ->numeric()
+                                    ->step(0.001)
+                                    ->suffix('g')
+                                    ->required()
+                                    ->minValue(0.001)
+                                    ->live(debounce: 400)
+                                    ->afterStateUpdated(function (Set $set, Get $get): void {
+                                        $pricing = JewelleryPricing::calculate(
+                                            $get('../metal_type'),
+                                            $get('weight_grams'),
+                                            $get('../making_charge_percent'),
+                                            $get('../discount_type'),
+                                            $get('../discount_value'),
+                                        );
+                                        $set('price', $pricing['total']);
+                                    }),
+                                Forms\Components\TextInput::make('price')
+                                    ->label('Price')
+                                    ->prefix('₹')
+                                    ->numeric()
+                                    ->disabled()
+                                    ->dehydrated()
+                                    ->default(0),
+                                Forms\Components\Toggle::make('is_active')
+                                    ->label('Active')
+                                    ->default(true)
+                                    ->inline(false),
+                            ])
+                            ->columns(4)
+                            ->columnSpanFull(),
                         Forms\Components\Textarea::make('description')
                             ->rows(3)
                             ->columnSpanFull(),
@@ -158,7 +236,15 @@ class JewelleryProductResource extends Resource
                     ->schema([
                         Forms\Components\Placeholder::make('pricing_breakdown')
                             ->label('Price Calculation')
-                            ->content(fn (Get $get): HtmlString => static::pricingBreakdownHtml($get))
+                            ->content(function (Get $get): HtmlString {
+                                if ((bool) $get('has_size_variants')) {
+                                    return new HtmlString(
+                                        '<p class="text-sm text-gray-500">Size variants enabled — each size uses its own weight. Prices update from live metal rates + making charge − discount.</p>'
+                                    );
+                                }
+
+                                return static::pricingBreakdownHtml($get);
+                            })
                             ->columnSpanFull(),
                         Forms\Components\TextInput::make('making_charge_percent')
                             ->label('Making Charge')
@@ -168,7 +254,15 @@ class JewelleryProductResource extends Resource
                             ->step(0.01)
                             ->suffix('%')
                             ->live(debounce: 400)
-                            ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get))
+                            ->afterStateUpdated(function (Set $set, Get $get): void {
+                                if ((bool) $get('has_size_variants')) {
+                                    static::syncVariantPrices($set, $get);
+
+                                    return;
+                                }
+
+                                static::syncSellingPrice($set, $get);
+                            })
                             ->helperText('Optional percentage added on top of metal value.'),
                         Forms\Components\Select::make('discount_type')
                             ->label('Discount Type')
@@ -185,6 +279,12 @@ class JewelleryProductResource extends Resource
                                     $set('discount_value', null);
                                 }
 
+                                if ((bool) $get('has_size_variants')) {
+                                    static::syncVariantPrices($set, $get);
+
+                                    return;
+                                }
+
                                 static::syncSellingPrice($set, $get);
                             }),
                         Forms\Components\TextInput::make('discount_value')
@@ -197,13 +297,22 @@ class JewelleryProductResource extends Resource
                             ->maxValue(fn (Get $get): ?float => $get('discount_type') === 'percent' ? 100 : null)
                             ->helperText('Percent or flat amount off the making charge only.')
                             ->live(debounce: 400)
-                            ->afterStateUpdated(fn (Set $set, Get $get) => static::syncSellingPrice($set, $get)),
+                            ->afterStateUpdated(function (Set $set, Get $get): void {
+                                if ((bool) $get('has_size_variants')) {
+                                    static::syncVariantPrices($set, $get);
+
+                                    return;
+                                }
+
+                                static::syncSellingPrice($set, $get);
+                            }),
                         Forms\Components\TextInput::make('price')
                             ->label('Selling Price (Total)')
                             ->numeric()
                             ->prefix('₹')
                             ->disabled()
                             ->dehydrated()
+                            ->visible(fn (Get $get): bool => ! (bool) $get('has_size_variants'))
                             ->helperText('Metal value + making charge − discount on making charge.'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Show in App')
@@ -231,8 +340,28 @@ class JewelleryProductResource extends Resource
                 Tables\Columns\TextColumn::make('subCategory.name')->label('Sub Category')->placeholder('—'),
                 Tables\Columns\TextColumn::make('subSubCategory.name')->label('Sub Sub Category')->placeholder('—'),
                 Tables\Columns\TextColumn::make('purity')->placeholder('—'),
-                Tables\Columns\TextColumn::make('size')->placeholder('—')->toggleable(),
-                Tables\Columns\TextColumn::make('weight_grams')->suffix(' g')->placeholder('—'),
+                Tables\Columns\TextColumn::make('size')
+                    ->placeholder('—')
+                    ->formatStateUsing(function ($state, JewelleryProduct $record): string {
+                        if ($record->has_size_variants) {
+                            $count = $record->variants()->count();
+
+                            return $count > 0 ? $count.' sizes' : 'Variants';
+                        }
+
+                        return filled($state) ? (string) $state : '—';
+                    })
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('weight_grams')
+                    ->suffix(' g')
+                    ->placeholder('—')
+                    ->formatStateUsing(function ($state, JewelleryProduct $record): string {
+                        if ($record->has_size_variants) {
+                            return 'per size';
+                        }
+
+                        return $state !== null ? (string) $state : '—';
+                    }),
                 Tables\Columns\TextColumn::make('price')->inr()->label('Total Price'),
                 Tables\Columns\TextColumn::make('making_charge_percent')
                     ->label('Making %')
@@ -302,6 +431,33 @@ class JewelleryProductResource extends Resource
         $pricing = static::pricingForForm($get);
 
         $set('price', $pricing['total']);
+    }
+
+    protected static function syncVariantPrices(Set $set, Get $get): void
+    {
+        $variants = $get('variants');
+
+        if (! is_array($variants)) {
+            return;
+        }
+
+        foreach ($variants as $uuid => $variant) {
+            if (! is_array($variant)) {
+                continue;
+            }
+
+            $pricing = JewelleryPricing::calculate(
+                $get('metal_type'),
+                $variant['weight_grams'] ?? null,
+                $get('making_charge_percent'),
+                $get('discount_type'),
+                $get('discount_value'),
+            );
+
+            $variants[$uuid]['price'] = $pricing['total'];
+        }
+
+        $set('variants', $variants);
     }
 
     /**

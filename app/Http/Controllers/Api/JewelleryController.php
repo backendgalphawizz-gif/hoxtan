@@ -214,7 +214,7 @@ class JewelleryController extends Controller
         $search = trim((string) ($data['search'] ?? $data['q'] ?? ''));
 
         $query = JewelleryProduct::query()
-            ->with(['category', 'subCategory', 'subSubCategory'])
+            ->with(['category', 'subCategory', 'subSubCategory', 'variants'])
             ->where('is_active', true)
             ->when(filled($data['metal_type'] ?? null), fn (Builder $q) => $q->where('metal_type', $data['metal_type']))
             ->when(filled($data['gender'] ?? null), function (Builder $q) use ($data): void {
@@ -300,7 +300,7 @@ class JewelleryController extends Controller
             'recently_viewed_ids.*' => ['integer', 'distinct'],
         ]);
 
-        $product->load(['category', 'subCategory', 'subSubCategory']);
+        $product->load(['category', 'subCategory', 'subSubCategory', 'variants']);
 
         /** @var User|null $user */
         $user = $request->user('sanctum');
@@ -391,7 +391,7 @@ class JewelleryController extends Controller
         $limit = 8;
 
         $query = JewelleryProduct::query()
-            ->with(['category', 'subCategory'])
+            ->with(['category', 'subCategory', 'variants'])
             ->where('is_active', true)
             ->whereNotIn('id', $excludeIds)
             ->where('metal_type', $product->metal_type);
@@ -418,7 +418,7 @@ class JewelleryController extends Controller
         $alreadyIds = array_merge($excludeIds, $similar->pluck('id')->all());
 
         $fallback = JewelleryProduct::query()
-            ->with(['category', 'subCategory'])
+            ->with(['category', 'subCategory', 'variants'])
             ->where('is_active', true)
             ->whereNotIn('id', $alreadyIds)
             ->where('metal_type', $product->metal_type)
@@ -445,7 +445,7 @@ class JewelleryController extends Controller
         }
 
         $products = JewelleryProduct::query()
-            ->with(['category', 'subCategory'])
+            ->with(['category', 'subCategory', 'variants'])
             ->where('is_active', true)
             ->whereIn('id', $ids)
             ->get()
