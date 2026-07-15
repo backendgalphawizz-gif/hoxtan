@@ -57,11 +57,16 @@ class SigPayload
 
         $plan = $installment->plan;
         $processedAt = $installment->processed_at ?? $installment->scheduled_at;
+        $isWithdrawal = in_array($installment->status, ['withdrawal_pending', 'withdrawal', 'withdrawal_rejected'], true);
 
         return [
             'id' => $installment->id,
             'reference_id' => $installment->reference_id,
-            'title' => $plan ? self::transactionTitle($plan) : 'SIG Transaction',
+            'transaction_id' => $installment->reference_id,
+            'type' => $isWithdrawal ? 'withdrawal' : 'installment',
+            'title' => $isWithdrawal
+                ? 'SIG Withdrawal'
+                : ($plan ? self::transactionTitle($plan) : 'SIG Transaction'),
             'metal_type' => $plan?->metal_type,
             'frequency' => $plan?->frequency,
             'amount' => (float) $installment->amount,
@@ -82,6 +87,7 @@ class SigPayload
             'time_display' => $processedAt
                 ? $processedAt->format('H:i').' • '.$processedAt->format('d F Y')
                 : null,
+            'note' => $isWithdrawal ? $installment->failure_reason : null,
         ];
     }
 

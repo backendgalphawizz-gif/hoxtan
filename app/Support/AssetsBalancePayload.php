@@ -27,7 +27,14 @@ class AssetsBalancePayload
 
         $sigPlan = SigPlan::query()
             ->where('user_id', $user->id)
-            ->whereIn('status', ['active', 'paused'])
+            ->where(function ($query): void {
+                $query->whereIn('status', ['active', 'paused'])
+                    ->orWhere(function ($stopped): void {
+                        $stopped->where('status', 'stopped')
+                            ->where('metal_accumulated_grams', '>', 0);
+                    });
+            })
+            ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 ELSE 2 END")
             ->latest('id')
             ->first();
 

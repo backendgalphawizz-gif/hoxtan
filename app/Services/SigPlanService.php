@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\MetalWithdrawal;
 use App\Models\SigInstallment;
 use App\Models\SigPlan;
 use App\Models\User;
@@ -161,10 +162,18 @@ class SigPlanService
     {
         $successful = $plan->installments()->where('status', 'success');
 
+        $withdrawnGrams = (float) MetalWithdrawal::query()
+            ->where('sig_plan_id', $plan->id)
+            ->where('asset_source', 'sig')
+            ->whereIn('status', ['approved', 'paid'])
+            ->sum('quantity_grams');
+
+        $investedGrams = (float) (clone $successful)->sum('quantity_grams');
+
         $plan->update([
             'completed_installments' => (clone $successful)->count(),
             'total_invested' => (clone $successful)->sum('amount'),
-            'metal_accumulated_grams' => (clone $successful)->sum('quantity_grams'),
+            'metal_accumulated_grams' => max(0, round($investedGrams - $withdrawnGrams, 6)),
         ]);
 
         return $plan->fresh();

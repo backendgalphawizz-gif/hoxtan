@@ -212,11 +212,22 @@ class SigController extends Controller
         $plan = $this->requireManageablePlan($request);
 
         $plan = $service->stop($plan);
+        $canWithdraw = round((float) $plan->metal_accumulated_grams, 6) > 0;
 
         return ApiResponse::success([
-            'sig' => SigPayload::plan($plan, includeManageActions: false),
+            'sig' => SigPayload::plan($plan, includeManageActions: true),
             'modal' => collect(config('sig.manage_actions', []))
                 ->firstWhere('key', 'stop')['modal'] ?? null,
+            'withdrawal' => [
+                'available' => $canWithdraw,
+                'asset_source' => 'sig',
+                'endpoint' => '/api/v1/withdraw',
+                'method' => 'POST',
+                'auto_approve_hours' => (int) config('withdraw.auto_approve_hours', 2),
+                'message' => $canWithdraw
+                    ? 'SIG stopped. You can now request withdrawal of your remaining SIG balance. Request appears in admin and auto-approves after 2 hours to your registered bank account.'
+                    : 'SIG stopped. There is no remaining SIG balance to withdraw.',
+            ],
         ], 'SIG stopped.');
     }
 

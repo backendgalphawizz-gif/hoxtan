@@ -10,6 +10,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
 
 class InstallmentsRelationManager extends RelationManager
 {
@@ -57,10 +58,11 @@ class InstallmentsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('quantity_grams')->grams(4)->placeholder('—'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
+                    ->formatStateUsing(fn (?string $state): string => config('sig.installment_statuses.'.$state, Str::headline((string) $state)))
                     ->colors([
-                        'warning' => 'pending',
-                        'success' => 'success',
-                        'danger' => 'failed',
+                        'warning' => fn (?string $state): bool => in_array($state, ['pending', 'withdrawal_pending'], true),
+                        'success' => fn (?string $state): bool => in_array($state, ['success', 'withdrawal'], true),
+                        'danger' => fn (?string $state): bool => in_array($state, ['failed', 'withdrawal_rejected'], true),
                     ]),
                 Tables\Columns\TextColumn::make('processed_at')->dateTime('d M Y, h:i A')->placeholder('—'),
             ])

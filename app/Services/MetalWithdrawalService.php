@@ -240,10 +240,18 @@ class MetalWithdrawalService
         $withdrawal = DB::transaction(function () use ($user, $assetSource, $estimate, $bank, $hours, $data, $sourceLotId, $notes, $fromHoldings): MetalWithdrawal {
             $sigPlanId = null;
             if ($assetSource === 'sig') {
-                $sigPlanId = $this->activeSigPlan($user)?->id;
+                $sigPlan = $this->withdrawableSigPlan($user);
+                if (! $sigPlan) {
+                    throw ValidationException::withMessages([
+                        'asset_source' => [
+                            'No withdrawable SIG balance found.',
+                        ],
+                    ]);
+                }
+                $sigPlanId = $sigPlan->id;
             }
 
-            return MetalWithdrawal::query()->create([
+            $withdrawal = MetalWithdrawal::query()->create([
                 'user_id' => $user->id,
                 'asset_source' => $assetSource,
                 'metal_type' => $estimate['metal_type'],
@@ -263,6 +271,23 @@ class MetalWithdrawalService
                 'requested_at' => now(),
                 'auto_approve_at' => $hours > 0 ? now()->addHours($hours) : null,
             ]);
+
+            if ($assetSource === 'sig' && $sigPlanId) {
+                SigInstallment::query()->create([
+                    'reference_id' => $withdrawal->reference_id,
+                    'sig_plan_id' => $sigPlanId,
+                    'user_id' => $user->id,
+                    'amount' => $estimate['amount'],
+                    'quantity_grams' => $estimate['weight_grams'],
+                    'rate_per_gram' => $estimate['rate_per_gram'],
+                    'status' => 'withdrawal_pending',
+                    'scheduled_at' => now(),
+                    'processed_at' => null,
+                    'failure_reason' => 'SIG withdrawal request — payout to bank after approval',
+                ]);
+            }
+
+            return $withdrawal;
         });
 
         NavigationBadgeCounts::clearCache();
@@ -357,7 +382,13 @@ class MetalWithdrawalService
                 $plan->update([
                     'metal_accumulated_grams' => max(0, round((float) $plan->metal_accumulated_grams - $grams, 4)),
                 ]);
+
+                // Mark bank payout as paid for both admin and auto-approve (credits registered bank).
+                $payoutStatus = 'paid';
+                $autoPayoutRef = $payoutReference ?: ($auto ? 'AUTO-'.$withdrawal->reference_id : null);
             } else {
+                $payoutStatus = $auto ? 'approved' : 'paid';
+                $autoPayoutRef = $payoutReference;
                 $investment = Investment::query()->create([
                     'user_id' => $user->id,
                     'metal_type' => $withdrawal->metal_type,
@@ -384,14 +415,31 @@ class MetalWithdrawalService
             $withdrawal->update([
                 'rate_per_gram' => $currentRate,
                 'amount' => $payoutAmount,
-                'status' => $auto ? 'approved' : 'paid',
+                'status' => $payoutStatus ?? ($auto ? 'approved' : 'paid'),
                 'auto_approved' => $auto,
                 'investment_id' => $investment?->id,
-                'payout_reference' => $payoutReference,
+                'payout_reference' => $autoPayoutRef ?? $payoutReference,
                 'reviewed_by' => $auto ? null : $adminId,
                 'reviewed_at' => now(),
                 'paid_at' => now(),
             ]);
+
+            if ($withdrawal->asset_source === 'sig') {
+                SigInstallment::query()
+                    ->where('sig_plan_id', $withdrawal->sig_plan_id)
+                    ->where('reference_id', $withdrawal->reference_id)
+                    ->whereIn('status', ['withdrawal_pending'])
+                    ->update([
+                        'status' => 'withdrawal',
+                        'amount' => $payoutAmount,
+                        'rate_per_gram' => $currentRate,
+                        'quantity_grams' => $grams,
+                        'processed_at' => now(),
+                        'failure_reason' => $auto
+                            ? 'Auto-approved and credited to registered bank account'
+                            : 'Approved and credited to registered bank account',
+                    ]);
+            }
 
             NavigationBadgeCounts::clearCache();
 
@@ -413,6 +461,18 @@ class MetalWithdrawalService
             'reviewed_by' => $adminId,
             'reviewed_at' => now(),
         ]);
+
+        if ($withdrawal->asset_source === 'sig' && $withdrawal->reference_id) {
+            SigInstallment::query()
+                ->where('sig_plan_id', $withdrawal->sig_plan_id)
+                ->where('reference_id', $withdrawal->reference_id)
+                ->where('status', 'withdrawal_pending')
+                ->update([
+                    'status' => 'withdrawal_rejected',
+                    'processed_at' => now(),
+                    'failure_reason' => $reason,
+                ]);
+        }
 
         NavigationBadgeCounts::clearCache();
 
@@ -511,6 +571,12 @@ class MetalWithdrawalService
             $holdingPeriodMessage = config('withdraw.holding_period_message');
         }
 
+        if ($assetSource === 'sig' && ! $this->withdrawableSigPlan($user)) {
+            $blockReasonEarly = 'No withdrawable SIG balance found.';
+        } else {
+            $blockReasonEarly = null;
+        }
+
         $availableValue = round($availableGrams * $rate, 2);
 
         if ($inputMode === 'weight') {
@@ -521,10 +587,10 @@ class MetalWithdrawalService
             $grams = $rate > 0 ? round($receiveAmount / $rate, 4) : 0.0;
         }
 
-        $blockReason = null;
-        if (! $fromHoldings && $receiveAmount < $minAmount) {
+        $blockReason = $blockReasonEarly;
+        if ($blockReason === null && ! $fromHoldings && $receiveAmount < $minAmount) {
             $blockReason = 'Minimum withdrawal amount is ₹'.number_format($minAmount, 0).'.';
-        } elseif ($grams > $availableGrams + 0.00005) {
+        } elseif ($blockReason === null && $grams > $availableGrams + 0.00005) {
             $locked = $breakdown['locked_grams'];
             $blockReason = $locked > 0
                 ? 'Only metal held for '.$holdingPeriodHours.' hours can be sold/withdrawn. Locked: '.number_format($locked, 2).'g.'
@@ -599,7 +665,7 @@ class MetalWithdrawalService
     protected function totalHoldingsGrams(User $user, string $assetSource): float
     {
         if ($assetSource === 'sig') {
-            return round((float) ($this->activeSigPlan($user)?->metal_accumulated_grams ?? 0), 4);
+            return round((float) ($this->withdrawableSigPlan($user)?->metal_accumulated_grams ?? 0), 4);
         }
 
         if ($assetSource === 'silver') {
@@ -665,7 +731,7 @@ class MetalWithdrawalService
 
     protected function matureSigGrams(User $user, CarbonInterface $cutoff): float
     {
-        $plan = $this->activeSigPlan($user);
+        $plan = $this->withdrawableSigPlan($user);
         if (! $plan) {
             return 0.0;
         }
@@ -725,7 +791,7 @@ class MetalWithdrawalService
     protected function metalTypeForAsset(User $user, string $assetSource): string
     {
         if ($assetSource === 'sig') {
-            $plan = $this->activeSigPlan($user);
+            $plan = $this->withdrawableSigPlan($user);
 
             return ($plan?->metal_type === 'silver') ? 'silver' : 'gold';
         }
@@ -733,13 +799,32 @@ class MetalWithdrawalService
         return $assetSource === 'silver' ? 'silver' : 'gold';
     }
 
-    protected function activeSigPlan(User $user): ?SigPlan
+    /**
+     * SIG metal available to withdraw: active/paused plan, or stopped plan with remaining grams.
+     */
+    protected function withdrawableSigPlan(User $user): ?SigPlan
     {
-        return SigPlan::query()
+        $active = SigPlan::query()
             ->where('user_id', $user->id)
             ->whereIn('status', ['active', 'paused'])
             ->latest('id')
             ->first();
+
+        if ($active) {
+            return $active;
+        }
+
+        return SigPlan::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'stopped')
+            ->where('metal_accumulated_grams', '>', 0)
+            ->latest('id')
+            ->first();
+    }
+
+    protected function activeSigPlan(User $user): ?SigPlan
+    {
+        return $this->withdrawableSigPlan($user);
     }
 
     protected function normalizeAssetSource(string $assetSource): string

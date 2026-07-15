@@ -43,7 +43,14 @@ return new class extends Migration
             $table->decimal('amount', 14, 2);
             $table->decimal('quantity_grams', 14, 4)->nullable();
             $table->decimal('rate_per_gram', 12, 2)->nullable();
-            $table->enum('status', ['pending', 'success', 'failed'])->default('pending');
+            $table->enum('status', [
+                'pending',
+                'success',
+                'failed',
+                'withdrawal_pending',
+                'withdrawal',
+                'withdrawal_rejected',
+            ])->default('pending');
             $table->timestamp('scheduled_at');
             $table->timestamp('processed_at')->nullable();
             $table->text('failure_reason')->nullable();

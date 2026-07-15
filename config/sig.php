@@ -26,6 +26,9 @@ return [
         'pending' => 'PENDING',
         'success' => 'SUCCESS',
         'failed' => 'FAILED',
+        'withdrawal_pending' => 'WITHDRAWAL PENDING',
+        'withdrawal' => 'WITHDRAWN',
+        'withdrawal_rejected' => 'WITHDRAWAL REJECTED',
     ],
 
     'manage_actions' => [
@@ -61,9 +64,21 @@ return [
             'available_when' => ['active', 'paused'],
             'modal' => [
                 'title' => 'Stop SIG permanently?',
-                'message' => 'This cannot be undone. You will need to activate a new SIG plan to invest again.',
+                'message' => 'This cannot be undone. You will need to activate a new SIG plan to invest again. You can then withdraw your SIG balance to your bank account.',
                 'confirm_label' => 'Stop SIG',
                 'destructive' => true,
+            ],
+        ],
+        [
+            'key' => 'withdraw',
+            'label' => 'Withdraw SIG',
+            'description' => 'Request payout of remaining SIG metal to your registered bank account.',
+            'endpoint' => 'POST /api/v1/withdraw',
+            'available_when' => ['stopped'],
+            'modal' => [
+                'title' => 'Withdraw SIG?',
+                'message' => 'Your withdrawal request will be sent to admin. If not actioned within 2 hours it will auto-approve and credit your bank account.',
+                'confirm_label' => 'Request Withdrawal',
             ],
         ],
     ],
