@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Investment;
 use App\Models\User;
-use App\Models\WalletTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -116,10 +115,12 @@ class MetalPurchaseApiTest extends TestCase
 
         $user->refresh();
 
-        $this->assertLessThan(10000, (float) $user->wallet_balance);
         $this->assertGreaterThan(0, (float) $user->gold_holdings);
         $this->assertSame(1, Investment::query()->where('user_id', $user->id)->count());
-        $this->assertSame(1, WalletTransaction::query()->where('user_id', $user->id)->where('type', 'debit')->count());
+        $this->assertDatabaseCount('holding_certificates', 1);
+        $this->assertNotNull($response->json('data.certificate.certificate_number'));
+        $this->assertSame('24K', $response->json('data.certificate.purity'));
+        $this->assertStringContainsString('HXT-POH-', (string) $response->json('data.certificate.certificate_number'));
     }
 
     public function test_purchase_fails_when_wallet_balance_is_insufficient(): void

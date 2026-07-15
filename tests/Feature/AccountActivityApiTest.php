@@ -237,8 +237,8 @@ class AccountActivityApiTest extends TestCase
             'type' => 'credit',
             'amount' => 500,
             'balance_after' => 500,
-            'description' => 'Welcome bonus',
-            'source' => 'welcome_bonus',
+            'description' => 'Admin credit',
+            'source' => 'admin',
         ]);
 
         $this->getJson('/api/v1/transactions/config')
@@ -248,19 +248,26 @@ class AccountActivityApiTest extends TestCase
         $list = $this->getJson('/api/v1/transactions?filter=all');
 
         $list->assertOk()
-            ->assertJsonPath('data.pagination.total', 2)
+            ->assertJsonPath('pagination.total', 2)
             ->assertJsonStructure([
                 'data' => [
-                    'transactions' => [
-                        ['id', 'title', 'amount_display', 'status_label', 'occurred_at_display'],
-                    ],
+                    ['id', 'title', 'amount_display', 'status_label', 'occurred_at_display'],
                 ],
             ]);
 
-        $transactionId = $list->json('data.transactions.0.id');
+        $buy = collect($list->json('data'))->firstWhere('source_type', 'investment');
+        $this->assertNotNull($buy);
+        $this->assertNotNull($buy['certificate'] ?? null);
+        $this->assertNotEmpty($buy['certificate']['certificate_number'] ?? null);
+        $this->assertSame('24K', $buy['certificate']['purity'] ?? null);
+        $this->assertSame(0.5, $buy['certificate']['holding_grams'] ?? null);
+        $this->assertStringContainsString('/certificates/', $buy['certificate']['download_url'] ?? '');
+
+        $transactionId = (string) ($buy['id'] ?? $list->json('data.0.id'));
 
         $this->getJson('/api/v1/transactions/'.$transactionId)
             ->assertOk()
-            ->assertJsonPath('data.transaction.id', $transactionId);
+            ->assertJsonPath('data.id', $transactionId)
+            ->assertJsonPath('data.certificate.purity', '24K');
     }
 }

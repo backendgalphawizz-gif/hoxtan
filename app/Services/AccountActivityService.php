@@ -91,7 +91,11 @@ class AccountActivityService
         $items = collect();
 
         if ($this->includesFilter($filter, ['all', 'buy', 'sell'])) {
-            $investments = $user->investments()->latest('id')->limit(100)->get();
+            $investments = $user->investments()
+                ->with('holdingCertificate')
+                ->latest('id')
+                ->limit(100)
+                ->get();
 
             foreach ($investments as $investment) {
                 $payload = AccountTransactionPayload::fromInvestment($investment);
@@ -158,7 +162,7 @@ class AccountActivityService
 
     protected function findInvestment(User $user, int $id): ?array
     {
-        $investment = $user->investments()->find($id);
+        $investment = $user->investments()->with('holdingCertificate')->find($id);
 
         return $investment ? AccountTransactionPayload::fromInvestment($investment) : null;
     }

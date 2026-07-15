@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Investment extends Model
 {
@@ -48,6 +49,11 @@ class Investment extends Model
     public function sigPlan(): BelongsTo
     {
         return $this->belongsTo(SigPlan::class);
+    }
+
+    public function holdingCertificate(): HasOne
+    {
+        return $this->hasOne(HoldingCertificate::class);
     }
 
     protected static function booted(): void

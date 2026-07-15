@@ -139,6 +139,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/invoices', [ProfileController::class, 'invoices']);
         Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
             ->name('api.invoices.download');
+        Route::get('/certificates/{certificate}/download', [ProfileController::class, 'downloadCertificate'])
+            ->name('api.certificates.download');
 
         Route::get('/orders/config', [OrderController::class, 'config']);
         Route::get('/orders', [OrderController::class, 'index']);

@@ -152,6 +152,11 @@ class User extends Authenticatable
         return $this->hasMany(Invoice::class);
     }
 
+    public function holdingCertificates(): HasMany
+    {
+        return $this->hasMany(HoldingCertificate::class);
+    }
+
     public function addresses(): HasMany
     {
         return $this->hasMany(UserAddress::class);

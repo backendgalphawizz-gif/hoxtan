@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\HoldingCertificate;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\HoldingCertificateService;
 use App\Services\InvoiceService;
 use App\Services\KycService;
 use App\Support\ApiResponse;
@@ -281,6 +283,32 @@ class ProfileController extends Controller
         return Storage::disk('local')->download(
             $invoice->file_path,
             $invoice->invoice_number.'.html',
+            ['Content-Type' => 'text/html'],
+        );
+    }
+
+    public function downloadCertificate(
+        Request $request,
+        HoldingCertificate $certificate,
+        HoldingCertificateService $certificates,
+    ): StreamedResponse|JsonResponse {
+        if ($certificate->user_id !== $request->user()->id) {
+            return ApiResponse::error('Unauthorized.', [], 403);
+        }
+
+        if (! $certificate->file_path || ! Storage::disk('local')->exists($certificate->file_path)) {
+            $investment = $certificate->investment()->firstOrFail();
+            $certificates->generateForInvestment($investment);
+            $certificate->refresh();
+        }
+
+        if (! $certificate->file_path || ! Storage::disk('local')->exists($certificate->file_path)) {
+            return ApiResponse::error('Certificate file not found.', [], 404);
+        }
+
+        return Storage::disk('local')->download(
+            $certificate->file_path,
+            $certificate->certificate_number.'.html',
             ['Content-Type' => 'text/html'],
         );
     }

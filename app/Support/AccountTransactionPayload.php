@@ -8,6 +8,7 @@ use App\Models\OldGoldBooking;
 use App\Models\Redemption;
 use App\Models\SigInstallment;
 use App\Models\WalletTransaction;
+use App\Services\HoldingCertificateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -17,8 +18,22 @@ class AccountTransactionPayload
     {
         $metal = ucfirst((string) $investment->metal_type);
         $type = $investment->type === 'sell' ? 'sell' : 'buy';
+        $investment->loadMissing('holdingCertificate');
 
-        return self::base(
+        $meta = [
+            'investment_id' => $investment->id,
+            'rate_per_gram' => $investment->rate_per_gram !== null ? (float) $investment->rate_per_gram : null,
+            'gst_amount' => $investment->gst_amount !== null ? (float) $investment->gst_amount : null,
+        ];
+
+        $certificate = null;
+        if ($type === 'buy' && $investment->holdingCertificate) {
+            $certificate = app(HoldingCertificateService::class)
+                ->payload($investment->holdingCertificate);
+            $meta['certificate_number'] = $investment->holdingCertificate->certificate_number;
+        }
+
+        $payload = self::base(
             id: 'investment:'.$investment->id,
             sourceType: 'investment',
             category: $type,
@@ -32,12 +47,12 @@ class AccountTransactionPayload
             occurredAt: $investment->created_at,
             metalType: $investment->metal_type,
             quantityGrams: $investment->quantity_grams !== null ? (float) $investment->quantity_grams : null,
-            meta: [
-                'investment_id' => $investment->id,
-                'rate_per_gram' => $investment->rate_per_gram !== null ? (float) $investment->rate_per_gram : null,
-                'gst_amount' => $investment->gst_amount !== null ? (float) $investment->gst_amount : null,
-            ],
+            meta: $meta,
         );
+
+        $payload['certificate'] = $certificate;
+
+        return $payload;
     }
 
     public static function fromWallet(WalletTransaction $transaction): array
