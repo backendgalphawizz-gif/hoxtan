@@ -35,7 +35,7 @@ return [
     ],
 
     'series' => [
-        ['key' => 'market_value', 'label' => 'Current Value', 'style' => 'solid'],
-        ['key' => 'invested_value', 'label' => 'Invested Value', 'style' => 'dashed'],
+        ['key' => 'purchase_amount', 'label' => 'Purchase Amount', 'style' => 'dashed'],
+        ['key' => 'current_rate_amount', 'label' => 'Current Rate Amount', 'style' => 'solid'],
     ],
 ];
