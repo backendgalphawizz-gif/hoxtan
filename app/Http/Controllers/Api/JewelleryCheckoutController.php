@@ -26,6 +26,7 @@ class JewelleryCheckoutController extends Controller
             isset($data['emi_plan_id']) ? (int) $data['emi_plan_id'] : null,
             isset($data['tenure']) ? (int) $data['tenure'] : null,
             isset($data['total_emi_cost']) ? (float) $data['total_emi_cost'] : null,
+            isset($data['variant_id']) ? (int) $data['variant_id'] : null,
         );
 
         return ApiResponse::success($summary);
@@ -48,6 +49,7 @@ class JewelleryCheckoutController extends Controller
             isset($data['total_emi_cost']) ? (float) $data['total_emi_cost'] : null,
             $data['payment_method'] ?? null,
             $data['transaction_id'] ?? null,
+            isset($data['variant_id']) ? (int) $data['variant_id'] : null,
         );
 
         $message = ($data['payment_type'] ?? 'full') === 'emi'
@@ -60,12 +62,15 @@ class JewelleryCheckoutController extends Controller
     /**
      * @return array{
      *     product_id: int,
+     *     variant_id?: int,
      *     quantity?: int,
      *     address_id?: int,
      *     payment_type?: string,
      *     emi_plan_id?: int,
      *     tenure?: int,
-     *     total_emi_cost?: float
+     *     total_emi_cost?: float,
+     *     payment_method?: string,
+     *     transaction_id?: string
      * }
      */
     protected function validatedCheckoutRequest(Request $request): array
@@ -78,6 +83,11 @@ class JewelleryCheckoutController extends Controller
 
         return $request->validate([
             'product_id' => ['required', 'integer', 'exists:jewellery_products,id'],
+            'variant_id' => [
+                'nullable',
+                'integer',
+                'exists:jewellery_product_variants,id',
+            ],
             'quantity' => ['nullable', 'integer', 'min:1', 'max:10'],
             'address_id' => ['nullable', 'integer', 'exists:user_addresses,id'],
             'payment_type' => ['nullable', 'string', Rule::in(['full', 'emi'])],

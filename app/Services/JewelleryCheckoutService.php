@@ -5,10 +5,10 @@ namespace App\Services;
 use App\Models\JewelleryOrder;
 use App\Models\JewelleryOrderItem;
 use App\Models\JewelleryProduct;
+use App\Models\JewelleryProductVariant;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\UserAddress;
-use App\Services\BlockedPincodeService;
 use App\Support\AddressPayload;
 use App\Support\DeliveryOtp;
 use App\Support\JewelleryEmiPayload;
@@ -47,15 +47,29 @@ class JewelleryCheckoutService
         ?int $emiPlanId = null,
         ?int $tenure = null,
         ?float $totalEmiCost = null,
+        ?int $variantId = null,
     ): array {
         $product = $this->resolveProduct($productId);
+        $variant = $this->resolveVariant($product, $variantId);
         $address = $this->resolveAddress($user, $addressId);
-        $breakup = $this->priceBreakup($product, $quantity);
+        $breakup = $this->priceBreakup($product, $quantity, $variant);
         $delivery = $this->expectedDelivery();
         $emi = $this->emiContext($breakup['total'], $emiPlanId, $tenure, $totalEmiCost);
 
         return [
-            'product' => JewelleryProductPayload::make($product),
+            'product' => JewelleryProductPayload::make($product, $variant),
+            'has_size_variants' => (bool) $product->has_size_variants,
+            'variant_id' => $variant?->id,
+            'selected_variant' => $variant
+                ? JewelleryProductPayload::variantPayload($product, $variant)
+                : null,
+            'variants' => $product->has_size_variants
+                ? $product->variants
+                    ->where('is_active', true)
+                    ->values()
+                    ->map(fn (JewelleryProductVariant $row) => JewelleryProductPayload::variantPayload($product, $row))
+                    ->all()
+                : [],
             'quantity' => $quantity,
             'address' => $address ? AddressPayload::make($address) : null,
             'price_breakup' => $breakup,
@@ -92,10 +106,12 @@ class JewelleryCheckoutService
         ?float $totalEmiCost = null,
         ?string $paymentMethod = null,
         ?string $transactionId = null,
+        ?int $variantId = null,
     ): array {
         $product = $this->resolveProduct($productId);
+        $variant = $this->resolveVariant($product, $variantId, requiredForSizedProduct: true);
         $address = $this->resolveAddress($user, $addressId, required: true);
-        $breakup = $this->priceBreakup($product, $quantity);
+        $breakup = $this->priceBreakup($product, $quantity, $variant);
         $delivery = $this->expectedDelivery();
         $emiSelection = $paymentType === 'emi'
             ? $this->emi->resolveForCheckout($breakup['total'], $emiPlanId, $tenure, $totalEmiCost)
@@ -106,6 +122,7 @@ class JewelleryCheckoutService
         $order = DB::transaction(function () use (
             $user,
             $product,
+            $variant,
             $quantity,
             $address,
             $breakup,
@@ -146,6 +163,9 @@ class JewelleryCheckoutService
             JewelleryOrderItem::query()->create([
                 'jewellery_order_id' => $order->id,
                 'jewellery_product_id' => $product->id,
+                'jewellery_product_variant_id' => $variant?->id,
+                'size' => $variant?->size ?? $product->size,
+                'weight_grams' => $breakup['unit_weight_grams'],
                 'quantity' => $quantity,
                 'unit_price' => $breakup['unit_price'],
                 'line_total' => $breakup['subtotal'],
@@ -177,6 +197,7 @@ class JewelleryCheckoutService
             return $order->fresh([
                 'items.product.category',
                 'items.product.subCategory',
+                'items.variant',
                 'payment',
                 'emiPlan',
                 'emiInstallments',
@@ -205,7 +226,8 @@ class JewelleryCheckoutService
             : $delivery;
 
         return [
-            'product' => JewelleryProductPayload::make($product),
+            'product' => JewelleryProductPayload::make($product, $variant),
+            'variant_id' => $variant?->id,
             'quantity' => $quantity,
             'address' => AddressPayload::make($address),
             'price_breakup' => $breakup,
@@ -246,18 +268,24 @@ class JewelleryCheckoutService
      *     total: float
      * }
      */
-    public function priceBreakup(JewelleryProduct $product, int $quantity = 1): array
-    {
+    public function priceBreakup(
+        JewelleryProduct $product,
+        int $quantity = 1,
+        ?JewelleryProductVariant $variant = null,
+    ): array {
         $quantity = max(1, $quantity);
+        $unitWeight = $variant?->weight_grams ?? $product->weight_grams;
+        $storedUnitPrice = $variant?->price ?? $product->price;
+
         $pricing = JewelleryPricing::calculate(
             $product->metal_type,
-            $product->weight_grams,
+            $unitWeight,
             $product->making_charge_percent,
             $product->discount_type,
             $product->discount_value,
         );
 
-        $unitPrice = $pricing['total'] > 0 ? $pricing['total'] : (float) $product->price;
+        $unitPrice = $pricing['total'] > 0 ? $pricing['total'] : (float) $storedUnitPrice;
         $metalValue = round($pricing['metal_value'] * $quantity, 2);
         $makingCharges = round($pricing['making_charge_amount'] * $quantity, 2);
         $subtotalBeforeDiscount = round($pricing['subtotal_before_discount'] * $quantity, 2);
@@ -272,9 +300,12 @@ class JewelleryCheckoutService
             'gold_value' => $metalValue,
             'making_charges' => $makingCharges,
             'making_charge_percent' => $pricing['making_charge_percent'],
-            'weight_grams' => $product->weight_grams !== null
-                ? round((float) $product->weight_grams * $quantity, 3)
+            'weight_grams' => $unitWeight !== null
+                ? round((float) $unitWeight * $quantity, 3)
                 : null,
+            'unit_weight_grams' => $unitWeight !== null ? (float) $unitWeight : null,
+            'size' => $variant?->size ?? $product->size,
+            'variant_id' => $variant?->id,
             'rate_per_gram' => $pricing['rate_per_gram'],
             'unit_price' => $unitPrice,
             'subtotal_before_discount' => $subtotalBeforeDiscount,
@@ -319,7 +350,7 @@ class JewelleryCheckoutService
     protected function resolveProduct(int $productId): JewelleryProduct
     {
         $product = JewelleryProduct::query()
-            ->with(['category', 'subCategory'])
+            ->with(['category', 'subCategory', 'variants'])
             ->where('is_active', true)
             ->find($productId);
 
@@ -330,6 +361,43 @@ class JewelleryCheckoutService
         }
 
         return $product;
+    }
+
+    protected function resolveVariant(
+        JewelleryProduct $product,
+        ?int $variantId,
+        bool $requiredForSizedProduct = false,
+    ): ?JewelleryProductVariant {
+        if (! $product->has_size_variants) {
+            if ($variantId !== null) {
+                throw ValidationException::withMessages([
+                    'variant_id' => ['This product does not have size variants.'],
+                ]);
+            }
+
+            return null;
+        }
+
+        if ($variantId === null) {
+            if ($requiredForSizedProduct) {
+                throw ValidationException::withMessages([
+                    'variant_id' => ['Please select a size variant for this product.'],
+                ]);
+            }
+
+            return $product->variants->firstWhere('is_active', true) ?? $product->variants->first();
+        }
+
+        $variant = $product->variants
+            ->first(fn (JewelleryProductVariant $row): bool => $row->id === $variantId && $row->is_active);
+
+        if (! $variant) {
+            throw ValidationException::withMessages([
+                'variant_id' => ['Selected size variant is invalid for this product.'],
+            ]);
+        }
+
+        return $variant;
     }
 
     protected function resolveAddress(User $user, ?int $addressId, bool $required = false): ?UserAddress
@@ -465,11 +533,14 @@ class JewelleryCheckoutService
             'items' => $order->items->map(fn (JewelleryOrderItem $item) => [
                 'id' => $item->id,
                 'product_id' => $item->jewellery_product_id,
+                'variant_id' => $item->jewellery_product_variant_id,
+                'size' => $item->size,
+                'weight_grams' => $item->weight_grams !== null ? (float) $item->weight_grams : null,
                 'quantity' => $item->quantity,
                 'unit_price' => (float) $item->unit_price,
                 'line_total' => (float) $item->line_total,
                 'product' => $item->product
-                    ? JewelleryProductPayload::make($item->product)
+                    ? JewelleryProductPayload::make($item->product, $item->variant)
                     : null,
             ])->values()->all(),
         ];

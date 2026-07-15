@@ -9,6 +9,7 @@ use App\Support\FilamentDateFilters;
 use App\Support\FilamentTableActions;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
@@ -85,6 +86,7 @@ class InvoiceResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('source')
                     ->label('Type')
+                    ->placeholder('All types')
                     ->options([
                         'investment' => 'Metal',
                         'jewellery' => 'Jewellery',
@@ -97,9 +99,12 @@ class InvoiceResource extends Resource
                         };
                     }),
                 Tables\Filters\SelectFilter::make('metal_type')
+                    ->label('Metal')
+                    ->placeholder('All metals')
                     ->options(['gold' => 'Gold', 'silver' => 'Silver']),
                 FilamentDateFilters::tableFilter('issued_date', 'issued_at', 'Issued Date'),
-            ])
+            ], layout: FiltersLayout::AboveContent)
+            ->filtersFormColumns(3)
             ->actions([
                 FilamentTableActions::make('download')
                     ->icon('heroicon-o-arrow-down-tray')

@@ -12,7 +12,7 @@ class OrderPayload
 {
     public static function make(JewelleryOrder $order, bool $detailed = false, bool $includeDeliveryOtp = true): array
     {
-        $order->loadMissing(['items.product', 'payment', 'emiInstallments', 'invoice']);
+        $order->loadMissing(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice']);
 
         $firstItem = $order->items->first();
         $itemTitle = $firstItem?->product?->name ?? 'Jewellery Order';
@@ -91,16 +91,21 @@ class OrderPayload
 
     public static function item(JewelleryOrderItem $item): array
     {
-        $item->loadMissing('product');
+        $item->loadMissing(['product', 'variant']);
 
         return [
             'id' => $item->id,
             'product_id' => $item->jewellery_product_id,
+            'variant_id' => $item->jewellery_product_variant_id,
+            'size' => $item->size,
+            'weight_grams' => $item->weight_grams !== null ? (float) $item->weight_grams : null,
             'quantity' => (int) $item->quantity,
             'unit_price' => (float) $item->unit_price,
             'line_total' => (float) $item->line_total,
             'line_total_display' => '₹'.number_format((float) $item->line_total, 2),
-            'product' => $item->product ? JewelleryProductPayload::make($item->product) : null,
+            'product' => $item->product
+                ? JewelleryProductPayload::make($item->product, $item->variant)
+                : null,
         ];
     }
 
