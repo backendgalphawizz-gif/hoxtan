@@ -10,6 +10,7 @@ use App\Models\JewelleryOrder;
 use App\Models\JewelleryOrderListing;
 use App\Models\OldGoldBooking;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
 use App\Support\SellJewelleryPayload;
@@ -203,9 +204,7 @@ class JewelleryOrderResource extends Resource
                             ->label('Tracking Number')
                             ->maxLength(100)
                             ->disabled(fn (string $operation): bool => $operation === 'view'),
-                        Forms\Components\TextInput::make('courier_name')
-                            ->label('Courier Name')
-                            ->maxLength(100)
+                        FilamentFormFields::name('courier_name', 'Courier Name', false, 100)
                             ->disabled(fn (string $operation): bool => $operation === 'view'),
                         Forms\Components\DateTimePicker::make('dispatched_at')
                             ->label('Dispatched At')
@@ -356,6 +355,7 @@ class JewelleryOrderResource extends Resource
                         ? static::getUrl('view-sell', ['record' => $record->source_id])
                         : static::getUrl('view', ['record' => $record->source_id])),
                 FilamentTableActions::edit()
+                    ->visible(fn (JewelleryOrderListing $record): bool => static::canEdit($record))
                     ->url(fn (JewelleryOrderListing $record): string => $record->isSell()
                         ? static::getUrl('edit-sell', ['record' => $record->source_id])
                         : static::getUrl('edit', ['record' => $record->source_id])),
@@ -363,7 +363,7 @@ class JewelleryOrderResource extends Resource
                     ->icon('heroicon-o-user-plus')
                     ->color('info')
                     ->tooltip('Assign Driver')
-                    ->visible(fn (JewelleryOrderListing $record): bool => ! in_array($record->status, ['completed', 'cancelled', 'failed'], true))
+                    ->visible(fn (JewelleryOrderListing $record): bool => static::canEdit($record))
                     ->form(fn (JewelleryOrderListing $record): array => [
                         ($record->isSell()
                             ? static::sellDriverAssignmentSelect($record->driver_id)
@@ -429,6 +429,24 @@ class JewelleryOrderResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        if (! parent::canEdit($record)) {
+            return false;
+        }
+
+        return ! static::isOrderLocked($record);
+    }
+
+    public static function isOrderLocked(mixed $record): bool
+    {
+        $status = is_object($record) && isset($record->status)
+            ? (string) $record->status
+            : null;
+
+        return in_array($status, ['completed', 'cancelled', 'failed'], true);
     }
 
     public static function getNavigationBadge(): ?string

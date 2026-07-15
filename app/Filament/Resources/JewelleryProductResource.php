@@ -11,6 +11,7 @@ use App\Models\JewellerySubSubCategory;
 use App\Models\JewelleryCategory;
 use App\Support\FilamentTableActions;
 use App\Support\FilamentFormat;
+use App\Support\JewelleryOptions;
 use App\Support\JewelleryPricing;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -55,6 +56,12 @@ class JewelleryProductResource extends Resource
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (Set $set, Get $get): void {
+                                $purity = $get('purity');
+                                $allowed = JewelleryOptions::puritySelectOptions($get('metal_type'));
+                                if (filled($purity) && ! array_key_exists((string) $purity, $allowed)) {
+                                    $set('purity', null);
+                                }
+
                                 if ((bool) $get('has_size_variants')) {
                                     static::syncVariantPrices($set, $get);
 
@@ -133,11 +140,10 @@ class JewelleryProductResource extends Resource
                             ->hiddenOn('create')
                             ->unique(ignoreRecord: true),
                         Forms\Components\Select::make('purity')
-                            ->options(collect(config('jewellery.purities', []))->mapWithKeys(
-                                fn (array $row) => [($row['value'] ?? '') => ($row['label'] ?? $row['value'] ?? '')]
-                            )->filter()->all())
+                            ->options(fn (Get $get): array => JewelleryOptions::puritySelectOptions($get('metal_type')))
                             ->searchable()
                             ->nullable()
+                            ->live()
                             ->placeholder('Select purity'),
                         Forms\Components\Toggle::make('has_size_variants')
                             ->label('Enable size variants')

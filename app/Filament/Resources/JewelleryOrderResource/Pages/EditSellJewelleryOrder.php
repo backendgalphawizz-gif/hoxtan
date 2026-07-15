@@ -18,6 +18,12 @@ class EditSellJewelleryOrder extends EditRecord
             ->with(['user', 'payment', 'driver'])
             ->findOrFail($record);
 
+        if (JewelleryOrderResource::isOrderLocked($this->getRecord())) {
+            $this->redirect(JewelleryOrderResource::getUrl('view-sell', ['record' => $this->getRecord()]));
+
+            return;
+        }
+
         $this->authorizeAccess();
         $this->fillForm();
     }
