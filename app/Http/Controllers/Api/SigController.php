@@ -39,12 +39,13 @@ class SigController extends Controller
 
     public function show(Request $request): JsonResponse
     {
-        $plan = $this->activePlanQuery($request)->with('installments')->first();
+        $activePlan = $this->activePlanQuery($request)->with('installments')->first();
+        $plan = $activePlan ?? $this->latestPlanQuery($request)->with('installments')->first();
 
         return ApiResponse::success([
             'sig' => $plan ? SigPayload::plan($plan) : null,
-            'has_active_plan' => $plan !== null,
-            'can_activate' => $plan === null,
+            'has_active_plan' => $activePlan !== null,
+            'can_activate' => $activePlan === null,
         ]);
     }
 
@@ -75,7 +76,8 @@ class SigController extends Controller
         ]);
 
         $limit = (int) ($data['limit'] ?? 20);
-        $plan = $this->activePlanQuery($request)->first();
+        $activePlan = $this->activePlanQuery($request)->first();
+        $plan = $activePlan ?? $this->latestPlanQuery($request)->first();
 
         $query = SigInstallment::query()
             ->where('user_id', $request->user()->id)
@@ -223,6 +225,13 @@ class SigController extends Controller
         return SigPlan::query()
             ->where('user_id', $request->user()->id)
             ->whereIn('status', ['active', 'paused'])
+            ->latest('id');
+    }
+
+    private function latestPlanQuery(Request $request)
+    {
+        return SigPlan::query()
+            ->where('user_id', $request->user()->id)
             ->latest('id');
     }
 

@@ -116,29 +116,55 @@ class HoldingLotService
     }
 
     /**
-     * Sell holdings by weight only.
+     * Sell one holding lot by lot_id (full remaining grams of that lot).
      * Eligible only after sell_after_hours (default 48h) from purchase.
      * Creates admin withdrawal request; auto-approves after sell_auto_approve_hours (default 2h).
      * On approve, payout uses the current metal rate.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array{lot_id: int}  $data
      * @return array<string, mixed>
      */
     public function sell(User $user, array $data): array
     {
-        $metalType = strtolower((string) ($data['metal_type'] ?? 'gold'));
-        if (! in_array($metalType, ['gold', 'silver'], true)) {
-            $metalType = 'gold';
-        }
+        $lotId = (int) ($data['lot_id'] ?? 0);
+        $sellAfterHours = (int) config('holdings.sell_after_hours', 48);
 
-        $weightGrams = round((float) ($data['weight_grams'] ?? 0), 4);
-        if ($weightGrams <= 0) {
+        $lot = Investment::query()
+            ->where('user_id', $user->id)
+            ->whereKey($lotId)
+            ->where('type', 'buy')
+            ->where('status', 'completed')
+            ->first();
+
+        if (! $lot) {
             throw ValidationException::withMessages([
-                'weight_grams' => ['Please enter weight in grams to sell.'],
+                'lot_id' => ['Holding lot not found.'],
             ]);
         }
 
-        $sellAfterHours = (int) config('holdings.sell_after_hours', 48);
+        $metalType = (string) $lot->metal_type;
+        $weightGrams = round((float) ($lot->remaining_grams ?? 0), 4);
+
+        if ($weightGrams <= 0) {
+            throw ValidationException::withMessages([
+                'lot_id' => ['This holding lot has no remaining balance to sell.'],
+            ]);
+        }
+
+        $started = $lot->hold_started_at ?? $lot->created_at;
+        $unlockedAt = $started ? Carbon::parse($started)->addHours($sellAfterHours) : null;
+
+        if ($unlockedAt && $unlockedAt->isFuture()) {
+            $hoursLeft = max(1, (int) ceil(now()->floatDiffInHours($unlockedAt)));
+
+            throw ValidationException::withMessages([
+                'lot_id' => [
+                    'You can sell this lot only after '.$sellAfterHours.' hours from purchase. '
+                        .'Try again in about '.$hoursLeft.' hour(s).',
+                ],
+            ]);
+        }
+
         $sellable = $this->holdings->sellableGrams($user->id, $metalType, $sellAfterHours);
         $totalRemaining = round((float) Investment::query()
             ->where('user_id', $user->id)
@@ -149,30 +175,19 @@ class HoldingLotService
             ->sum('remaining_grams'), 4);
         $locked = max(0, round($totalRemaining - $sellable, 4));
 
-        if ($weightGrams > $sellable + 0.00005) {
-            throw ValidationException::withMessages([
-                'weight_grams' => [
-                    $locked > 0
-                        ? 'You can sell only after '.$sellAfterHours.' hours from purchase. Sellable: '
-                            .number_format($sellable, 4).' g, locked: '.number_format($locked, 4).' g.'
-                        : 'Insufficient sellable holding balance. Available: '.number_format($sellable, 4).' g.',
-                ],
-            ]);
-        }
-
         $payload = [
             'asset_source' => $metalType,
             'input_mode' => 'weight',
             'weight_grams' => $weightGrams,
             'from_holdings' => true,
-            'payment_method' => $data['payment_method'] ?? null,
-            'transaction_id' => $data['transaction_id'] ?? null,
+            'source_lot_id' => $lot->id,
             'holdings_sell_after_hours' => $sellAfterHours,
             'holdings_auto_approve_hours' => (int) config('holdings.sell_auto_approve_hours', 2),
         ];
 
         $result = $this->withdrawals->create($user, $payload);
         $result['holding'] = $this->summary($user->fresh(), $metalType);
+        $result['lot'] = $this->lotPayload($lot->fresh());
         $result['sellable_grams'] = $sellable;
         $result['locked_grams'] = $locked;
         $result['sell_after_hours'] = $sellAfterHours;
@@ -358,6 +373,9 @@ class HoldingLotService
         $eligible = $this->isBonusEligible($lot, $holdDays);
         $bonusAmount = $eligible ? round($currentValue * ($bonusPercent / 100), 2) : 0.0;
         $bonusGrams = $eligible ? round($remaining * ($bonusPercent / 100), 4) : 0.0;
+        $sellAfterHours = (int) config('holdings.sell_after_hours', 48);
+        $sellUnlockedAt = $started ? Carbon::parse($started)->addHours($sellAfterHours) : null;
+        $canSell = $remaining > 0 && ($sellUnlockedAt === null || ! $sellUnlockedAt->isFuture());
 
         return [
             'id' => $lot->id,
@@ -387,7 +405,8 @@ class HoldingLotService
             'bonus_grams' => $bonusGrams,
             'bonus_amount' => $bonusAmount,
             'bonus_amount_display' => '₹'.number_format($bonusAmount, 2),
-            'can_sell' => $remaining > 0,
+            'can_sell' => $canSell,
+            'sell_unlocks_at' => $sellUnlockedAt?->toIso8601String(),
         ];
     }
 

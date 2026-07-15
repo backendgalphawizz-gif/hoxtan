@@ -73,12 +73,10 @@ class SigApiTest extends TestCase
 
         $this->getJson('/api/v1/sig/transactions')
             ->assertOk()
-            ->assertJsonPath('data.transactions.0.status_label', 'SUCCESS')
+            ->assertJsonPath('data.0.status_label', 'SUCCESS')
             ->assertJsonStructure([
                 'data' => [
-                    'transactions' => [
-                        ['title', 'time_display', 'amount_display', 'status_label'],
-                    ],
+                    ['title', 'time_display', 'amount_display', 'status_label'],
                 ],
             ]);
 
@@ -95,6 +93,13 @@ class SigApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.sig.status', 'stopped');
 
+        $this->getJson('/api/v1/sig')
+            ->assertOk()
+            ->assertJsonPath('data.sig.status', 'stopped')
+            ->assertJsonPath('data.has_active_plan', false)
+            ->assertJsonPath('data.can_activate', true);
+
         $this->assertSame(0, SigPlan::query()->whereIn('status', ['active', 'paused'])->count());
+        $this->assertSame(1, SigPlan::query()->where('status', 'stopped')->count());
     }
 }

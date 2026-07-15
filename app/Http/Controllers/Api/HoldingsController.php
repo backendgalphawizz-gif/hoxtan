@@ -69,25 +69,9 @@ class HoldingsController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        if ($request->filled('Transaction_id') && ! $request->filled('transaction_id')) {
-            $request->merge([
-                'transaction_id' => $request->input('Transaction_id'),
-            ]);
-        }
-
         $data = $request->validate([
-            'metal_type' => ['nullable', Rule::in(['gold', 'silver'])],
-            'weight_grams' => [
-                'required',
-                'numeric',
-                'min:0.001',
-                'max:'.config('buy_metal.max_weight_grams', 10000),
-            ],
-            'payment_method' => ['nullable', 'string', 'max:50'],
-            'transaction_id' => ['nullable', 'string', 'max:120'],
+            'lot_id' => ['required', 'integer', 'exists:investments,id'],
         ]);
-
-        $data['metal_type'] = $data['metal_type'] ?? 'gold';
 
         $result = $lots->sell($user, $data);
 
@@ -95,6 +79,7 @@ class HoldingsController extends Controller
             'withdrawal' => app(\App\Services\MetalWithdrawalService::class)->withdrawalPayload($result['withdrawal']),
             'estimate' => $result['estimate'],
             'holding' => $result['holding'],
+            'lot' => $result['lot'] ?? null,
             'sellable_grams' => $result['sellable_grams'] ?? null,
             'locked_grams' => $result['locked_grams'] ?? null,
             'sell_after_hours' => $result['sell_after_hours'] ?? 48,

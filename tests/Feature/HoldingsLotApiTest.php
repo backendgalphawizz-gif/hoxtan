@@ -140,7 +140,7 @@ class HoldingsLotApiTest extends TestCase
         ]);
     }
 
-    public function test_holdings_sell_requires_48_hours_and_accepts_weight_only_payload(): void
+    public function test_holdings_sell_uses_lot_id_and_requires_48_hours(): void
     {
         MetalRate::query()->create([
             'metal_type' => 'gold',
@@ -166,7 +166,7 @@ class HoldingsLotApiTest extends TestCase
         ]);
 
         // Fresh purchase — locked for 48h.
-        Investment::query()->create([
+        $lot = Investment::query()->create([
             'user_id' => $user->id,
             'metal_type' => 'gold',
             'type' => 'buy',
@@ -182,34 +182,32 @@ class HoldingsLotApiTest extends TestCase
         ]);
 
         $locked = $this->postJson('/api/v1/holdings/sell', [
-            'weight_grams' => 50,
-            'payment_method' => 'upi',
-            'transaction_id' => 'TXN123',
+            'lot_id' => $lot->id,
         ]);
 
         $locked->assertStatus(422);
         $payload = json_encode($locked->json());
         $this->assertTrue(
-            data_get($locked->json(), 'errors.weight_grams') !== null || str_contains($payload, '48'),
+            data_get($locked->json(), 'data.errors.lot_id') !== null
+                || data_get($locked->json(), 'errors.lot_id') !== null
+                || str_contains($payload, '48'),
             'Expected 48h sell lock validation. Got: '.$payload
         );
 
         // Mature lot.
-        Investment::query()
-            ->where('user_id', $user->id)
-            ->update(['hold_started_at' => now()->subHours(49)]);
+        $lot->update(['hold_started_at' => now()->subHours(49)]);
 
         $this->postJson('/api/v1/holdings/sell', [
-            'weight_grams' => 50,
-            'payment_method' => 'upi',
-            'transaction_id' => 'TXN123',
+            'lot_id' => $lot->id,
         ])->assertCreated()
             ->assertJsonPath('data.auto_approve_hours', 2)
             ->assertJsonPath('data.sell_after_hours', 48)
-            ->assertJsonPath('data.withdrawal.status', 'pending');
+            ->assertJsonPath('data.withdrawal.status', 'pending')
+            ->assertJsonPath('data.withdrawal.quantity_grams', 50);
 
         $this->assertDatabaseHas('metal_withdrawals', [
             'user_id' => $user->id,
+            'source_lot_id' => $lot->id,
             'quantity_grams' => 50,
             'status' => 'pending',
         ]);
