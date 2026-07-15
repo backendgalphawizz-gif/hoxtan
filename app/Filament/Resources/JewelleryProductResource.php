@@ -415,7 +415,7 @@ class JewelleryProductResource extends Resource
             ->itemPanelAspectRatio(1)
             ->imagePreviewHeight('136')
             ->placeholder('Drag & drop images here, or click to browse')
-            ->helperText('Image size: 1000*1000 px (square). Max 4 MB each.')
+            ->helperText('Use short filenames (under 80 chars). Square images preferred (1000×1000). Max 4 MB each.')
             ->imageEditor()
             ->imageEditorAspectRatios([
                 '1:1' => 'Square (1:1)',
@@ -424,6 +424,8 @@ class JewelleryProductResource extends Resource
             ->imageResizeMode('cover')
             ->imageResizeTargetWidth('1000')
             ->imageResizeTargetHeight('1000')
+            // Avoid Flysystem metadata crashes when Livewire temp files are cleaned/moved on the server.
+            ->fetchFileInformation(false)
             ->disk('public')
             ->directory('jewellery/products')
             ->visibility('public')

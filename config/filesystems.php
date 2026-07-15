@@ -38,6 +38,17 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Dedicated disk for Livewire/Filament temporary uploads.
+         * Avoids private/public mismatches and metadata errors on shared hosting.
+         */
+        'livewire' => [
+            'driver' => 'local',
+            'root' => storage_path('app/livewire-tmp'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
