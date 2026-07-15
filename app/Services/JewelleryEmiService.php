@@ -74,10 +74,25 @@ class JewelleryEmiService
             'notes' => $notes ?? $installment->notes,
         ]);
 
-        $order = $installment->order()->with('emiInstallments')->first();
+        $order = $installment->order()->with(['emiInstallments', 'payment', 'items.product', 'user'])->first();
 
         if ($order && $order->emiInstallmentsFullyPaid()) {
             $this->releaseEmiDelivery($order);
+
+            if ($order->payment && $order->payment->status !== 'completed') {
+                $order->payment->update([
+                    'status' => 'completed',
+                    'amount' => (float) ($order->total_emi_cost ?? $order->total_amount),
+                    'paid_at' => now(),
+                ]);
+            }
+
+            app(InvoiceService::class)->generateForJewelleryOrder($order->fresh([
+                'items.product',
+                'payment',
+                'emiInstallments',
+                'user',
+            ]));
         }
 
         return $installment->fresh();

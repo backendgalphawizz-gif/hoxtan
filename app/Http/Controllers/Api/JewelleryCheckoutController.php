@@ -46,9 +46,15 @@ class JewelleryCheckoutController extends Controller
             isset($data['emi_plan_id']) ? (int) $data['emi_plan_id'] : null,
             isset($data['tenure']) ? (int) $data['tenure'] : null,
             isset($data['total_emi_cost']) ? (float) $data['total_emi_cost'] : null,
+            $data['payment_method'] ?? null,
+            $data['transaction_id'] ?? null,
         );
 
-        return ApiResponse::success($result, 'Order created successfully. Complete payment to confirm.', 201);
+        $message = ($data['payment_type'] ?? 'full') === 'emi'
+            ? 'Order created successfully. Complete EMI payments to unlock delivery.'
+            : 'Order placed successfully. Invoice generated.';
+
+        return ApiResponse::success($result, $message, 201);
     }
 
     /**
@@ -64,6 +70,12 @@ class JewelleryCheckoutController extends Controller
      */
     protected function validatedCheckoutRequest(Request $request): array
     {
+        if ($request->filled('Transaction_id') && ! $request->filled('transaction_id')) {
+            $request->merge([
+                'transaction_id' => $request->input('Transaction_id'),
+            ]);
+        }
+
         return $request->validate([
             'product_id' => ['required', 'integer', 'exists:jewellery_products,id'],
             'quantity' => ['nullable', 'integer', 'min:1', 'max:10'],
@@ -82,6 +94,8 @@ class JewelleryCheckoutController extends Controller
                 'min:0',
                 Rule::requiredIf(fn (): bool => $request->input('payment_type') === 'emi' && ! $request->filled('emi_plan_id')),
             ],
+            'payment_method' => ['nullable', 'string', Rule::in(['direct', 'razorpay', 'wallet'])],
+            'transaction_id' => ['nullable', 'string', 'max:64'],
         ]);
     }
 }

@@ -6,6 +6,7 @@ use App\Services\DriverAssignmentNotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\ValidationException;
 
 class JewelleryOrder extends Model
@@ -145,6 +146,11 @@ class JewelleryOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(JewelleryOrderItem::class);
+    }
+
+    public function invoice(): HasOne
+    {
+        return $this->hasOne(Invoice::class);
     }
 
     public function isEmi(): bool

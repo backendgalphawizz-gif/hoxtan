@@ -13,10 +13,11 @@ class InvoiceDownloadController
     public function __invoke(Invoice $invoice, InvoiceService $invoices): StreamedResponse|RedirectResponse
     {
         if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
-            $investment = $invoice->investment;
-
-            if ($investment) {
-                $invoices->generateForInvestment($investment);
+            if ($invoice->jewellery_order_id && $invoice->jewelleryOrder) {
+                $invoices->generateForJewelleryOrder($invoice->jewelleryOrder);
+                $invoice->refresh();
+            } elseif ($invoice->investment) {
+                $invoices->generateForInvestment($invoice->investment);
                 $invoice->refresh();
             }
         }

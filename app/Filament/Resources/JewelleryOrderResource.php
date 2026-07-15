@@ -48,7 +48,7 @@ class JewelleryOrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'payment', 'items.product', 'address', 'driver', 'emiPlan', 'emiInstallments']);
+            ->with(['user', 'payment', 'items.product', 'address', 'driver', 'emiPlan', 'emiInstallments', 'invoice']);
     }
 
     public static function form(Form $form): Form
@@ -229,7 +229,10 @@ class JewelleryOrderResource extends Resource
                             ->content(fn (?JewelleryOrder $record): string => $record?->payment
                                 ? '₹'.number_format((float) $record->payment->amount, 2)
                                 : '—'),
-                    ])->columns(3)
+                        Forms\Components\Placeholder::make('invoice_number')
+                            ->label('Invoice')
+                            ->content(fn (?JewelleryOrder $record): string => $record?->invoice?->invoice_number ?? '—'),
+                    ])->columns(2)
                     ->visible(fn (?JewelleryOrder $record): bool => $record?->payment !== null),
                 Forms\Components\Section::make('Order Items')
                     ->schema([
@@ -611,15 +614,21 @@ class JewelleryOrderResource extends Resource
     {
         return Forms\Components\Select::make('driver_id')
             ->label('Assigned Driver')
-            ->options(function (?JewelleryOrder $record) use ($includeDriverId): array {
-                return Driver::assignmentOptions($includeDriverId ?? $record?->driver_id);
+            ->options(function ($record = null) use ($includeDriverId): array {
+                $currentDriverId = $includeDriverId;
+
+                if ($currentDriverId === null && is_object($record)) {
+                    $currentDriverId = $record->driver_id ?? null;
+                }
+
+                return Driver::assignmentOptions($currentDriverId !== null ? (int) $currentDriverId : null);
             })
             ->placeholder('Select an online driver')
             ->searchable()
             ->nullable()
             ->live()
-            ->afterStateUpdated(function (?int $state, JewelleryOrder $record, Forms\Set $set, $livewire): void {
-                if (! $livewire instanceof Pages\ViewJewelleryOrder) {
+            ->afterStateUpdated(function (?int $state, $record, Forms\Set $set, $livewire): void {
+                if (! $livewire instanceof Pages\ViewJewelleryOrder || ! $record instanceof JewelleryOrder) {
                     return;
                 }
 
@@ -639,17 +648,19 @@ class JewelleryOrderResource extends Resource
     {
         return Forms\Components\Select::make('driver_id')
             ->label('Assigned Driver')
-            ->options(function (?OldGoldBooking $record, Forms\Get $get) use ($includeDriverId): array {
-                return Driver::assignmentOptions(
-                    $includeDriverId ?? $record?->driver_id ?? $get('driver_id'),
-                );
+            ->options(function ($record = null, ?Forms\Get $get = null) use ($includeDriverId): array {
+                $currentDriverId = $includeDriverId
+                    ?? (is_object($record) ? ($record->driver_id ?? null) : null)
+                    ?? ($get ? $get('driver_id') : null);
+
+                return Driver::assignmentOptions($currentDriverId !== null ? (int) $currentDriverId : null);
             })
             ->placeholder('Select an online driver')
             ->searchable()
             ->nullable()
             ->live()
-            ->afterStateUpdated(function (?int $state, OldGoldBooking $record, Forms\Set $set, $livewire): void {
-                if (! $livewire instanceof Pages\ViewSellJewelleryOrder) {
+            ->afterStateUpdated(function (?int $state, $record, Forms\Set $set, $livewire): void {
+                if (! $livewire instanceof Pages\ViewSellJewelleryOrder || ! $record instanceof OldGoldBooking) {
                     return;
                 }
 

@@ -163,7 +163,7 @@ class AccountActivityService
         if ($this->includesFilter($filter, ['all', 'jewellery', 'buy'])) {
             $user->jewelleryOrders()
                 ->where('status', '!=', 'cart')
-                ->with('items.product')
+                ->with(['items.product', 'invoice'])
                 ->latest('id')
                 ->limit(100)
                 ->get()
@@ -217,7 +217,7 @@ class AccountActivityService
     {
         $order = $user->jewelleryOrders()
             ->where('status', '!=', 'cart')
-            ->with('items.product')
+            ->with(['items.product', 'invoice'])
             ->find($id);
 
         return $order ? AccountTransactionPayload::fromJewelleryOrder($order) : null;

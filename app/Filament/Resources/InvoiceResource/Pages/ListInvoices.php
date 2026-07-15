@@ -11,6 +11,6 @@ class ListInvoices extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Invoices auto-generated when buy transactions are marked completed.';
+        return 'Invoices auto-generated for completed metal buys and fully paid jewellery orders.';
     }
 }

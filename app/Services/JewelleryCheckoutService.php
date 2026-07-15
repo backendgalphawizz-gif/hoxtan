@@ -25,6 +25,7 @@ class JewelleryCheckoutService
         protected AppSettingService $settings,
         protected BlockedPincodeService $blockedPincodeService,
         protected JewelleryEmiService $emi,
+        protected InvoiceService $invoices,
     ) {}
 
     /**
@@ -89,6 +90,8 @@ class JewelleryCheckoutService
         ?int $emiPlanId = null,
         ?int $tenure = null,
         ?float $totalEmiCost = null,
+        ?string $paymentMethod = null,
+        ?string $transactionId = null,
     ): array {
         $product = $this->resolveProduct($productId);
         $address = $this->resolveAddress($user, $addressId, required: true);
@@ -100,7 +103,18 @@ class JewelleryCheckoutService
         $emiFields = $this->emiOrderFields($emiSelection);
 
         /** @var JewelleryOrder $order */
-        $order = DB::transaction(function () use ($user, $product, $quantity, $address, $breakup, $delivery, $paymentType, $emiFields): JewelleryOrder {
+        $order = DB::transaction(function () use (
+            $user,
+            $product,
+            $quantity,
+            $address,
+            $breakup,
+            $delivery,
+            $paymentType,
+            $emiFields,
+            $paymentMethod,
+            $transactionId,
+        ): JewelleryOrder {
             $isEmi = $paymentType === 'emi';
 
             $order = JewelleryOrder::query()->create([
@@ -141,8 +155,11 @@ class JewelleryCheckoutService
                 $this->emi->createInstallmentSchedule($order);
             }
 
+            // Full payment is treated as paid at checkout (same as metal buy).
             $payment = Payment::query()->create([
-                'reference_id' => 'PAY-'.strtoupper(uniqid()),
+                'reference_id' => $transactionId
+                    ? (string) $transactionId
+                    : 'PAY-'.strtoupper(uniqid()),
                 'user_id' => $user->id,
                 'payable_type' => JewelleryOrder::class,
                 'payable_id' => $order->id,
@@ -150,7 +167,9 @@ class JewelleryCheckoutService
                     ? (float) ($emiFields['monthly_emi_amount'] ?? $breakup['total'])
                     : $breakup['total'],
                 'currency' => 'INR',
-                'status' => 'pending',
+                'status' => $isEmi ? 'pending' : 'completed',
+                'gateway' => $isEmi ? null : ($paymentMethod ?: 'direct'),
+                'paid_at' => $isEmi ? null : now(),
             ]);
 
             $order->update(['payment_id' => $payment->id]);
@@ -163,6 +182,11 @@ class JewelleryCheckoutService
                 'emiInstallments',
             ]);
         });
+
+        $invoice = null;
+        if ($paymentType === 'full') {
+            $invoice = $this->invoices->generateForJewelleryOrder($order);
+        }
 
         $emi = $this->emiContext(
             $breakup['total'],
@@ -195,6 +219,7 @@ class JewelleryCheckoutService
             'emi' => $emi,
             'order' => $this->orderPayload($order),
             'payment' => $this->paymentPayload($order->payment),
+            'invoice' => $invoice ? $this->invoices->apiPayload($invoice) : null,
         ];
     }
 

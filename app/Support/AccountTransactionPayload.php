@@ -111,8 +111,21 @@ class AccountTransactionPayload
 
     public static function fromJewelleryOrder(JewelleryOrder $order): array
     {
-        $order->loadMissing('items.product');
+        $order->loadMissing(['items.product', 'invoice']);
         $firstItem = $order->items->first();
+        $invoice = $order->invoice;
+
+        $meta = [
+            'order_id' => $order->id,
+            'order_number_display' => '#'.$order->order_number,
+            'item_count' => (int) $order->items->sum('quantity'),
+            'payment_mode' => $order->payment_mode,
+        ];
+
+        if ($invoice) {
+            $meta['invoice_number'] = $invoice->invoice_number;
+            $meta['invoice_download_url'] = route('api.invoices.download', $invoice);
+        }
 
         return self::base(
             id: 'jewellery_order:'.$order->id,
@@ -128,11 +141,7 @@ class AccountTransactionPayload
             occurredAt: $order->created_at,
             metalType: $firstItem?->product?->metal_type,
             quantityGrams: null,
-            meta: [
-                'order_id' => $order->id,
-                'order_number_display' => '#'.$order->order_number,
-                'item_count' => (int) $order->items->sum('quantity'),
-            ],
+            meta: $meta,
         );
     }
 

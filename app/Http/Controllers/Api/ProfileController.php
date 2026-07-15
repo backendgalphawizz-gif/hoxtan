@@ -251,18 +251,10 @@ class ProfileController extends Controller
     {
         $invoices = $request->user()
             ->invoices()
-            ->with('investment:id,reference_id,type')
+            ->with(['investment:id,reference_id,type', 'jewelleryOrder:id,order_number'])
             ->latest('issued_at')
             ->get()
-            ->map(fn (Invoice $invoice) => [
-                'invoice_number' => $invoice->invoice_number,
-                'investment_reference' => $invoice->investment?->reference_id,
-                'metal_type' => $invoice->metal_type,
-                'quantity_grams' => (float) $invoice->quantity_grams,
-                'total_amount' => (float) $invoice->total_amount,
-                'issued_at' => $invoice->issued_at?->toIso8601String(),
-                'download_url' => route('api.invoices.download', $invoice),
-            ]);
+            ->map(fn (Invoice $invoice) => app(InvoiceService::class)->apiPayload($invoice));
 
         return ApiResponse::success([
             'invoices' => $invoices,
@@ -276,7 +268,12 @@ class ProfileController extends Controller
         }
 
         if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
-            $invoices->generateForInvestment($invoice->investment()->firstOrFail());
+            if ($invoice->jewellery_order_id) {
+                $order = $invoice->jewelleryOrder()->firstOrFail();
+                $invoices->generateForJewelleryOrder($order);
+            } else {
+                $invoices->generateForInvestment($invoice->investment()->firstOrFail());
+            }
             $invoice->refresh();
         }
 

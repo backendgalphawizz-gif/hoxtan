@@ -37,7 +37,7 @@ class OrderController extends Controller
         $query = $request->user()
             ->jewelleryOrders()
             ->where('status', '!=', 'cart')
-            ->with(['items.product', 'payment', 'emiInstallments'])
+            ->with(['items.product', 'payment', 'emiInstallments', 'invoice'])
             ->latest('id');
 
         if ($status !== 'all') {
@@ -72,7 +72,7 @@ class OrderController extends Controller
     {
         $this->ensureOwnedByUser($request, $order);
 
-        $order->load(['items.product', 'payment', 'emiInstallments']);
+        $order->load(['items.product', 'payment', 'emiInstallments', 'invoice']);
 
         return ApiResponse::success([
             'order' => OrderPayload::make($order, detailed: true),

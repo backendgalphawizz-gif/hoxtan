@@ -12,7 +12,7 @@ class OrderPayload
 {
     public static function make(JewelleryOrder $order, bool $detailed = false, bool $includeDeliveryOtp = true): array
     {
-        $order->loadMissing(['items.product', 'payment', 'emiInstallments']);
+        $order->loadMissing(['items.product', 'payment', 'emiInstallments', 'invoice']);
 
         $firstItem = $order->items->first();
         $itemTitle = $firstItem?->product?->name ?? 'Jewellery Order';
@@ -59,6 +59,12 @@ class OrderPayload
                 ->map(fn (JewelleryOrderItem $item) => self::item($item))
                 ->values()
                 ->all(),
+            'invoice' => $order->invoice ? [
+                'invoice_number' => $order->invoice->invoice_number,
+                'total_amount' => (float) $order->invoice->total_amount,
+                'issued_at' => $order->invoice->issued_at?->toIso8601String(),
+                'download_url' => route('api.invoices.download', $order->invoice),
+            ] : null,
         ];
 
         if ($includeDeliveryOtp) {

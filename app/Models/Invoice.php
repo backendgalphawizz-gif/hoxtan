@@ -11,6 +11,7 @@ class Invoice extends Model
         'invoice_number',
         'user_id',
         'investment_id',
+        'jewellery_order_id',
         'subtotal',
         'gst_amount',
         'total_amount',
@@ -41,5 +42,29 @@ class Invoice extends Model
     public function investment(): BelongsTo
     {
         return $this->belongsTo(Investment::class);
+    }
+
+    public function jewelleryOrder(): BelongsTo
+    {
+        return $this->belongsTo(JewelleryOrder::class);
+    }
+
+    public function isJewellery(): bool
+    {
+        return $this->jewellery_order_id !== null;
+    }
+
+    public function sourceType(): string
+    {
+        return $this->isJewellery() ? 'jewellery' : 'investment';
+    }
+
+    public function sourceReference(): ?string
+    {
+        if ($this->isJewellery()) {
+            return $this->jewelleryOrder?->order_number;
+        }
+
+        return $this->investment?->reference_id;
     }
 }

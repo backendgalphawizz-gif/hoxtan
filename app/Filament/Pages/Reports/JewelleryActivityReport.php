@@ -62,12 +62,13 @@ class JewelleryActivityReport extends BaseReportPage
         }
 
         return $table
-            ->query(JewelleryOrder::query()->with(['user', 'payment']))
+            ->query(JewelleryOrder::query()->with(['user', 'payment', 'invoice']))
             ->columns([
                 TextColumn::make('order_number')->searchable(),
                 TextColumn::make('user.name')->searchable(),
                 TextColumn::make('status')->badge(),
                 TextColumn::make('payment.status')->label('Payment')->badge(),
+                TextColumn::make('invoice.invoice_number')->label('Invoice')->placeholder('—')->searchable(),
                 TextColumn::make('total_amount')->inr(),
                 TextColumn::make('created_at')->dateTime('d M Y'),
             ])
