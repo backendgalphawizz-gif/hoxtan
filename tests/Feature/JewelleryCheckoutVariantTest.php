@@ -99,7 +99,23 @@ class JewelleryCheckoutVariantTest extends TestCase
             ->assertJsonPath('data.variants.0.size', '16')
             ->assertJsonPath('data.variants.1.size', '18')
             ->assertJsonCount(2, 'data.variants')
-            ->assertJsonPath('data.variant_id', $small->id);
+            ->assertJsonPath('data.variant_id', $small->id)
+            ->assertJsonStructure([
+                'data' => [
+                    'variants' => [
+                        [
+                            'id',
+                            'size',
+                            'gst_percent',
+                            'gst_amount',
+                            'discount_type',
+                            'discount_percent',
+                            'discount_value',
+                            'discount_amount',
+                        ],
+                    ],
+                ],
+            ]);
     }
 
     /**
@@ -127,6 +143,9 @@ class JewelleryCheckoutVariantTest extends TestCase
             'purity' => '22K',
             'weight_grams' => 8,
             'price' => 0,
+            'making_charge_percent' => 10,
+            'discount_type' => 'percent',
+            'discount_value' => 5,
             'has_size_variants' => true,
             'stock_status' => 'in_stock',
             'is_active' => true,

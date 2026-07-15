@@ -123,6 +123,19 @@ class JewelleryProductPayload
         $price = $pricing['total'] > 0 ? $pricing['total'] : (float) $variant->price;
         $gstService = app(GstService::class);
         $gst = $gstService->calculateGstAmount($price);
+        $discountType = $pricing['discount_type'];
+        $discountValue = $pricing['discount_value'] > 0 ? $pricing['discount_value'] : null;
+        $discountPercent = null;
+
+        if ($discountType === 'percent' && $discountValue !== null) {
+            $discountPercent = $discountValue;
+        } elseif (
+            $discountType === 'flat'
+            && $pricing['making_charge_amount'] > 0
+            && $pricing['discount_amount'] > 0
+        ) {
+            $discountPercent = round(($pricing['discount_amount'] / $pricing['making_charge_amount']) * 100, 2);
+        }
 
         return [
             'id' => $variant->id,
@@ -131,9 +144,15 @@ class JewelleryProductPayload
             'specification' => $variant->specificationLabel($product->purity),
             'rate_per_gram' => $pricing['rate_per_gram'],
             'metal_value' => $pricing['metal_value'],
+            'making_charge_percent' => $pricing['making_charge_percent'] > 0
+                ? $pricing['making_charge_percent']
+                : null,
             'making_charge_amount' => $pricing['making_charge_amount'] > 0
                 ? $pricing['making_charge_amount']
                 : null,
+            'discount_type' => $discountType,
+            'discount_value' => $discountValue,
+            'discount_percent' => $discountPercent,
             'discount_amount' => $pricing['discount_amount'] > 0
                 ? $pricing['discount_amount']
                 : null,
@@ -141,6 +160,7 @@ class JewelleryProductPayload
                 ? $pricing['subtotal_before_discount']
                 : $price,
             'price' => $price,
+            'gst_percent' => $gstService->ratePercent(),
             'gst_amount' => $gst['gst_amount'],
             'total_price' => $gst['total'],
         ];
