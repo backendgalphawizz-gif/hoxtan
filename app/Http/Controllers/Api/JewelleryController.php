@@ -40,6 +40,7 @@ class JewelleryController extends Controller
                 })
             )
             ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
             ->map(fn (JewelleryCategory $category) => $this->categoryPayload($category));
 
@@ -56,12 +57,9 @@ class JewelleryController extends Controller
             ->where('jewellery_category_id', $data['category_id'])
             ->where('is_active', true)
             ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
-            ->map(fn (JewellerySubCategory $sub) => [
-                'id' => $sub->id,
-                'name' => $sub->name,
-                'slug' => $sub->slug,
-            ]);
+            ->map(fn (JewellerySubCategory $sub) => $this->subCategoryPayload($sub));
 
         return ApiResponse::success(['sub_categories' => $subCategories]);
     }
@@ -76,12 +74,9 @@ class JewelleryController extends Controller
             ->where('jewellery_sub_category_id', $data['sub_category_id'])
             ->where('is_active', true)
             ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
-            ->map(fn (JewellerySubSubCategory $subSub) => [
-                'id' => $subSub->id,
-                'name' => $subSub->name,
-                'slug' => $subSub->slug,
-            ]);
+            ->map(fn (JewellerySubSubCategory $subSub) => $this->subSubCategoryPayload($subSub));
 
         return ApiResponse::success(['sub_sub_categories' => $subSubCategories]);
     }
@@ -123,6 +118,7 @@ class JewelleryController extends Controller
                 })
             )
             ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
             ->map(fn (JewelleryCategory $category) => $this->categoryPayload($category))
             ->values()
@@ -143,14 +139,14 @@ class JewelleryController extends Controller
                         });
                 })
             )
-            ->orderBy('sort_order');
+            ->orderBy('jewellery_category_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
 
-        $subCategories = $subCategoriesQuery->get()->map(fn (JewellerySubCategory $sub) => [
-            'id' => $sub->id,
-            'category_id' => $sub->jewellery_category_id,
-            'name' => $sub->name,
-            'slug' => $sub->slug,
-        ])->values()->all();
+        $subCategories = $subCategoriesQuery->get()
+            ->map(fn (JewellerySubCategory $sub) => $this->subCategoryPayload($sub, includeParent: true))
+            ->values()
+            ->all();
 
         $subSubCategories = [];
         if (filled($data['sub_category_id'] ?? null)) {
@@ -158,13 +154,9 @@ class JewelleryController extends Controller
                 ->where('jewellery_sub_category_id', $data['sub_category_id'])
                 ->where('is_active', true)
                 ->orderBy('sort_order')
+                ->orderBy('id')
                 ->get()
-                ->map(fn (JewellerySubSubCategory $row) => [
-                    'id' => $row->id,
-                    'sub_category_id' => $row->jewellery_sub_category_id,
-                    'name' => $row->name,
-                    'slug' => $row->slug,
-                ])
+                ->map(fn (JewellerySubSubCategory $row) => $this->subSubCategoryPayload($row, includeParent: true))
                 ->values()
                 ->all();
         }
@@ -472,8 +464,46 @@ class JewelleryController extends Controller
             'name' => $category->name,
             'slug' => $category->slug,
             'metal_type' => $category->metal_type,
-            'sort_order' => $category->sort_order,
+            'sort_order' => (int) $category->sort_order,
         ];
+    }
+
+    /**
+     * @return array{id: int, name: string, slug: string, sort_order: int, category_id?: int}
+     */
+    private function subCategoryPayload(JewellerySubCategory $sub, bool $includeParent = false): array
+    {
+        $payload = [
+            'id' => $sub->id,
+            'name' => $sub->name,
+            'slug' => $sub->slug,
+            'sort_order' => (int) $sub->sort_order,
+        ];
+
+        if ($includeParent) {
+            $payload['category_id'] = $sub->jewellery_category_id;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array{id: int, name: string, slug: string, sort_order: int, sub_category_id?: int}
+     */
+    private function subSubCategoryPayload(JewellerySubSubCategory $subSub, bool $includeParent = false): array
+    {
+        $payload = [
+            'id' => $subSub->id,
+            'name' => $subSub->name,
+            'slug' => $subSub->slug,
+            'sort_order' => (int) $subSub->sort_order,
+        ];
+
+        if ($includeParent) {
+            $payload['sub_category_id'] = $subSub->jewellery_sub_category_id;
+        }
+
+        return $payload;
     }
 
 }

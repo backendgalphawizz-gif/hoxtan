@@ -32,6 +32,22 @@ return [
         'cancelled' => 0,
     ],
 
+    /*
+    | EMI jewellery track timeline (order detail / track screen).
+    | Index: 0 placed, 1 reserved, 2 waiting/completed EMI, 3 ready, 4 delivered.
+    */
+    'emi_order_tracking_steps' => [
+        ['key' => 'placed', 'label' => 'Order Placed'],
+        ['key' => 'reserved', 'label' => 'Reserved for You'],
+        [
+            'key' => 'emi_waiting',
+            'label' => 'Waiting for EMI Completion',
+            'completed_label' => 'EMI Completed',
+        ],
+        ['key' => 'ready_for_delivery', 'label' => 'Ready for Delivery'],
+        ['key' => 'delivered', 'label' => 'Delivered'],
+    ],
+
     'transaction_filters' => [
         ['value' => 'all', 'label' => 'All'],
         ['value' => 'buy', 'label' => 'Buy'],

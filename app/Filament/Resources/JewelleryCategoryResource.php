@@ -58,10 +58,12 @@ class JewelleryCategoryResource extends Resource
                             ->default('both')
                             ->required(),
                         Forms\Components\TextInput::make('sort_order')
+                            ->label('Sort order')
                             ->numeric()
-                            ->minValue(0)
-                            ->default(0)
-                            ->required(),
+                            ->minValue(1)
+                            ->default(fn (): int => JewelleryCategory::nextSortOrder())
+                            ->required()
+                            ->helperText('Sequence position (1, 2, 3…). If you move to a taken number, the other item swaps places.'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
@@ -83,7 +85,10 @@ class JewelleryCategoryResource extends Resource
                 Tables\Columns\TextColumn::make('products_count')
                     ->counts('products')
                     ->label('Products'),
-                Tables\Columns\TextColumn::make('sort_order')->sortable(),
+                Tables\Columns\TextColumn::make('sort_order')
+                    ->label('Sort order')
+                    ->sortable()
+                    ->alignCenter(),
                 Tables\Columns\IconColumn::make('is_active')->boolean()->label('Active'),
             ])
             ->filters([

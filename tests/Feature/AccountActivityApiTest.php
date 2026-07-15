@@ -94,6 +94,127 @@ class AccountActivityApiTest extends TestCase
             ->assertJsonPath('data.order.tracking.1.current', true);
     }
 
+    public function test_emi_order_track_payload_includes_timeline_progress_and_actions(): void
+    {
+        $user = User::factory()->create(['phone' => '9876543212', 'mpin' => '1234']);
+        Sanctum::actingAs($user);
+
+        \App\Models\KycDetail::query()->create([
+            'user_id' => $user->id,
+            'full_name' => 'Test User',
+            'bank_name' => 'HDFC Bank',
+            'account_holder_name' => 'Test User',
+            'account_number' => '12345678904521',
+            'ifsc_code' => 'HDFC0001234',
+        ]);
+
+        $product = \App\Models\JewelleryProduct::query()->create([
+            'name' => 'Antique Gold Necklace',
+            'metal_type' => 'gold',
+            'purity' => '24K',
+            'weight_grams' => 10,
+            'price' => 90000,
+            'stock_status' => 'in_stock',
+            'is_active' => true,
+        ]);
+
+        $order = JewelleryOrder::query()->create([
+            'order_number' => 'HGX78210',
+            'user_id' => $user->id,
+            'subtotal' => 90000,
+            'metal_value' => 85000,
+            'making_charge_amount' => 5000,
+            'gst_percent' => 3,
+            'gst_amount' => 2700,
+            'discount_amount' => 0,
+            'total_amount' => 92700,
+            'payment_mode' => 'emi',
+            'emi_tenure' => 12,
+            'total_emi_cost' => 96235,
+            'monthly_emi_amount' => 8019.58,
+            'status' => 'pending',
+            'shipping_name' => 'Alexander Vance',
+            'shipping_phone' => '+91 98765 43210',
+            'shipping_address' => "42B, Orchard Heights,\nResidency Road, Bengaluru 560025",
+            'shipping_address_type' => 'home',
+            'expected_delivery_date' => '2026-10-20',
+        ]);
+
+        \App\Models\JewelleryOrderItem::query()->create([
+            'jewellery_order_id' => $order->id,
+            'jewellery_product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 90000,
+            'line_total' => 90000,
+        ]);
+
+        foreach (range(1, 12) as $number) {
+            \App\Models\JewelleryOrderEmiInstallment::query()->create([
+                'jewellery_order_id' => $order->id,
+                'installment_number' => $number,
+                'amount' => 8019.58,
+                'due_date' => now()->startOfMonth()->addMonths($number - 1)->toDateString(),
+                'status' => $number <= 4 ? 'paid' : 'pending',
+                'paid_at' => $number <= 4 ? now()->subMonths(4 - $number) : null,
+            ]);
+        }
+
+        $this->getJson('/api/v1/orders/'.$order->id)
+            ->assertOk()
+            ->assertJsonPath('data.order.is_emi', true)
+            ->assertJsonPath('data.order.product_specification', '24K | 10.0 gm')
+            ->assertJsonPath('data.order.tracking.0.key', 'placed')
+            ->assertJsonPath('data.order.tracking.1.key', 'reserved')
+            ->assertJsonPath('data.order.tracking.2.key', 'emi_waiting')
+            ->assertJsonPath('data.order.tracking.2.label', 'Waiting for EMI Completion')
+            ->assertJsonPath('data.order.tracking.2.current', true)
+            ->assertJsonPath('data.order.tracking.3.key', 'ready_for_delivery')
+            ->assertJsonPath('data.order.tracking.4.key', 'delivered')
+            ->assertJsonPath('data.order.emi.progress.paid_count', 4)
+            ->assertJsonPath('data.order.emi.progress.total_count', 12)
+            ->assertJsonPath('data.order.emi.progress.progress_label', '4/12 Installments Paid')
+            ->assertJsonPath('data.order.emi.actions.0.key', 'cancel_emi_plan')
+            ->assertJsonPath('data.order.emi.actions.1.key', 'withdraw_emi_value')
+            ->assertJsonPath('data.order.emi.auto_debit_account.bank_name', 'HDFC Bank')
+            ->assertJsonPath('data.order.delivery_address.name', 'Alexander Vance')
+            ->assertJsonStructure([
+                'data' => [
+                    'order' => [
+                        'emi' => [
+                            'progress' => [
+                                'paid_emi_display',
+                                'remaining_display',
+                                'last_emi_paid_display',
+                                'next_auto_debit_display',
+                            ],
+                            'cancel_popup' => ['message', 'confirm_label'],
+                            'withdrawal' => [
+                                'order_value_display',
+                                'deduction_amount_display',
+                                'you_will_receive_display',
+                                'credit_note',
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+
+        // Mark all paid → ready for delivery actions.
+        \App\Models\JewelleryOrderEmiInstallment::query()
+            ->where('jewellery_order_id', $order->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'paid', 'paid_at' => now()]);
+
+        $this->getJson('/api/v1/orders/'.$order->id)
+            ->assertOk()
+            ->assertJsonPath('data.order.tracking.2.label', 'EMI Completed')
+            ->assertJsonPath('data.order.tracking.3.current', true)
+            ->assertJsonPath('data.order.emi.is_completed', true)
+            ->assertJsonPath('data.order.emi.can_deliver', true)
+            ->assertJsonPath('data.order.emi.actions.0.key', 'deliver_jewellery')
+            ->assertJsonPath('data.order.emi.actions.1.key', 'withdraw_emi_value');
+    }
+
     public function test_user_can_list_and_view_transactions(): void
     {
         $user = User::factory()->create(['phone' => '9876543211', 'mpin' => '1234']);

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsSortOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class JewelleryCategory extends Model
 {
+    use SyncsSortOrder;
+
     protected $fillable = [
         'name',
         'slug',
@@ -20,6 +23,7 @@ class JewelleryCategory extends Model
     {
         return [
             'is_active' => 'boolean',
+            'sort_order' => 'integer',
         ];
     }
 
@@ -32,9 +36,14 @@ class JewelleryCategory extends Model
         });
     }
 
+    public static function ensureSortSequence(): void
+    {
+        static::resequenceGroup(static::query());
+    }
+
     public function subCategories(): HasMany
     {
-        return $this->hasMany(JewellerySubCategory::class);
+        return $this->hasMany(JewellerySubCategory::class)->orderBy('sort_order')->orderBy('id');
     }
 
     public function products(): HasMany
