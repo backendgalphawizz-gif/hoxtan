@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\User;
 use App\Services\InvoiceService;
+use App\Services\KycService;
 use App\Support\ApiResponse;
 use App\Support\AssetsBalancePayload;
 use App\Support\FilamentFormFields;
@@ -35,7 +36,7 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request, KycService $kyc): JsonResponse
     {
         $user = $request->user();
 
@@ -111,7 +112,11 @@ class ProfileController extends Controller
             }
         }
 
-        $detail = $user->kycDetail()->firstOrCreate([]);
+        if ($updates !== []) {
+            $user->update($updates);
+        }
+
+        $detail = $kyc->getOrCreateDetail($user->fresh());
         $detail->update([
             'account_holder_name' => $data['account_holder_name'],
             'bank_name' => $data['bank_name'],
@@ -122,10 +127,6 @@ class ProfileController extends Controller
                 : 'pending',
             'bank_submitted_at' => now(),
         ]);
-
-        if ($updates !== []) {
-            $user->update($updates);
-        }
 
         return ApiResponse::success([
             'user' => UserProfilePayload::make($user->fresh()),
