@@ -62,7 +62,12 @@ class EmiInstallmentsRelationManager extends RelationManager
                     ->label('Mark Paid')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn (JewelleryOrderEmiInstallment $record): bool => $record->isPending())
+                    ->visible(function (JewelleryOrderEmiInstallment $record): bool {
+                        $order = $this->getOwnerRecord();
+
+                        return $record->isPending()
+                            && ! in_array($order->status, ['cancelled', 'failed'], true);
+                    })
                     ->form([
                         Forms\Components\Textarea::make('notes')
                             ->label('Notes (optional)')
@@ -72,13 +77,25 @@ class EmiInstallmentsRelationManager extends RelationManager
                     ->modalHeading('Mark EMI as Paid')
                     ->modalDescription('Confirm this monthly EMI installment has been paid.')
                     ->action(function (JewelleryOrderEmiInstallment $record, array $data): void {
+                        $order = $this->getOwnerRecord();
+
+                        if (in_array($order->status, ['cancelled', 'failed'], true)) {
+                            Notification::make()
+                                ->title('Cannot mark EMI paid')
+                                ->body('This EMI order is cancelled.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
                         app(JewelleryEmiService::class)->markInstallmentPaid(
                             $record,
                             auth('admin')->id(),
                             $data['notes'] ?? null,
                         );
 
-                        $order = $this->getOwnerRecord()->fresh('emiInstallments');
+                        $order = $order->fresh('emiInstallments');
 
                         Notification::make()
                             ->title('EMI marked as paid')
@@ -92,9 +109,26 @@ class EmiInstallmentsRelationManager extends RelationManager
                     ->label('Mark Pending')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('warning')
-                    ->visible(fn (JewelleryOrderEmiInstallment $record): bool => $record->isPaid())
+                    ->visible(function (JewelleryOrderEmiInstallment $record): bool {
+                        $order = $this->getOwnerRecord();
+
+                        return $record->isPaid()
+                            && ! in_array($order->status, ['cancelled', 'failed'], true);
+                    })
                     ->requiresConfirmation()
                     ->action(function (JewelleryOrderEmiInstallment $record): void {
+                        $order = $this->getOwnerRecord();
+
+                        if (in_array($order->status, ['cancelled', 'failed'], true)) {
+                            Notification::make()
+                                ->title('Cannot change EMI status')
+                                ->body('This EMI order is cancelled.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
                         app(JewelleryEmiService::class)->markInstallmentPending($record);
 
                         Notification::make()

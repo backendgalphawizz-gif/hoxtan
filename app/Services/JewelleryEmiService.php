@@ -67,6 +67,14 @@ class JewelleryEmiService
             return $installment;
         }
 
+        $order = $installment->order;
+
+        if ($order && in_array($order->status, ['cancelled', 'failed'], true)) {
+            throw ValidationException::withMessages([
+                'status' => ['Cannot mark EMI as paid on a cancelled order.'],
+            ]);
+        }
+
         $installment->update([
             'status' => 'paid',
             'paid_at' => now(),
