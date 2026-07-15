@@ -10,7 +10,7 @@ Route::middleware(['web', 'auth:admin'])
         Route::get('/invoices/{invoice}/download', InvoiceDownloadController::class)
             ->name('admin.invoices.download');
 
+        // Token stored in cache (no signed URL — avoids INVALID SIGNATURE behind proxies).
         Route::get('/exports/{token}/download', TemporaryExportDownloadController::class)
-            ->middleware('signed')
             ->name('admin.exports.download');
     });

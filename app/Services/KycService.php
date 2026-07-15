@@ -139,6 +139,15 @@ class KycService
             $updates['full_name'] = $fullName;
         }
 
+        $dob = $data['dob'] ?? $data['date_of_birth'] ?? null;
+        if (filled($dob) && is_string($dob)) {
+            try {
+                $updates['date_of_birth'] = \Illuminate\Support\Carbon::parse($dob)->toDateString();
+            } catch (\Throwable) {
+                // Ignore unparseable DOB from provider.
+            }
+        }
+
         $detail->update($updates);
         $this->syncUserKycStatus($user->fresh(), $detail->fresh());
 
@@ -278,6 +287,27 @@ class KycService
             'provider_message' => $providerResponse['message'] ?? null,
             'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
         ];
+    }
+
+    /**
+     * Admin / system path: verify PAN via active provider without user KYC edit locks.
+     *
+     * @return array<string, mixed>
+     */
+    public function applyPanVerification(User $user, string $panNumber): array
+    {
+        $panNumber = strtoupper(trim($panNumber));
+        $this->assertPanFormat($panNumber);
+
+        $providerResponse = $this->provider->sendPanOtp($panNumber, $user);
+
+        if (($providerResponse['verified'] ?? false) !== true) {
+            throw ValidationException::withMessages([
+                'pan_number' => [(string) ($providerResponse['message'] ?? 'PAN verification failed.')],
+            ]);
+        }
+
+        return $this->markPanVerified($user, $panNumber, $providerResponse);
     }
 
     public function syncUserKycStatus(User $user, KycDetail $detail): void

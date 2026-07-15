@@ -6,11 +6,11 @@ use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use OpenSpout\Common\Entity\Row;
@@ -21,10 +21,10 @@ class FilamentImmediateExportService
 {
     /**
      * Build the export file in-process (no Filament export jobs), then download
-     * via a signed GET URL outside Livewire.
+     * via an authenticated one-time token URL (no Laravel signed URLs).
      *
-     * Filament's sync ExportCsv job calls auth()->login(), which regenerates the
-     * session/CSRF token mid-request and causes HTTP 419 Page Expired.
+     * Signed URLs fail with INVALID SIGNATURE when APP_URL / HTTPS proxy
+     * does not match the browser host. Cache tokens avoid that entirely.
      *
      * @param  list<int|string>|null  $selectedKeys
      */
@@ -41,16 +41,20 @@ class FilamentImmediateExportService
         $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
         $file = $this->writeExportFile($livewire, $exporterClass, $format, $selectedKeys);
 
-        $url = URL::temporarySignedRoute(
-            'admin.exports.download',
-            now()->addMinutes(10),
-            [
-                'token' => $file['token'],
-            ],
-            absolute: false,
-        );
+        $url = route('admin.exports.download', ['token' => $file['token']], absolute: false);
 
-        $livewire->js('window.setTimeout(() => { window.location.assign('.json_encode($url).'); }, 150);');
+        $livewire->js('(() => {
+            const href = '.json_encode($url).';
+            window.setTimeout(() => {
+                const link = document.createElement("a");
+                link.href = href;
+                link.rel = "noopener";
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            }, 150);
+        })()');
 
         Notification::make()
             ->title('Export ready')
@@ -118,11 +122,14 @@ class FilamentImmediateExportService
             $this->writeCsv($absolutePath, $headers, $query, $exporter);
         }
 
-        // Allow the download controller to resolve token → path for a short window.
+        $admin = Filament::auth()->user();
+
+        // One-time download token tied to the admin who started the export.
         cache()->put($this->cacheKey($token), [
             'path' => $relativePath,
             'filename' => $filename,
             'disk' => 'local',
+            'admin_id' => $admin?->getAuthIdentifier(),
         ], now()->addMinutes(15));
 
         return [

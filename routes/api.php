@@ -157,6 +157,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/kyc', [KycController::class, 'show']);
         Route::post('/kyc/pan/request-otp', [KycController::class, 'requestPanOtp']);
         Route::post('/kyc/pan/verify-otp', [KycController::class, 'verifyPanOtp']);
+        Route::post('/kyc/pan/verify', [KycController::class, 'verifyPan']);
         Route::post('/kyc/aadhaar/request-otp', [KycController::class, 'requestAadhaarOtp']);
         Route::post('/kyc/aadhaar/verify-otp', [KycController::class, 'verifyAadhaarOtp']);
         Route::post('/kyc/face', [KycController::class, 'submitFace']);

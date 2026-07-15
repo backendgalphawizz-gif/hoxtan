@@ -71,6 +71,10 @@ class SurepassPanKycApiTest extends TestCase
             'pan_verification_status' => 'verified',
             'full_name' => 'ALEXANDER VANCE',
         ]);
+        $this->assertSame(
+            '1990-04-12',
+            $user->kycDetail()->first()?->date_of_birth?->toDateString(),
+        );
 
         Http::assertSent(function ($request) {
             return $request->url() === 'https://kyc-api.surepass.app/api/v1/pan/pan-comprehensive'

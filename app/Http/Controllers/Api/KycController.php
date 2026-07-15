@@ -83,6 +83,27 @@ class KycController extends Controller
         return ApiResponse::success($result, $result['message']);
     }
 
+    /**
+     * Direct PAN verify (preferred when pan_otp_required is false / Surepass).
+     */
+    public function verifyPan(Request $request, KycService $kyc): JsonResponse
+    {
+        $data = $request->validate([
+            'pan_number' => ['required', 'string', 'size:10', 'regex:'.FilamentFormFields::PAN_REGEX],
+        ]);
+
+        $result = $kyc->requestPanOtp($request->user(), $data['pan_number']);
+
+        if (! ($result['verified'] ?? false)) {
+            return ApiResponse::success($result, 'PAN OTP sent successfully.');
+        }
+
+        return ApiResponse::success(
+            $result,
+            (string) ($result['message'] ?? 'PAN verified successfully.'),
+        );
+    }
+
     public function requestAadhaarOtp(Request $request, KycService $kyc): JsonResponse
     {
         $data = $request->validate([
