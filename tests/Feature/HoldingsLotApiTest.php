@@ -211,5 +211,25 @@ class HoldingsLotApiTest extends TestCase
             'quantity_grams' => 50,
             'status' => 'pending',
         ]);
+
+        // Same lot cannot be sold again while request is pending.
+        $duplicate = $this->postJson('/api/v1/holdings/sell', [
+            'lot_id' => $lot->id,
+        ]);
+
+        $duplicate->assertStatus(422);
+        $duplicatePayload = json_encode($duplicate->json());
+        $this->assertTrue(
+            data_get($duplicate->json(), 'data.errors.lot_id') !== null
+                || data_get($duplicate->json(), 'errors.lot_id') !== null
+                || str_contains(strtolower($duplicatePayload), 'already pending'),
+            'Expected duplicate sell blocked. Got: '.$duplicatePayload
+        );
+
+        $list = $this->getJson('/api/v1/holdings?metal_type=gold')->assertOk();
+        $lotRow = collect($list->json('data.lots'))->firstWhere('id', $lot->id);
+        $this->assertNotNull($lotRow);
+        $this->assertFalse((bool) ($lotRow['can_sell'] ?? true));
+        $this->assertTrue((bool) ($lotRow['sell_request_pending'] ?? false));
     }
 }

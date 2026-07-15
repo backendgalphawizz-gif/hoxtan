@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Events\UserAssetsUpdated;
 use App\Models\Investment;
+use App\Models\MetalWithdrawal;
 use App\Models\User;
 use App\Support\WalletHoldingsSnapshot;
 use Carbon\Carbon;
@@ -27,8 +28,11 @@ class HoldingLotService
         $lots = $this->lotsQuery($user, $metalType)->get();
         $bonusPercent = (float) config('holdings.hold_bonus_percent', 1);
         $holdDays = (int) config('holdings.hold_bonus_after_days', 365);
+        $pendingSellLotIds = $this->pendingSellLotIdsForUser((int) $user->id);
 
-        $serialized = $lots->map(fn (Investment $lot) => $this->lotPayload($lot, $bonusPercent, $holdDays))->values();
+        $serialized = $lots->map(
+            fn (Investment $lot) => $this->lotPayload($lot, $bonusPercent, $holdDays, $pendingSellLotIds)
+        )->values();
 
         $totalGrams = round((float) $serialized->sum('remaining_grams'), 4);
         $totalValue = round((float) $serialized->sum('current_value'), 2);
@@ -161,6 +165,14 @@ class HoldingLotService
                 'lot_id' => [
                     'You can sell this lot only after '.$sellAfterHours.' hours from purchase. '
                         .'Try again in about '.$hoursLeft.' hour(s).',
+                ],
+            ]);
+        }
+
+        if ($this->hasPendingSellRequest($lot->id, (int) $user->id)) {
+            throw ValidationException::withMessages([
+                'lot_id' => [
+                    'A sell request for this lot is already pending. You cannot sell this lot again until that request is completed or rejected.',
                 ],
             ]);
         }
@@ -359,10 +371,15 @@ class HoldingLotService
     }
 
     /**
+     * @param  array<int, true>|null  $pendingSellLotIds
      * @return array<string, mixed>
      */
-    public function lotPayload(Investment $lot, ?float $bonusPercent = null, ?int $holdDays = null): array
-    {
+    public function lotPayload(
+        Investment $lot,
+        ?float $bonusPercent = null,
+        ?int $holdDays = null,
+        ?array $pendingSellLotIds = null,
+    ): array {
         $bonusPercent ??= (float) config('holdings.hold_bonus_percent', 1);
         $holdDays ??= (int) config('holdings.hold_bonus_after_days', 365);
         $remaining = round((float) ($lot->remaining_grams ?? $lot->quantity_grams ?? 0), 4);
@@ -375,7 +392,12 @@ class HoldingLotService
         $bonusGrams = $eligible ? round($remaining * ($bonusPercent / 100), 4) : 0.0;
         $sellAfterHours = (int) config('holdings.sell_after_hours', 48);
         $sellUnlockedAt = $started ? Carbon::parse($started)->addHours($sellAfterHours) : null;
-        $canSell = $remaining > 0 && ($sellUnlockedAt === null || ! $sellUnlockedAt->isFuture());
+        $sellRequestPending = $pendingSellLotIds !== null
+            ? isset($pendingSellLotIds[(int) $lot->id])
+            : $this->hasPendingSellRequest((int) $lot->id, (int) $lot->user_id);
+        $canSell = $remaining > 0
+            && ! $sellRequestPending
+            && ($sellUnlockedAt === null || ! $sellUnlockedAt->isFuture());
 
         return [
             'id' => $lot->id,
@@ -406,8 +428,36 @@ class HoldingLotService
             'bonus_amount' => $bonusAmount,
             'bonus_amount_display' => '₹'.number_format($bonusAmount, 2),
             'can_sell' => $canSell,
+            'sell_request_pending' => $sellRequestPending,
             'sell_unlocks_at' => $sellUnlockedAt?->toIso8601String(),
         ];
+    }
+
+    protected function hasPendingSellRequest(int $lotId, int $userId): bool
+    {
+        return MetalWithdrawal::query()
+            ->where('user_id', $userId)
+            ->where('source_lot_id', $lotId)
+            ->where('from_holdings', true)
+            ->where('status', 'pending')
+            ->exists();
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    protected function pendingSellLotIdsForUser(int $userId): array
+    {
+        $ids = MetalWithdrawal::query()
+            ->where('user_id', $userId)
+            ->where('from_holdings', true)
+            ->where('status', 'pending')
+            ->whereNotNull('source_lot_id')
+            ->pluck('source_lot_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return array_fill_keys($ids, true);
     }
 
     protected function isBonusEligible(Investment $lot, int $holdDays): bool

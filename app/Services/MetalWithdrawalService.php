@@ -208,6 +208,23 @@ class MetalWithdrawalService
             : max(0, (int) config('withdraw.auto_approve_hours', 2));
         $sourceLotId = isset($data['source_lot_id']) ? (int) $data['source_lot_id'] : null;
 
+        if ($fromHoldings && $sourceLotId) {
+            $alreadyPending = MetalWithdrawal::query()
+                ->where('user_id', $user->id)
+                ->where('source_lot_id', $sourceLotId)
+                ->where('from_holdings', true)
+                ->where('status', 'pending')
+                ->exists();
+
+            if ($alreadyPending) {
+                throw ValidationException::withMessages([
+                    'lot_id' => [
+                        'A sell request for this lot is already pending. You cannot sell this lot again until that request is completed or rejected.',
+                    ],
+                ]);
+            }
+        }
+
         $notes = null;
         if ($fromHoldings) {
             $parts = ['Holdings sell'];

@@ -117,11 +117,9 @@ class HoldingsController extends Controller
             'auto_approve_hours' => $result['auto_approve_hours'] ?? 2,
             'success' => [
                 'title' => 'Sell Requested',
-                'message' => 'Your holding sell request is pending admin approval. If not actioned within '
-                    .((int) ($result['auto_approve_hours'] ?? 2))
-                    .' hours it will auto-approve and payout at the live metal rate to your bank account.',
+                'message' => 'Sell request sent to Admin successfully',
             ],
-        ], 'Holding sell requested successfully.', 201);
+        ], 'Sell request sent to Admin successfully', 201);
     }
 
     public function claimBonus(Request $request, HoldingLotService $lots): JsonResponse

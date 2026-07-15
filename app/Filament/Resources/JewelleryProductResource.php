@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Filament\Resources\JewelleryProductResource\Pages;
 use App\Models\JewelleryProduct;
+use App\Models\JewelleryProductVariant;
 use App\Models\JewellerySubCategory;
 use App\Models\JewellerySubSubCategory;
 use App\Models\JewelleryCategory;
@@ -350,7 +351,9 @@ class JewelleryProductResource extends Resource
                     ->placeholder('—')
                     ->formatStateUsing(function ($state, JewelleryProduct $record): string {
                         if ($record->has_size_variants) {
-                            $count = $record->variants()->count();
+                            $count = $record->relationLoaded('variants')
+                                ? $record->variants->count()
+                                : $record->variants()->count();
 
                             return $count > 0 ? $count.' sizes' : 'Variants';
                         }
@@ -359,30 +362,125 @@ class JewelleryProductResource extends Resource
                     })
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('weight_grams')
+                    ->label('Weight Grams')
                     ->suffix(' g')
                     ->placeholder('—')
-                    ->formatStateUsing(function ($state, JewelleryProduct $record): string {
+                    ->getStateUsing(function (JewelleryProduct $record): ?string {
                         if ($record->has_size_variants) {
-                            return 'per size';
+                            $variant = static::firstVariant($record);
+
+                            return $variant?->weight_grams !== null
+                                ? number_format((float) $variant->weight_grams, 3, '.', '')
+                                : null;
                         }
 
-                        return $state !== null ? (string) $state : '—';
+                        return $record->weight_grams !== null
+                            ? number_format((float) $record->weight_grams, 3, '.', '')
+                            : null;
                     }),
-                Tables\Columns\TextColumn::make('price')->inr()->label('Total Price'),
+                Tables\Columns\TextColumn::make('price')
+                    ->label('Total Price')
+                    ->getStateUsing(function (JewelleryProduct $record): ?float {
+                        if ($record->has_size_variants) {
+                            $variant = static::firstVariant($record);
+
+                            return $variant?->price !== null ? (float) $variant->price : null;
+                        }
+
+                        return $record->price !== null ? (float) $record->price : null;
+                    })
+                    ->inr(),
                 Tables\Columns\TextColumn::make('making_charge_percent')
                     ->label('Making %')
                     ->suffix('%')
                     ->placeholder('—'),
                 Tables\Columns\IconColumn::make('is_active')->boolean()->label('App'),
             ])
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['variants' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')]))
             ->filters([
                 Tables\Filters\SelectFilter::make('metal_type')
+                    ->label('Metal Type')
                     ->options(['gold' => 'Gold', 'silver' => 'Silver']),
                 Tables\Filters\SelectFilter::make('jewellery_category_id')
                     ->label('Category')
-                    ->relationship('category', 'name'),
+                    ->relationship('category', 'name')
+                    ->searchable()
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('jewellery_sub_category_id')
+                    ->label('Sub Category')
+                    ->relationship('subCategory', 'name')
+                    ->searchable()
+                    ->preload(),
+                Tables\Filters\Filter::make('price')
+                    ->label('Price')
+                    ->form([
+                        Forms\Components\TextInput::make('min')
+                            ->label('Min Price')
+                            ->numeric()
+                            ->minValue(0)
+                            ->prefix('₹'),
+                        Forms\Components\TextInput::make('max')
+                            ->label('Max Price')
+                            ->numeric()
+                            ->minValue(0)
+                            ->prefix('₹'),
+                    ])
+                    ->columns(2)
+                    ->query(function (Builder $query, array $data): Builder {
+                        $min = isset($data['min']) && $data['min'] !== '' && $data['min'] !== null
+                            ? (float) $data['min']
+                            : null;
+                        $max = isset($data['max']) && $data['max'] !== '' && $data['max'] !== null
+                            ? (float) $data['max']
+                            : null;
+
+                        if ($min === null && $max === null) {
+                            return $query;
+                        }
+
+                        return $query->where(function (Builder $outer) use ($min, $max): void {
+                            $outer->where(function (Builder $q) use ($min, $max): void {
+                                $q->where(function (Builder $nonVariant) use ($min, $max): void {
+                                    $nonVariant->where(function (Builder $flag): void {
+                                        $flag->where('has_size_variants', false)
+                                            ->orWhereNull('has_size_variants');
+                                    });
+                                    if ($min !== null) {
+                                        $nonVariant->where('price', '>=', $min);
+                                    }
+                                    if ($max !== null) {
+                                        $nonVariant->where('price', '<=', $max);
+                                    }
+                                });
+                            })->orWhere(function (Builder $q) use ($min, $max): void {
+                                $q->where('has_size_variants', true)
+                                    ->whereHas('variants', function (Builder $variantQuery) use ($min, $max): void {
+                                        if ($min !== null) {
+                                            $variantQuery->where('price', '>=', $min);
+                                        }
+                                        if ($max !== null) {
+                                            $variantQuery->where('price', '<=', $max);
+                                        }
+                                    });
+                            });
+                        });
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+
+                        if (filled($data['min'] ?? null)) {
+                            $indicators[] = 'Min ₹'.number_format((float) $data['min'], 2);
+                        }
+
+                        if (filled($data['max'] ?? null)) {
+                            $indicators[] = 'Max ₹'.number_format((float) $data['max'], 2);
+                        }
+
+                        return $indicators;
+                    }),
                 Tables\Filters\TernaryFilter::make('is_active')->label('Active in App'),
-            ])
+            ], layout: Tables\Enums\FiltersLayout::AboveContent)
+            ->filtersFormColumns(4)
             ->actions([
                 FilamentTableActions::edit(),
                 FilamentTableActions::delete(),
@@ -390,6 +488,29 @@ class JewelleryProductResource extends Resource
             ->actionsColumnLabel('Actions')
             ->defaultSort('id', 'desc')
             ->reorderable('sort_order');
+    }
+
+    protected static function firstVariant(JewelleryProduct $record): ?JewelleryProductVariant
+    {
+        if ($record->relationLoaded('variants')) {
+            return $record->variants
+                ->sortBy([
+                    ['sort_order', 'asc'],
+                    ['id', 'asc'],
+                ])
+                ->first(fn ($variant) => (bool) $variant->is_active)
+                ?? $record->variants->sortBy([
+                    ['sort_order', 'asc'],
+                    ['id', 'asc'],
+                ])->first();
+        }
+
+        return $record->variants()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->first()
+            ?? $record->variants()->orderBy('sort_order')->orderBy('id')->first();
     }
 
     public static function getPages(): array
