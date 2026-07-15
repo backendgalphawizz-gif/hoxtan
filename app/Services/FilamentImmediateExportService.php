@@ -14,14 +14,16 @@ use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FilamentImmediateExportService
 {
     /**
-     * Build the export synchronously, then trigger download via a normal GET.
+     * Build the export synchronously and return a StreamedResponse so Livewire
+     * can deliver the file via its download effect (base64 in the same response).
      *
-     * Returning a StreamedResponse from Livewire leaves the page CSRF token stale,
-     * so the next export (or any Livewire action) gets "This page has expired".
+     * Do NOT trigger a separate authenticated GET download from JS — that races
+     * the Livewire session write and causes 419 "This page has expired".
      *
      * @param  list<int|string>|null  $selectedKeys
      */
@@ -30,31 +32,18 @@ class FilamentImmediateExportService
         string $exporterClass,
         string $format = 'csv',
         ?array $selectedKeys = null,
-    ): void {
+    ): StreamedResponse {
         $export = $this->buildExport($livewire, $exporterClass, $format, $selectedKeys);
 
-        $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
-
-        $url = route('filament.exports.download', [
-            'export' => $export,
-            'format' => $format,
-        ]);
-
-        // Separate GET download keeps the Livewire response valid (CSRF/session stay in sync).
-        $livewire->js('(() => {
-            const link = document.createElement("a");
-            link.href = '.json_encode($url).';
-            link.setAttribute("download", "");
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        })()');
+        $formatEnum = ExportFormat::tryFrom($format) ?? ExportFormat::Csv;
 
         Notification::make()
             ->title('Export ready')
             ->body('Your download should start shortly.')
             ->success()
             ->send();
+
+        return $formatEnum->getDownloader()($export);
     }
 
     /**
