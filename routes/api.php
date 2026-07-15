@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Driver\DriverNotificationController;
 use App\Http\Controllers\Api\Driver\DriverAppConfigController;
 use App\Http\Controllers\Api\Driver\DriverAuthController;
 use App\Http\Controllers\Api\Driver\DriverDeliveriesController;
@@ -109,6 +110,12 @@ Route::prefix('v1')->group(function (): void {
                 ->where('booking', '[A-Za-z0-9#_-]+');
             Route::post('/tasks/pickups/{booking}/unable-to-pickup', [DriverPickupController::class, 'markUnableToPickup'])
                 ->where('booking', '[A-Za-z0-9#_-]+');
+
+            Route::get('/notifications', [DriverNotificationController::class, 'index']);
+            Route::get('/notifications/unread-count', [DriverNotificationController::class, 'unreadCount']);
+            Route::post('/notifications/read-all', [DriverNotificationController::class, 'markAllRead']);
+            Route::post('/notifications/{notification}/read', [DriverNotificationController::class, 'markRead'])
+                ->whereNumber('notification');
         });
     });
 

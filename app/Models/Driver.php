@@ -136,4 +136,9 @@ class Driver extends Model
     {
         return $this->morphMany(DeviceToken::class, 'tokenable');
     }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(DriverNotification::class)->latest('id');
+    }
 }
