@@ -2,28 +2,29 @@
 
 namespace App\Services;
 
-use AnourValar\EloquentSerialize\Facades\EloquentSerializeFacade;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Jobs\CreateXlsxFile;
-use Filament\Actions\Exports\Jobs\PrepareCsvExport;
+use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
-use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use RuntimeException;
 
 class FilamentImmediateExportService
 {
     /**
-     * Build the export synchronously, then download in-browser via a Blob.
+     * Build the export file in-process (no Filament export jobs), then download
+     * via a signed GET URL outside Livewire.
      *
-     * Avoids:
-     * - Returning StreamedResponse from Livewire (stale CSRF / 419 Page Expired)
-     * - A second authenticated GET download (session race → 419 / expired tab)
+     * Filament's sync ExportCsv job calls auth()->login(), which regenerates the
+     * session/CSRF token mid-request and causes HTTP 419 Page Expired.
      *
      * @param  list<int|string>|null  $selectedKeys
      */
@@ -33,35 +34,23 @@ class FilamentImmediateExportService
         string $format = 'csv',
         ?array $selectedKeys = null,
     ): void {
+        if (! $livewire instanceof HasTable) {
+            throw new \InvalidArgumentException('Export requires a table view.');
+        }
+
         $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
-        $export = $this->buildExport($livewire, $exporterClass, $format, $selectedKeys);
+        $file = $this->writeExportFile($livewire, $exporterClass, $format, $selectedKeys);
 
-        $payload = $this->buildBrowserDownloadPayload($export, $format);
+        $url = URL::temporarySignedRoute(
+            'admin.exports.download',
+            now()->addMinutes(10),
+            [
+                'token' => $file['token'],
+            ],
+            absolute: false,
+        );
 
-        $livewire->js('(() => {
-            try {
-                const payload = '.json_encode($payload, JSON_THROW_ON_ERROR).';
-                const binary = atob(payload.content);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) {
-                    bytes[i] = binary.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: payload.mime });
-                const objectUrl = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = objectUrl;
-                link.download = payload.filename;
-                link.rel = "noopener";
-                link.style.display = "none";
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-            } catch (error) {
-                console.error("Export download failed", error);
-                window.alert("Export ready, but the browser could not start the download. Please try again.");
-            }
-        })()');
+        $livewire->js('window.setTimeout(() => { window.location.assign('.json_encode($url).'); }, 150);');
 
         Notification::make()
             ->title('Export ready')
@@ -71,130 +60,148 @@ class FilamentImmediateExportService
     }
 
     /**
-     * @return array{filename: string, mime: string, content: string}
-     */
-    protected function buildBrowserDownloadPayload(Export $export, string $format): array
-    {
-        $disk = $export->getFileDisk();
-        $directory = $export->getFileDirectory();
-
-        if (! $disk->exists($directory)) {
-            throw new RuntimeException('Export file directory was not created.');
-        }
-
-        if ($format === ExportFormat::Xlsx->value) {
-            $path = $directory.DIRECTORY_SEPARATOR.$export->file_name.'.xlsx';
-
-            if (! $disk->exists($path)) {
-                throw new RuntimeException('Excel export file was not created.');
-            }
-
-            return [
-                'filename' => $export->file_name.'.xlsx',
-                'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'content' => base64_encode($disk->get($path)),
-            ];
-        }
-
-        $csv = (string) $disk->get($directory.DIRECTORY_SEPARATOR.'headers.csv');
-
-        foreach ($disk->files($directory) as $file) {
-            if (str($file)->endsWith('headers.csv') || ! str($file)->endsWith('.csv')) {
-                continue;
-            }
-
-            $csv .= (string) $disk->get($file);
-        }
-
-        return [
-            'filename' => $export->file_name.'.csv',
-            'mime' => 'text/csv;charset=utf-8',
-            'content' => base64_encode($csv),
-        ];
-    }
-
-    /**
      * @param  list<int|string>|null  $selectedKeys
+     * @return array{token: string, filename: string, path: string}
      */
-    protected function buildExport(
-        Component $livewire,
+    protected function writeExportFile(
+        HasTable&Component $livewire,
         string $exporterClass,
         string $format,
-        ?array $selectedKeys = null,
-    ): Export {
-        if (! $livewire instanceof HasTable) {
-            throw new \InvalidArgumentException('Export requires a table view.');
-        }
-
-        $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
-
+        ?array $selectedKeys,
+    ): array {
+        /** @var class-string<Exporter> $exporterClass */
         $query = $exporterClass::modifyQuery($livewire->getTableQueryForExport());
 
-        $records = null;
-
         if ($selectedKeys !== null && $selectedKeys !== []) {
-            $selectedKeys = $this->normalizeSelectedKeys($selectedKeys);
-            $query = (clone $query)->whereKey($selectedKeys);
-            $records = $selectedKeys;
+            $query = (clone $query)->whereKey($this->normalizeSelectedKeys($selectedKeys));
         }
 
-        $columnMap = collect($exporterClass::getColumns())
+        $columns = $exporterClass::getColumns();
+        $columnMap = collect($columns)
             ->mapWithKeys(fn (ExportColumn $column): array => [$column->getName() => $column->getLabel()])
             ->all();
 
-        $export = app(Export::class);
-        $export->user()->associate(Filament::auth()->user());
-        $export->exporter = $exporterClass;
-        $export->total_rows = $records !== null ? count($records) : $query->count();
+        $headers = array_values($columnMap);
 
-        $exporter = $export->getExporter(
-            columnMap: $columnMap,
-            options: [],
-        );
-
-        $export->file_disk = $exporter->getFileDisk();
-        $export->save();
-        $export->file_name = $exporter->getFileName($export);
-        $export->save();
-
-        $serializedQuery = EloquentSerializeFacade::serialize($query);
-        $export->unsetRelation('user');
-
-        $chain = [
-            Bus::batch([
-                app(PrepareCsvExport::class, [
-                    'export' => $export,
-                    'query' => $serializedQuery,
-                    'columnMap' => $columnMap,
-                    'options' => [],
-                    'chunkSize' => 100,
-                    'records' => $records,
-                ]),
-            ])
-                ->onConnection('sync')
-                ->allowFailures(),
-        ];
-
-        if ($format === ExportFormat::Xlsx->value) {
-            $chain[] = app(CreateXlsxFile::class, [
-                'export' => $export,
-                'columnMap' => $columnMap,
-                'options' => [],
-            ]);
-        }
-
-        Bus::chain($chain)
-            ->onConnection('sync')
-            ->dispatch();
-
-        $export->refresh();
-        $export->update([
-            'completed_at' => now(),
-            'successful_rows' => $export->total_rows,
-            'processed_rows' => $export->total_rows,
+        // Unsaved Export is only used to instantiate the exporter for column formatting.
+        // Do NOT persist it or run Filament export jobs (those call auth()->login()).
+        $export = new Export([
+            'exporter' => $exporterClass,
+            'file_name' => Str::slug(class_basename($exporterClass)).'-'.now()->format('Ymd-His'),
+            'file_disk' => 'local',
+            'total_rows' => 0,
+            'processed_rows' => 0,
+            'successful_rows' => 0,
         ]);
 
-        return $export;
+        /** @var Exporter $exporter */
+        $exporter = $export->getExporter($columnMap, []);
+
+        foreach ($exporter->getCachedColumns() as $column) {
+            $column->applyRelationshipAggregates($query);
+            $column->applyEagerLoading($query);
+        }
+
+        $token = (string) Str::uuid();
+        $directory = 'admin-exports';
+        $extension = $format === ExportFormat::Xlsx->value ? 'xlsx' : 'csv';
+        $filename = $export->file_name.'.'.$extension;
+        $relativePath = $directory.'/'.$token.'.'.$extension;
+
+        Storage::disk('local')->makeDirectory($directory);
+
+        $absolutePath = Storage::disk('local')->path($relativePath);
+
+        if ($format === ExportFormat::Xlsx->value) {
+            $this->writeXlsx($absolutePath, $headers, $query, $exporter);
+        } else {
+            $this->writeCsv($absolutePath, $headers, $query, $exporter);
+        }
+
+        // Allow the download controller to resolve token → path for a short window.
+        cache()->put($this->cacheKey($token), [
+            'path' => $relativePath,
+            'filename' => $filename,
+            'disk' => 'local',
+        ], now()->addMinutes(15));
+
+        return [
+            'token' => $token,
+            'filename' => $filename,
+            'path' => $relativePath,
+        ];
+    }
+
+    protected function writeCsv(string $absolutePath, array $headers, $query, Exporter $exporter): void
+    {
+        $handle = fopen($absolutePath, 'wb');
+
+        if ($handle === false) {
+            throw new RuntimeException('Unable to create CSV export file.');
+        }
+
+        // UTF-8 BOM helps Excel open international characters correctly.
+        fwrite($handle, "\xEF\xBB\xBF");
+        fputcsv($handle, $headers);
+
+        $keyName = $query->getModel()->getKeyName();
+
+        $query->orderBy($keyName)->chunk(200, function ($records) use ($handle, $exporter): void {
+            foreach ($records as $record) {
+                fputcsv($handle, array_map(
+                    fn (mixed $value): string => $this->stringifyCell($value),
+                    $exporter($record),
+                ));
+            }
+        });
+
+        fclose($handle);
+    }
+
+    protected function writeXlsx(string $absolutePath, array $headers, $query, Exporter $exporter): void
+    {
+        $writer = new XlsxWriter;
+        $writer->openToFile($absolutePath);
+        $writer->addRow(Row::fromValues($headers));
+
+        $keyName = $query->getModel()->getKeyName();
+
+        $query->orderBy($keyName)->chunk(200, function ($records) use ($writer, $exporter): void {
+            foreach ($records as $record) {
+                $writer->addRow(Row::fromValues(array_map(
+                    fn (mixed $value): string => $this->stringifyCell($value),
+                    $exporter($record),
+                )));
+            }
+        });
+
+        $writer->close();
+    }
+
+    protected function stringifyCell(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        if (is_array($value)) {
+            return implode(', ', array_map(fn ($item) => $this->stringifyCell($item), $value));
+        }
+
+        return (string) $value;
+    }
+
+    public function cacheKey(string $token): string
+    {
+        return 'admin-export:'.$token;
     }
 
     /**
