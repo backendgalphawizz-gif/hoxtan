@@ -62,7 +62,7 @@ class FilamentExportActions
                     ->default('csv')
                     ->required(),
             ])
-            ->action(function (array $data, EloquentCollection $records, Component $livewire) use ($exporterClass) {
+            ->action(function (array $data, EloquentCollection $records, Component $livewire) use ($exporterClass): void {
                 if ($records->isEmpty()) {
                     Notification::make()
                         ->title('No records selected')
@@ -70,10 +70,10 @@ class FilamentExportActions
                         ->warning()
                         ->send();
 
-                    return null;
+                    return;
                 }
 
-                return app(FilamentImmediateExportService::class)->download(
+                app(FilamentImmediateExportService::class)->download(
                     $livewire,
                     $exporterClass,
                     $data['format'] ?? 'csv',
@@ -110,7 +110,7 @@ class FilamentExportActions
                     ->default('csv')
                     ->required(),
             ])
-            ->action(function (array $data, Component $livewire) use ($exporterClass, $requireSelection) {
+            ->action(function (array $data, Component $livewire) use ($exporterClass, $requireSelection): void {
                 $selectedKeys = $livewire instanceof HasTable
                     ? array_values($livewire->selectedTableRecords ?? [])
                     : [];
@@ -122,10 +122,10 @@ class FilamentExportActions
                         ->warning()
                         ->send();
 
-                    return null;
+                    return;
                 }
 
-                return app(FilamentImmediateExportService::class)->download(
+                app(FilamentImmediateExportService::class)->download(
                     $livewire,
                     $exporterClass,
                     $data['format'] ?? 'csv',

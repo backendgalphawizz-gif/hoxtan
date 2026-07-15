@@ -14,16 +14,15 @@ use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Component;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FilamentImmediateExportService
 {
     /**
-     * Build the export synchronously and return a StreamedResponse so Livewire
-     * can deliver the file via its download effect (base64 in the same response).
+     * Build the export synchronously, then trigger download via a normal GET.
      *
-     * Do NOT trigger a separate authenticated GET download from JS — that races
-     * the Livewire session write and causes 419 "This page has expired".
+     * Do not return a StreamedResponse from Livewire — that leaves the page CSRF
+     * token stale and shows "This page has expired" (419) on the next action,
+     * and can open an expired page in a new window.
      *
      * @param  list<int|string>|null  $selectedKeys
      */
@@ -32,18 +31,36 @@ class FilamentImmediateExportService
         string $exporterClass,
         string $format = 'csv',
         ?array $selectedKeys = null,
-    ): StreamedResponse {
+    ): void {
         $export = $this->buildExport($livewire, $exporterClass, $format, $selectedKeys);
 
-        $formatEnum = ExportFormat::tryFrom($format) ?? ExportFormat::Csv;
+        $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
+
+        $url = route('filament.exports.download', [
+            'export' => $export,
+            'format' => $format,
+        ], absolute: false);
+
+        // Delay slightly so the Livewire response can finish writing the session
+        // before the download GET uses the same cookie (avoids AuthenticateSession races).
+        $livewire->js('(() => {
+            const href = '.json_encode($url).';
+            window.setTimeout(() => {
+                const link = document.createElement("a");
+                link.href = href;
+                link.rel = "noopener";
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            }, 250);
+        })()');
 
         Notification::make()
             ->title('Export ready')
             ->body('Your download should start shortly.')
             ->success()
             ->send();
-
-        return $formatEnum->getDownloader()($export);
     }
 
     /**
