@@ -56,6 +56,11 @@ class JewelleryProduct extends Model
 
         static::saving(function (JewelleryProduct $product): void {
             if ($product->has_size_variants) {
+                // DB requires price; real amount comes from variants after save.
+                if ($product->price === null || $product->price === '') {
+                    $product->price = 0;
+                }
+
                 return;
             }
 

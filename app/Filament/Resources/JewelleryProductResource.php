@@ -312,7 +312,8 @@ class JewelleryProductResource extends Resource
                             ->prefix('₹')
                             ->disabled()
                             ->dehydrated()
-                            ->visible(fn (Get $get): bool => ! (bool) $get('has_size_variants'))
+                            ->default(0)
+                            ->hidden(fn (Get $get): bool => (bool) $get('has_size_variants'))
                             ->helperText('Metal value + making charge − discount on making charge.'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Show in App')

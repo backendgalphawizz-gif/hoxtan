@@ -36,6 +36,20 @@ class EditJewelleryProduct extends BaseEditRecord
         return $data;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (! empty($data['has_size_variants'])) {
+            $data['price'] = $data['price'] ?? 0;
+            $data['size'] = null;
+        }
+
+        return $data;
+    }
+
     protected function afterSave(): void
     {
         $this->syncVariants($this->record);
