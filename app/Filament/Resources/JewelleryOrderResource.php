@@ -566,9 +566,9 @@ class JewelleryOrderResource extends Resource
 
                                         if (! $doc['uploaded'] || blank($doc['url'])) {
                                             return <<<HTML
-                                                <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-                                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{$label}</p>
-                                                    <p class="text-sm text-gray-500">Not uploaded</p>
+                                                <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fff;">
+                                                    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151;">{$label}</p>
+                                                    <p style="margin:0;font-size:13px;color:#6b7280;">Not uploaded</p>
                                                 </div>
                                             HTML;
                                         }
@@ -576,16 +576,17 @@ class JewelleryOrderResource extends Resource
                                         $url = e($doc['url']);
 
                                         return <<<HTML
-                                            <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-                                                <p class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{$label}</p>
-                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" class="block">
+                                            <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fff;max-width:260px;">
+                                                <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151;">{$label}</p>
+                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;">
                                                     <img
                                                         src="{$url}"
                                                         alt="{$label}"
-                                                        class="h-40 w-full rounded-md object-cover border border-gray-100 dark:border-gray-600"
+                                                        loading="lazy"
+                                                        style="display:block;width:220px;height:140px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;background:#f3f4f6;"
                                                     />
                                                 </a>
-                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-xs text-primary-600 hover:underline">
+                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:8px;font-size:12px;color:#ea580c;text-decoration:underline;">
                                                     Open full image
                                                 </a>
                                             </div>
@@ -598,7 +599,7 @@ class JewelleryOrderResource extends Resource
                                 }
 
                                 return new HtmlString(
-                                    '<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">'.$cards.'</div>'
+                                    '<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">'.$cards.'</div>'
                                 );
                             })
                             ->columnSpanFull(),
