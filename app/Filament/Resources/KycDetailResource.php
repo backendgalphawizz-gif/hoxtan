@@ -63,16 +63,8 @@ class KycDetailResource extends Resource
 
                 Forms\Components\Section::make('Bank Details')
                     ->schema([
-                        Forms\Components\TextInput::make('account_holder_name')
-                            ->label('Account Holder Name')
-                            ->maxLength(100)
-                            ->regex(FilamentFormFields::NAME_REGEX)
-                            ->validationMessages([
-                                'regex' => 'Account holder name may only contain letters and spaces.',
-                            ]),
-                        Forms\Components\TextInput::make('bank_name')
-                            ->label('Bank Name')
-                            ->maxLength(100),
+                        FilamentFormFields::fullName('account_holder_name', 'Account Holder Name', false, 32),
+                        FilamentFormFields::name('bank_name', 'Bank Name', false, 100),
                         Forms\Components\TextInput::make('account_number')
                             ->label('A/C No')
                             ->maxLength(30)

@@ -11,6 +11,7 @@ use App\Models\JewellerySubSubCategory;
 use App\Models\User;
 use App\Services\JewelleryEmiService;
 use App\Support\ApiResponse;
+use App\Support\JewelleryOptions;
 use App\Support\JewelleryProductPayload;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -165,7 +166,7 @@ class JewelleryController extends Controller
             'title' => 'Filters',
             'search_placeholder' => config('jewellery.search_placeholder'),
             'genders' => config('jewellery.genders', []),
-            'purities' => config('jewellery.purities', []),
+            'purities' => JewelleryOptions::purities($metalType),
             'weight' => config('jewellery.weight', []),
             'budget' => config('jewellery.budget', []),
             'metal_type' => $metalType,

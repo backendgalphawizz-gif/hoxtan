@@ -41,10 +41,8 @@ class BlockedPincodeResource extends Resource
                 Forms\Components\Section::make('Pincode Details')
                     ->schema([
                         FilamentFormFields::pincode(required: true),
-                        Forms\Components\TextInput::make('city')
-                            ->maxLength(100),
-                        Forms\Components\TextInput::make('state')
-                            ->maxLength(100),
+                        FilamentFormFields::city(required: false),
+                        FilamentFormFields::state(required: false),
                         Forms\Components\TextInput::make('reason')
                             ->maxLength(255)
                             ->columnSpanFull(),

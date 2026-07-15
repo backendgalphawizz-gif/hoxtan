@@ -68,6 +68,7 @@ class AdminRoleSeeder extends Seeder
 
         $permissions['jewellery_orders']['create'] = false;
         $permissions['jewellery_orders']['delete'] = false;
+        $permissions['jewellery_orders']['export'] = true;
 
         $permissions['metal_withdrawals']['view'] = true;
         $permissions['metal_withdrawals']['edit'] = true;

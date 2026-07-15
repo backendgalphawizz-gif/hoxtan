@@ -87,9 +87,7 @@ class UserResource extends Resource
                     ->description('Nominee information for the user profile.')
                     ->schema([
                         FilamentFormFields::fullName('nominee_name', 'Nominee Name', false),
-                        Forms\Components\TextInput::make('nominee_relation')
-                            ->label('Relation')
-                            ->maxLength(50),
+                        FilamentFormFields::relation('nominee_relation', 'Relation', false),
                         FilamentFormFields::mobile('nominee_phone', 'Nominee Mobile', false),
                         Forms\Components\DatePicker::make('nominee_date_of_birth')
                             ->label('Nominee Date of Birth')
