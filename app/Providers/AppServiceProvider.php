@@ -7,6 +7,7 @@ use App\Models\Investment;
 use App\Observers\InvestmentObserver;
 use App\Policies\ExportPolicy;
 use App\Services\KycVerificationProvider\StubKycVerificationProvider;
+use App\Services\KycVerificationProvider\SurepassKycVerificationProvider;
 use App\Support\AssetUrl;
 use App\Support\FilamentAdminForm;
 use App\Support\FilamentFormat;
@@ -24,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(KycVerificationProvider::class, function (): KycVerificationProvider {
             return match (config('kyc.provider', 'stub')) {
+                'surepass' => new SurepassKycVerificationProvider,
                 default => new StubKycVerificationProvider,
             };
         });

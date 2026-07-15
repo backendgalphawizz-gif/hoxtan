@@ -3,6 +3,14 @@
 return [
     'provider' => env('KYC_PROVIDER', 'stub'),
 
+    'surepass' => [
+        'base_url' => env('SUREPASS_BASE_URL', 'https://kyc-api.surepass.app'),
+        'token' => env('SUREPASS_TOKEN', ''),
+        'pan_path' => env('SUREPASS_PAN_PATH', '/api/v1/pan/pan-comprehensive'),
+        'pan_id_field' => env('SUREPASS_PAN_ID_FIELD', 'id_number'),
+        'timeout' => (int) env('SUREPASS_TIMEOUT', 30),
+    ],
+
     'title' => 'Identity Vault',
 
     'steps' => [

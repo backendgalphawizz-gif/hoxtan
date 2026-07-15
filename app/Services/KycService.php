@@ -43,6 +43,12 @@ class KycService
         $this->assertPanFormat($panNumber);
 
         $providerResponse = $this->provider->sendPanOtp($panNumber, $user);
+
+        // Surepass (and similar) verify PAN directly — no OTP step.
+        if (($providerResponse['verified'] ?? false) === true) {
+            return $this->markPanVerified($user, $panNumber, $providerResponse);
+        }
+
         $otpPayload = $this->storeStepOtp($user, 'pan', $panNumber);
 
         $detail = $this->getOrCreateDetail($user);
@@ -52,6 +58,8 @@ class KycService
         ]);
 
         return array_merge($otpPayload, [
+            'otp_required' => true,
+            'verified' => false,
             'pan_number_masked' => KycPayload::maskPan($panNumber),
             'provider_reference' => $providerResponse['provider_reference'] ?? null,
             'provider_message' => $providerResponse['message'] ?? null,
@@ -61,10 +69,43 @@ class KycService
     /**
      * @return array<string, mixed>
      */
-    public function verifyPanOtp(User $user, string $panNumber, string $otp): array
+    public function verifyPanOtp(User $user, string $panNumber, ?string $otp = null): array
     {
         $this->assertKycEditable($user);
         $panNumber = strtoupper($panNumber);
+        $this->assertPanFormat($panNumber);
+
+        $detail = $this->getOrCreateDetail($user);
+
+        if ($detail->pan_verification_status === 'verified'
+            && strtoupper((string) $detail->pan_number) === $panNumber) {
+            return [
+                'message' => 'PAN already verified.',
+                'otp_required' => false,
+                'verified' => true,
+                'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
+            ];
+        }
+
+        // Direct provider verification path (Surepass): OTP optional.
+        if (config('kyc.provider') === 'surepass') {
+            $providerResponse = $this->provider->sendPanOtp($panNumber, $user);
+
+            if (($providerResponse['verified'] ?? false) !== true) {
+                throw ValidationException::withMessages([
+                    'pan_number' => ['PAN verification failed. Please try again.'],
+                ]);
+            }
+
+            return $this->markPanVerified($user, $panNumber, $providerResponse);
+        }
+
+        if (blank($otp)) {
+            throw ValidationException::withMessages([
+                'otp' => ['OTP is required.'],
+            ]);
+        }
+
         $this->verifyStepOtp($user, 'pan', $panNumber, $otp);
 
         if (! $this->provider->verifyPanOtp($panNumber, $otp, $user)) {
@@ -73,17 +114,47 @@ class KycService
             ]);
         }
 
+        return $this->markPanVerified($user, $panNumber, [
+            'message' => 'PAN verified successfully.',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $providerResponse
+     * @return array<string, mixed>
+     */
+    protected function markPanVerified(User $user, string $panNumber, array $providerResponse): array
+    {
         $detail = $this->getOrCreateDetail($user);
-        $detail->update([
+        $data = is_array($providerResponse['data'] ?? null) ? $providerResponse['data'] : [];
+        $fullName = $data['full_name'] ?? $data['name'] ?? null;
+
+        $updates = [
             'pan_number' => $panNumber,
             'pan_verification_status' => 'verified',
             'pan_verified_at' => now(),
-        ]);
+        ];
 
+        if (filled($fullName) && is_string($fullName)) {
+            $updates['full_name'] = $fullName;
+        }
+
+        $detail->update($updates);
         $this->syncUserKycStatus($user->fresh(), $detail->fresh());
 
         return [
-            'message' => 'PAN verified successfully.',
+            'message' => (string) ($providerResponse['message'] ?? 'PAN verified successfully.'),
+            'otp_required' => false,
+            'verified' => true,
+            'pan_number_masked' => KycPayload::maskPan($panNumber),
+            'provider_reference' => $providerResponse['provider_reference'] ?? null,
+            'provider_message' => $providerResponse['message'] ?? null,
+            'pan' => [
+                'full_name' => $fullName,
+                'aadhaar_linked' => $data['aadhaar_linked'] ?? null,
+                'category' => $data['category'] ?? null,
+                'dob' => $data['dob'] ?? $data['date_of_birth'] ?? null,
+            ],
             'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
         ];
     }
