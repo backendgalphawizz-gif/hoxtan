@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\InvoiceService;
 use App\Support\ApiResponse;
 use App\Support\AssetsBalancePayload;
+use App\Support\FilamentFormFields;
 use App\Support\MpinRules;
 use App\Support\ProfilePhotoStorage;
 use App\Support\UserProfilePayload;
@@ -67,6 +68,14 @@ class ProfileController extends Controller
             'nominee_relation' => ['nullable', 'string', 'max:50'],
             'nominee_phone' => ['nullable', 'string', 'regex:/^\d{10}$/'],
             'nominee_date_of_birth' => ['nullable', 'date', 'before:today'],
+            'account_holder_name' => ['required', 'string', 'max:100', 'regex:'.FilamentFormFields::NAME_REGEX],
+            'bank_name' => ['required', 'string', 'max:100'],
+            'account_number' => ['required', 'string', 'min:6', 'max:30', 'regex:/^\d+$/'],
+            'ifsc_code' => ['required', 'string', 'size:11', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'],
+        ], [
+            'account_holder_name.regex' => 'Account holder name may only contain letters and spaces.',
+            'account_number.regex' => 'Account number must contain digits only.',
+            'ifsc_code.regex' => 'Invalid IFSC code format.',
         ]);
 
         $updates = collect($data)->only([
@@ -102,13 +111,21 @@ class ProfileController extends Controller
             }
         }
 
-        if ($updates === []) {
-            throw ValidationException::withMessages([
-                'message' => ['No profile fields were provided to update.'],
-            ]);
-        }
+        $detail = $user->kycDetail()->firstOrCreate([]);
+        $detail->update([
+            'account_holder_name' => $data['account_holder_name'],
+            'bank_name' => $data['bank_name'],
+            'account_number' => $data['account_number'],
+            'ifsc_code' => strtoupper($data['ifsc_code']),
+            'bank_verification_status' => $detail->bank_verification_status === 'verified'
+                ? 'verified'
+                : 'pending',
+            'bank_submitted_at' => now(),
+        ]);
 
-        $user->update($updates);
+        if ($updates !== []) {
+            $user->update($updates);
+        }
 
         return ApiResponse::success([
             'user' => UserProfilePayload::make($user->fresh()),

@@ -48,6 +48,13 @@ class UserProfilePayload
                 'date_of_birth' => $user->nominee_date_of_birth?->toDateString(),
                 'date_of_birth_display' => $user->nominee_date_of_birth?->format('d/m/Y'),
             ],
+            'bank' => [
+                'account_holder_name' => $user->kycDetail?->account_holder_name,
+                'bank_name' => $user->kycDetail?->bank_name,
+                'account_number' => $user->kycDetail?->account_number,
+                'ifsc_code' => $user->kycDetail?->ifsc_code,
+                'verification_status' => $user->kycDetail?->bank_verification_status,
+            ],
         ];
     }
 

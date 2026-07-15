@@ -37,6 +37,37 @@ class KycDetailRelationManager extends RelationManager
                 FilamentFormFields::city(),
                 FilamentFormFields::state(),
                 FilamentFormFields::pincode(),
+                Forms\Components\Section::make('Bank Details')
+                    ->schema([
+                        Forms\Components\TextInput::make('account_holder_name')
+                            ->label('Account Holder Name')
+                            ->maxLength(100)
+                            ->regex(FilamentFormFields::NAME_REGEX)
+                            ->validationMessages([
+                                'regex' => 'Account holder name may only contain letters and spaces.',
+                            ]),
+                        Forms\Components\TextInput::make('bank_name')
+                            ->label('Bank Name')
+                            ->maxLength(100),
+                        Forms\Components\TextInput::make('account_number')
+                            ->label('A/C No')
+                            ->maxLength(30)
+                            ->regex('/^\d{9,18}$/')
+                            ->validationMessages([
+                                'regex' => 'Account number must be 9–18 digits.',
+                            ]),
+                        Forms\Components\TextInput::make('ifsc_code')
+                            ->label('IFSC Code')
+                            ->maxLength(11)
+                            ->minLength(11)
+                            ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? strtoupper($state) : null)
+                            ->regex('/^[A-Z]{4}0[A-Z0-9]{6}$/')
+                            ->validationMessages([
+                                'regex' => 'Invalid IFSC code format.',
+                            ]),
+                    ])
+                    ->columns(2)
+                    ->columnSpanFull(),
                 Forms\Components\FileUpload::make('pan_document')
                     ->image()
                     ->directory('kyc/pan'),
@@ -56,7 +87,8 @@ class KycDetailRelationManager extends RelationManager
                         'approved' => 'Approved',
                         'rejected' => 'Rejected',
                     ])
-                    ->required(),
+                    ->default('pending')
+                    ->nullable(),
                 Forms\Components\Textarea::make('face_verification_notes')
                     ->label('Face Verification Notes')
                     ->maxLength(500),
@@ -72,6 +104,12 @@ class KycDetailRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('full_name'),
                 Tables\Columns\TextColumn::make('pan_number'),
+                Tables\Columns\TextColumn::make('bank_name')
+                    ->label('Bank')
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('account_number')
+                    ->label('A/C No')
+                    ->toggleable(),
                 Tables\Columns\BadgeColumn::make('face_verification_status')
                     ->colors([
                         'warning' => 'pending',
@@ -86,6 +124,7 @@ class KycDetailRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()
                     ->mutateFormDataUsing(function (array $data) {
                         $data['submitted_at'] = now();
+                        $data['face_verification_status'] = $data['face_verification_status'] ?? 'pending';
 
                         return $data;
                     }),

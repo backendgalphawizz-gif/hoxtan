@@ -61,12 +61,20 @@ class ProfileApiTest extends TestCase
                 'phone' => '9876543211',
                 'date_of_birth' => '1992-08-20',
             ],
+            'account_holder_name' => 'Alexander Vance',
+            'bank_name' => 'HDFC Bank',
+            'account_number' => '123456789012',
+            'ifsc_code' => 'HDFC0001234',
         ]);
 
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.user.name', 'Alexander Vance')
-            ->assertJsonPath('data.user.nominee.name', 'Jane Vance');
+            ->assertJsonPath('data.user.nominee.name', 'Jane Vance')
+            ->assertJsonPath('data.user.bank.account_holder_name', 'Alexander Vance')
+            ->assertJsonPath('data.user.bank.bank_name', 'HDFC Bank')
+            ->assertJsonPath('data.user.bank.account_number', '123456789012')
+            ->assertJsonPath('data.user.bank.ifsc_code', 'HDFC0001234');
     }
 
     public function test_update_profile_photo_only(): void
@@ -111,6 +119,10 @@ class ProfileApiTest extends TestCase
 
         $response = $this->post('/api/v1/profile', [
             'image' => UploadedFile::fake()->image('avatar.jpg'),
+            'account_holder_name' => 'Alex Vance',
+            'bank_name' => 'HDFC Bank',
+            'account_number' => '123456789012',
+            'ifsc_code' => 'HDFC0001234',
         ], [
             'Accept' => 'application/json',
         ]);
@@ -141,6 +153,10 @@ class ProfileApiTest extends TestCase
 
         $response = $this->putJson('/api/v1/profile', [
             'image' => 'data:image/jpeg;base64,'.$image,
+            'account_holder_name' => 'Alex Vance',
+            'bank_name' => 'HDFC Bank',
+            'account_number' => '123456789012',
+            'ifsc_code' => 'HDFC0001234',
         ]);
 
         $response->assertOk()
