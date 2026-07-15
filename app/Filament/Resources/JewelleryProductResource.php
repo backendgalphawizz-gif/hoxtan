@@ -388,7 +388,7 @@ class JewelleryProductResource extends Resource
                 FilamentTableActions::delete(),
             ])
             ->actionsColumnLabel('Actions')
-            ->defaultSort('sort_order')
+            ->defaultSort('id', 'desc')
             ->reorderable('sort_order');
     }
 
