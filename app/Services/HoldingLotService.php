@@ -53,7 +53,12 @@ class HoldingLotService
                 'sell' => [
                     'endpoint' => '/api/v1/holdings/sell',
                     'method' => 'POST',
-                    'note' => 'Sell from a specific purchase lot using lot_id (not FIFO).',
+                    'payload_example' => [
+                        'weight_grams' => 50,
+                        'payment_method' => 'upi',
+                        'transaction_id' => 'TXN123',
+                    ],
+                    'note' => 'Sell by grams only (metal_type defaults to gold). Allowed after 48 hours from purchase. Admin/sub-admin can approve, or auto-approve after 2 hours at current rate to bank.',
                 ],
                 'purchase' => [
                     'endpoint' => '/api/v1/holdings/purchase',
@@ -111,80 +116,67 @@ class HoldingLotService
     }
 
     /**
-     * Sell a specific holding lot (not FIFO) via metal withdrawal request.
+     * Sell holdings by weight only.
+     * Eligible only after sell_after_hours (default 48h) from purchase.
+     * Creates admin withdrawal request; auto-approves after sell_auto_approve_hours (default 2h).
+     * On approve, payout uses the current metal rate.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     public function sell(User $user, array $data): array
     {
-        $metalType = strtolower((string) $data['metal_type']);
+        $metalType = strtolower((string) ($data['metal_type'] ?? 'gold'));
         if (! in_array($metalType, ['gold', 'silver'], true)) {
+            $metalType = 'gold';
+        }
+
+        $weightGrams = round((float) ($data['weight_grams'] ?? 0), 4);
+        if ($weightGrams <= 0) {
             throw ValidationException::withMessages([
-                'metal_type' => ['Metal type must be gold or silver.'],
+                'weight_grams' => ['Please enter weight in grams to sell.'],
             ]);
         }
 
-        $lotId = (int) ($data['lot_id'] ?? 0);
-        $lot = Investment::query()
+        $sellAfterHours = (int) config('holdings.sell_after_hours', 48);
+        $sellable = $this->holdings->sellableGrams($user->id, $metalType, $sellAfterHours);
+        $totalRemaining = round((float) Investment::query()
             ->where('user_id', $user->id)
-            ->whereKey($lotId)
+            ->where('metal_type', $metalType)
             ->where('type', 'buy')
             ->where('status', 'completed')
-            ->where('metal_type', $metalType)
-            ->first();
+            ->where('remaining_grams', '>', 0)
+            ->sum('remaining_grams'), 4);
+        $locked = max(0, round($totalRemaining - $sellable, 4));
 
-        if (! $lot) {
+        if ($weightGrams > $sellable + 0.00005) {
             throw ValidationException::withMessages([
-                'lot_id' => ['Holding lot not found for this metal type.'],
-            ]);
-        }
-
-        $lotRemaining = round((float) ($lot->remaining_grams ?? 0), 4);
-        if ($lotRemaining <= 0) {
-            throw ValidationException::withMessages([
-                'lot_id' => ['This holding lot has no remaining balance to sell.'],
-            ]);
-        }
-
-        // When selling by amount, estimate grams first then validate against this lot.
-        $payload = [
-            'asset_source' => $metalType,
-            'input_mode' => $data['input_mode'],
-            'amount' => $data['amount'] ?? null,
-            'weight_grams' => $data['weight_grams'] ?? null,
-            'source_lot_id' => $lot->id,
-        ];
-
-        // Pre-check weight against selected lot when weight mode.
-        if (($data['input_mode'] ?? '') === 'weight') {
-            $want = round((float) ($data['weight_grams'] ?? 0), 4);
-            if ($want > $lotRemaining + 0.00005) {
-                throw ValidationException::withMessages([
-                    'weight_grams' => [
-                        'Selected lot only has '.number_format($lotRemaining, 4).' g remaining.',
-                    ],
-                ]);
-            }
-        }
-
-        $result = $this->withdrawals->create($user, $payload);
-
-        // Currency mode: ensure estimated grams fit this lot.
-        $estimatedGrams = round((float) ($result['estimate']['weight_grams'] ?? 0), 4);
-        if ($estimatedGrams > $lotRemaining + 0.00005) {
-            // Cancel the pending withdrawal we just created — amount exceeds this lot.
-            $result['withdrawal']->update(['status' => 'cancelled']);
-            throw ValidationException::withMessages([
-                'amount' => [
-                    'Selected lot only has '.number_format($lotRemaining, 4).' g remaining (≈ ₹'
-                    .number_format($lotRemaining * (float) ($result['estimate']['rate_per_gram'] ?? 0), 2).').',
+                'weight_grams' => [
+                    $locked > 0
+                        ? 'You can sell only after '.$sellAfterHours.' hours from purchase. Sellable: '
+                            .number_format($sellable, 4).' g, locked: '.number_format($locked, 4).' g.'
+                        : 'Insufficient sellable holding balance. Available: '.number_format($sellable, 4).' g.',
                 ],
             ]);
         }
 
-        $result['lot'] = $this->lotPayload($lot->fresh());
+        $payload = [
+            'asset_source' => $metalType,
+            'input_mode' => 'weight',
+            'weight_grams' => $weightGrams,
+            'from_holdings' => true,
+            'payment_method' => $data['payment_method'] ?? null,
+            'transaction_id' => $data['transaction_id'] ?? null,
+            'holdings_sell_after_hours' => $sellAfterHours,
+            'holdings_auto_approve_hours' => (int) config('holdings.sell_auto_approve_hours', 2),
+        ];
+
+        $result = $this->withdrawals->create($user, $payload);
         $result['holding'] = $this->summary($user->fresh(), $metalType);
+        $result['sellable_grams'] = $sellable;
+        $result['locked_grams'] = $locked;
+        $result['sell_after_hours'] = $sellAfterHours;
+        $result['auto_approve_hours'] = (int) config('holdings.sell_auto_approve_hours', 2);
 
         return $result;
     }

@@ -139,4 +139,79 @@ class HoldingsLotApiTest extends TestCase
             'quantity_grams' => 0.05,
         ]);
     }
+
+    public function test_holdings_sell_requires_48_hours_and_accepts_weight_only_payload(): void
+    {
+        MetalRate::query()->create([
+            'metal_type' => 'gold',
+            'rate_per_gram' => 7000,
+            'currency' => 'INR',
+        ]);
+
+        $user = User::factory()->create([
+            'phone' => '9876501003',
+            'mpin' => '1234',
+            'gold_holdings' => 50,
+            'name' => 'Seller User',
+        ]);
+        Sanctum::actingAs($user);
+
+        \App\Models\KycDetail::query()->create([
+            'user_id' => $user->id,
+            'full_name' => 'Seller User',
+            'bank_name' => 'HDFC Bank',
+            'account_holder_name' => 'Seller User',
+            'account_number' => '12345678904521',
+            'ifsc_code' => 'HDFC0001234',
+        ]);
+
+        // Fresh purchase — locked for 48h.
+        Investment::query()->create([
+            'user_id' => $user->id,
+            'metal_type' => 'gold',
+            'type' => 'buy',
+            'quantity_grams' => 50,
+            'remaining_grams' => 50,
+            'rate_per_gram' => 7000,
+            'amount' => 350000,
+            'gst_amount' => 0,
+            'total_amount' => 350000,
+            'status' => 'completed',
+            'hold_started_at' => now()->subHours(10),
+            'purpose' => 'hold',
+        ]);
+
+        $locked = $this->postJson('/api/v1/holdings/sell', [
+            'weight_grams' => 50,
+            'payment_method' => 'upi',
+            'transaction_id' => 'TXN123',
+        ]);
+
+        $locked->assertStatus(422);
+        $payload = json_encode($locked->json());
+        $this->assertTrue(
+            data_get($locked->json(), 'errors.weight_grams') !== null || str_contains($payload, '48'),
+            'Expected 48h sell lock validation. Got: '.$payload
+        );
+
+        // Mature lot.
+        Investment::query()
+            ->where('user_id', $user->id)
+            ->update(['hold_started_at' => now()->subHours(49)]);
+
+        $this->postJson('/api/v1/holdings/sell', [
+            'weight_grams' => 50,
+            'payment_method' => 'upi',
+            'transaction_id' => 'TXN123',
+        ])->assertCreated()
+            ->assertJsonPath('data.auto_approve_hours', 2)
+            ->assertJsonPath('data.sell_after_hours', 48)
+            ->assertJsonPath('data.withdrawal.status', 'pending');
+
+        $this->assertDatabaseHas('metal_withdrawals', [
+            'user_id' => $user->id,
+            'quantity_grams' => 50,
+            'status' => 'pending',
+        ]);
+    }
 }

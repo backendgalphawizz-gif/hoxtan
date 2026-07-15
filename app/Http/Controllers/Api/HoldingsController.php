@@ -69,29 +69,41 @@ class HoldingsController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        if ($request->filled('Transaction_id') && ! $request->filled('transaction_id')) {
+            $request->merge([
+                'transaction_id' => $request->input('Transaction_id'),
+            ]);
+        }
+
         $data = $request->validate([
-            'lot_id' => ['required', 'integer', 'exists:investments,id'],
-            'metal_type' => ['required', Rule::in(['gold', 'silver'])],
-            'input_mode' => ['required', Rule::in(['currency', 'weight'])],
-            'amount' => ['required_if:input_mode,currency', 'nullable', 'numeric', 'min:'.config('withdraw.min_amount', 1000)],
+            'metal_type' => ['nullable', Rule::in(['gold', 'silver'])],
             'weight_grams' => [
-                'required_if:input_mode,weight',
-                'nullable',
+                'required',
                 'numeric',
                 'min:0.001',
+                'max:'.config('buy_metal.max_weight_grams', 10000),
             ],
+            'payment_method' => ['nullable', 'string', 'max:50'],
+            'transaction_id' => ['nullable', 'string', 'max:120'],
         ]);
+
+        $data['metal_type'] = $data['metal_type'] ?? 'gold';
 
         $result = $lots->sell($user, $data);
 
         return ApiResponse::success([
             'withdrawal' => app(\App\Services\MetalWithdrawalService::class)->withdrawalPayload($result['withdrawal']),
             'estimate' => $result['estimate'],
-            'lot' => $result['lot'] ?? null,
             'holding' => $result['holding'],
+            'sellable_grams' => $result['sellable_grams'] ?? null,
+            'locked_grams' => $result['locked_grams'] ?? null,
+            'sell_after_hours' => $result['sell_after_hours'] ?? 48,
+            'auto_approve_hours' => $result['auto_approve_hours'] ?? 2,
             'success' => [
                 'title' => 'Sell Requested',
-                'message' => 'Your holding sell request has been submitted for bank payout approval.',
+                'message' => 'Your holding sell request is pending admin approval. If not actioned within '
+                    .((int) ($result['auto_approve_hours'] ?? 2))
+                    .' hours it will auto-approve and payout at the live metal rate to your bank account.',
             ],
         ], 'Holding sell requested successfully.', 201);
     }

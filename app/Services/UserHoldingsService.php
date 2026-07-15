@@ -47,17 +47,48 @@ class UserHoldingsService
     }
 
     /**
-     * Reduce remaining_grams on a specific hold lot (no FIFO).
-     * When $lotId is null, reduces from each lot only if a single lot matches sell — otherwise requires lotId.
+     * Grams that can be sold (remaining lots older than $minAgeHours).
      */
-    public function consumeHoldLots(int $userId, string $metalType, float $grams, ?int $lotId = null): void
+    public function sellableGrams(int $userId, string $metalType, int $minAgeHours = 48): float
     {
+        $cutoff = now()->subHours(max(0, $minAgeHours));
+
+        $grams = Investment::query()
+            ->where('user_id', $userId)
+            ->where('metal_type', $metalType)
+            ->where('type', 'buy')
+            ->where('status', 'completed')
+            ->where('remaining_grams', '>', 0)
+            ->where(function ($q) use ($cutoff): void {
+                $q->where('hold_started_at', '<=', $cutoff)
+                    ->orWhere(function ($inner) use ($cutoff): void {
+                        $inner->whereNull('hold_started_at')
+                            ->where('created_at', '<=', $cutoff);
+                    });
+            })
+            ->sum('remaining_grams');
+
+        return max(0, round((float) $grams, 4));
+    }
+
+    /**
+     * Reduce remaining_grams on hold lots.
+     * - With $lotId: sell from that lot only.
+     * - Without $lotId: consume unlocked lots (age >= $minAgeHours) until grams covered.
+     */
+    public function consumeHoldLots(
+        int $userId,
+        string $metalType,
+        float $grams,
+        ?int $lotId = null,
+        ?int $minAgeHours = null,
+    ): void {
         $remaining = round($grams, 4);
         if ($remaining <= 0) {
             return;
         }
 
-        DB::transaction(function () use ($userId, $metalType, $lotId, &$remaining): void {
+        DB::transaction(function () use ($userId, $metalType, $lotId, $minAgeHours, &$remaining): void {
             $query = Investment::query()
                 ->where('user_id', $userId)
                 ->where('metal_type', $metalType)
@@ -68,6 +99,15 @@ class UserHoldingsService
 
             if ($lotId !== null) {
                 $query->whereKey($lotId);
+            } elseif ($minAgeHours !== null) {
+                $cutoff = now()->subHours(max(0, $minAgeHours));
+                $query->where(function ($q) use ($cutoff): void {
+                    $q->where('hold_started_at', '<=', $cutoff)
+                        ->orWhere(function ($inner) use ($cutoff): void {
+                            $inner->whereNull('hold_started_at')
+                                ->where('created_at', '<=', $cutoff);
+                        });
+                });
             }
 
             $lots = $query->orderBy('id')->get();
@@ -75,13 +115,6 @@ class UserHoldingsService
             if ($lotId !== null && $lots->isEmpty()) {
                 throw ValidationException::withMessages([
                     'lot_id' => ['Selected holding lot was not found or has no remaining balance.'],
-                ]);
-            }
-
-            // Without a lot id: only allow when exactly one matching lot exists.
-            if ($lotId === null && $lots->count() > 1) {
-                throw ValidationException::withMessages([
-                    'lot_id' => ['Please select which purchase lot to sell from.'],
                 ]);
             }
 
@@ -108,7 +141,7 @@ class UserHoldingsService
 
             if ($remaining > 0.00005) {
                 throw ValidationException::withMessages([
-                    'weight_grams' => ['Not enough remaining balance in the selected lot.'],
+                    'weight_grams' => ['Not enough sellable holding balance (after lock period).'],
                 ]);
             }
         });

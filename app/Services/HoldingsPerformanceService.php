@@ -52,11 +52,13 @@ class HoldingsPerformanceService
             ],
             'sell_endpoint' => '/api/v1/holdings/sell',
             'sell_payload_example' => [
-                'lot_id' => 12,
-                'metal_type' => 'gold',
-                'input_mode' => 'weight',
-                'weight_grams' => 2,
+                'weight_grams' => 50,
+                'payment_method' => 'upi',
+                'transaction_id' => 'TXN123',
             ],
+            'sell_after_hours' => (int) config('holdings.sell_after_hours', 48),
+            'sell_auto_approve_hours' => (int) config('holdings.sell_auto_approve_hours', 2),
+            'sell_after_message' => config('holdings.sell_after_message'),
         ];
     }
 
