@@ -11,6 +11,17 @@ class CreateUser extends BaseCreateRecord
 {
     protected static string $resource = UserResource::class;
 
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $data['role'] = 'user';
+        $data['kyc_status'] = $data['kyc_status'] ?? 'pending';
+        $data['is_verified'] = true;
+        $data['is_blocked'] = false;
+        $data['is_employee'] = false;
+
+        return $data;
+    }
+
     protected function handleRecordCreation(array $data): Model
     {
         $registration = app(UserRegistrationService::class);
@@ -23,10 +34,11 @@ class CreateUser extends BaseCreateRecord
         );
 
         $user->update([
-            'role' => $data['role'] ?? 'user',
+            'role' => 'user',
             'kyc_status' => $data['kyc_status'] ?? 'pending',
-            'is_verified' => $data['is_verified'] ?? true,
-            'is_blocked' => $data['is_blocked'] ?? false,
+            'is_verified' => true,
+            'is_blocked' => false,
+            'is_employee' => false,
             'nominee_name' => $data['nominee_name'] ?? null,
             'nominee_relation' => $data['nominee_relation'] ?? null,
             'nominee_phone' => $data['nominee_phone'] ?? null,

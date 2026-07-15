@@ -105,7 +105,9 @@ class UserResource extends Resource
                                 'investor' => 'Investor',
                             ])
                             ->required()
-                            ->default('user'),
+                            ->default('user')
+                            ->hiddenOn('create')
+                            ->dehydrated(),
                         Forms\Components\Select::make('kyc_status')
                             ->options([
                                 'pending' => 'Pending',
@@ -114,23 +116,32 @@ class UserResource extends Resource
                                 'approved' => 'Approved',
                                 'rejected' => 'Rejected',
                             ])
-                            ->required(),
+                            ->required()
+                            ->default('pending'),
                         Forms\Components\Toggle::make('is_verified')
-                            ->label('Account Verified'),
+                            ->label('Account Verified')
+                            ->hiddenOn('create')
+                            ->dehydrated(),
                         Forms\Components\Toggle::make('is_blocked')
                             ->label('Account Blocked')
-                            ->live(),
+                            ->live()
+                            ->hiddenOn('create')
+                            ->dehydrated(),
                         Forms\Components\Toggle::make('is_employee')
-                            ->label('Employee Account'),
+                            ->label('Employee Account')
+                            ->hiddenOn('create')
+                            ->dehydrated(),
                         Forms\Components\TextInput::make('employee_code')
                             ->label('Employee Code')
                             ->maxLength(32)
-                            ->visible(fn (Forms\Get $get) => $get('is_employee')),
+                            ->visible(fn (Forms\Get $get) => $get('is_employee'))
+                            ->hiddenOn('create'),
                         Forms\Components\Textarea::make('block_reason')
                             ->label('Block Reason')
                             ->visible(fn (Forms\Get $get) => $get('is_blocked'))
                             ->required(fn (Forms\Get $get) => $get('is_blocked'))
-                            ->maxLength(500),
+                            ->maxLength(500)
+                            ->hiddenOn('create'),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Holdings & Wallet')
