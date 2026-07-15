@@ -10,6 +10,7 @@ use App\Models\JewelleryOrder;
 use App\Models\JewelleryOrderListing;
 use App\Models\OldGoldBooking;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
 use App\Support\SellJewelleryPayload;
@@ -203,9 +204,7 @@ class JewelleryOrderResource extends Resource
                             ->label('Tracking Number')
                             ->maxLength(100)
                             ->disabled(fn (string $operation): bool => $operation === 'view'),
-                        Forms\Components\TextInput::make('courier_name')
-                            ->label('Courier Name')
-                            ->maxLength(100)
+                        FilamentFormFields::name('courier_name', 'Courier Name', false, 100)
                             ->disabled(fn (string $operation): bool => $operation === 'view'),
                         Forms\Components\DateTimePicker::make('dispatched_at')
                             ->label('Dispatched At')

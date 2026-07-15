@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\JewelleryOrderResource\Pages;
 
+use App\Filament\Exports\JewelleryOrderListingExporter;
 use App\Filament\Resources\JewelleryOrderResource;
 use App\Models\JewelleryOrderListing;
+use App\Support\FilamentExportActions;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -13,7 +15,9 @@ class ListJewelleryOrders extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            FilamentExportActions::headerExport(JewelleryOrderListingExporter::class, 'jewellery_orders'),
+        ];
     }
 
     protected function getTableQuery(): Builder

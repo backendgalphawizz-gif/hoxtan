@@ -83,7 +83,11 @@ abstract class MetalRateResource extends Resource
                     ->colors(['info' => 'live_sync', 'warning' => 'manual_override']),
                 Tables\Columns\IconColumn::make('is_active')->boolean(),
                 Tables\Columns\TextColumn::make('updatedBy.name')->label('Updated By'),
-                Tables\Columns\TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Created at')
+                    ->dateTime('d M Y, h:i A')
+                    ->timezone('Asia/Kolkata')
+                    ->sortable(),
             ])
             ->defaultSort('created_at', 'desc');
     }
