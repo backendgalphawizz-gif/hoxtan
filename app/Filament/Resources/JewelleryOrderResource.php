@@ -352,6 +352,7 @@ class JewelleryOrderResource extends Resource
                         ? static::getUrl('view-sell', ['record' => $record->source_id])
                         : static::getUrl('view', ['record' => $record->source_id])),
                 FilamentTableActions::edit()
+                    ->visible(fn (JewelleryOrderListing $record): bool => static::canEdit($record))
                     ->url(fn (JewelleryOrderListing $record): string => $record->isSell()
                         ? static::getUrl('edit-sell', ['record' => $record->source_id])
                         : static::getUrl('edit', ['record' => $record->source_id])),
@@ -359,7 +360,7 @@ class JewelleryOrderResource extends Resource
                     ->icon('heroicon-o-user-plus')
                     ->color('info')
                     ->tooltip('Assign Driver')
-                    ->visible(fn (JewelleryOrderListing $record): bool => ! in_array($record->status, ['completed', 'cancelled', 'failed'], true))
+                    ->visible(fn (JewelleryOrderListing $record): bool => static::canEdit($record))
                     ->form(fn (JewelleryOrderListing $record): array => [
                         ($record->isSell()
                             ? static::sellDriverAssignmentSelect($record->driver_id)
@@ -425,6 +426,24 @@ class JewelleryOrderResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        if (! parent::canEdit($record)) {
+            return false;
+        }
+
+        return ! static::isOrderLocked($record);
+    }
+
+    public static function isOrderLocked(mixed $record): bool
+    {
+        $status = is_object($record) && isset($record->status)
+            ? (string) $record->status
+            : null;
+
+        return in_array($status, ['completed', 'cancelled', 'failed'], true);
     }
 
     public static function getNavigationBadge(): ?string
