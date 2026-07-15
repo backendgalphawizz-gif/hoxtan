@@ -28,3 +28,6 @@ Schedule::command('jewellery:send-emi-reminders')
 
 // Metal cash withdrawals: auto-approve if admin does not act within SLA (default 2 hours).
 Schedule::command('withdrawals:auto-approve')->everyMinute();
+
+// Holdings: credit 1% anniversary bonus after 1 year hold (per purchase lot).
+Schedule::command('holdings:credit-anniversary-bonuses')->dailyAt('01:15');

@@ -19,7 +19,8 @@ return [
     'default_months' => 12,
 
     'hold_bonus_percent' => 1,
-    'hold_bonus_message' => 'If you continue to hold, you get 1% extra on your holdings.',
+    'hold_bonus_after_days' => 365,
+    'hold_bonus_message' => 'Hold for 1 year from purchase date and get 1% extra on that lot\'s current value. Each purchase is tracked separately.',
 
     'my_purchases' => [
         'label' => 'MY PURCHASES',

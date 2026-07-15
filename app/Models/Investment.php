@@ -14,11 +14,15 @@ class Investment extends Model
         'metal_type',
         'type',
         'quantity_grams',
+        'remaining_grams',
         'rate_per_gram',
         'amount',
         'gst_amount',
         'total_amount',
         'status',
+        'hold_started_at',
+        'hold_bonus_credited_at',
+        'purpose',
         'notes',
     ];
 
@@ -26,10 +30,13 @@ class Investment extends Model
     {
         return [
             'quantity_grams' => 'decimal:4',
+            'remaining_grams' => 'decimal:4',
             'rate_per_gram' => 'decimal:2',
             'amount' => 'decimal:2',
             'gst_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'hold_started_at' => 'datetime',
+            'hold_bonus_credited_at' => 'datetime',
         ];
     }
 

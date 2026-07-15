@@ -23,6 +23,7 @@ class MetalWithdrawal extends Model
         'ifsc_code',
         'sig_plan_id',
         'investment_id',
+        'source_lot_id',
         'admin_notes',
         'rejection_reason',
         'payout_reference',

@@ -28,11 +28,35 @@ class HoldingsPerformanceService
             'default_metal_type' => config('holdings.default_metal_type', 'gold'),
             'default_months' => (int) config('holdings.default_months', 12),
             'hold_bonus_percent' => (float) config('holdings.hold_bonus_percent', 1),
+            'hold_bonus_after_days' => (int) config('holdings.hold_bonus_after_days', 365),
             'hold_bonus_message' => config('holdings.hold_bonus_message'),
             'series' => config('holdings.series', []),
             'my_purchases' => config('holdings.my_purchases', []),
             'can_withdraw' => true,
             'withdraw_note' => config('withdraw.holding_period_message'),
+            'purchase_endpoint' => '/api/v1/holdings/purchase',
+            'purchase_payload_examples' => [
+                'default' => [
+                    'weight_grams' => 5,
+                    'amount' => 1000,
+                    'payment_method' => 'upi',
+                    'transaction_id' => 'TXN123',
+                ],
+                'with_metal_type' => [
+                    'metal_type' => 'silver',
+                    'weight_grams' => 50,
+                    'amount' => 5000,
+                    'payment_method' => 'upi',
+                    'transaction_id' => 'TXN123',
+                ],
+            ],
+            'sell_endpoint' => '/api/v1/holdings/sell',
+            'sell_payload_example' => [
+                'lot_id' => 12,
+                'metal_type' => 'gold',
+                'input_mode' => 'weight',
+                'weight_grams' => 2,
+            ],
         ];
     }
 
@@ -105,6 +129,7 @@ class HoldingsPerformanceService
             'metal_type' => $metalType,
             'months' => $months,
             'hold_bonus_percent' => (float) config('holdings.hold_bonus_percent', 1),
+            'hold_bonus_after_days' => (int) config('holdings.hold_bonus_after_days', 365),
             'hold_bonus_message' => config('holdings.hold_bonus_message'),
             'withdraw_note' => config('withdraw.holding_period_message'),
             'series' => config('holdings.series', []),

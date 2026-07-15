@@ -33,32 +33,80 @@ class MetalPurchaseService
     /**
      * Simple buy insert (no Razorpay) — creates completed investment and credits holdings.
      * When request includes weight_grams, that exact value is stored (not recalculated from amount).
+     * When client_calculated=true (holdings mobile), both grams and amount are trusted as-is.
      *
      * @param  array{
      *     metal_type: string,
-     *     input_mode: string,
+     *     input_mode?: string,
      *     amount?: float,
      *     weight_grams?: float,
      *     payment_method?: string,
-     *     transaction_id?: string|null
+     *     transaction_id?: string|null,
+     *     client_calculated?: bool
      * }  $data
      * @return array<string, mixed>
      */
     public function purchase(User $user, array $data): array
     {
+        $data['metal_type'] = strtolower((string) ($data['metal_type'] ?? 'gold'));
+        if (! in_array($data['metal_type'], ['gold', 'silver'], true)) {
+            $data['metal_type'] = 'gold';
+        }
+
+        $clientCalculated = (bool) ($data['client_calculated'] ?? false);
         $requestGrams = isset($data['weight_grams']) && (float) $data['weight_grams'] > 0
             ? round((float) $data['weight_grams'], 4)
             : null;
+        $requestAmount = isset($data['amount']) && (float) $data['amount'] > 0
+            ? round((float) $data['amount'], 2)
+            : null;
 
-        // If client already sent grams, estimate from weight so we don't convert amount → grams.
-        // Amount (if any) is still applied below for payment / GST.
-        if ($requestGrams !== null) {
+        // Mobile already converted gram ↔ rupee — store both values exactly.
+        if ($clientCalculated && $requestGrams !== null && $requestAmount !== null) {
+            $rate = round($requestAmount / $requestGrams, 2);
+            $liveRate = (float) $this->metalRates->getCurrentRatePerGram($data['metal_type']);
+            if ($rate <= 0 && $liveRate > 0) {
+                $rate = round($liveRate, 2);
+            }
+
+            $estimate = $this->withUserContext($user, $this->buildEstimate(
+                metalType: $data['metal_type'],
+                inputMode: 'weight',
+                rate: $rate > 0 ? $rate : $liveRate,
+                weightGrams: $requestGrams,
+                taxableAmount: $requestAmount,
+                gstAmount: 0,
+                totalAmount: $requestAmount,
+                gstIncluded: true,
+                gstPercent: $this->gst->ratePercent(),
+            ));
+            $estimate['input_mode'] = 'weight';
+            $estimate['weight_grams'] = $requestGrams;
+            $estimate['weight_grams_display'] = rtrim(rtrim(number_format($requestGrams, 4, '.', ''), '0'), '.');
+            $estimate['amount'] = $requestAmount;
+            $estimate['taxable_amount'] = $requestAmount;
+            $estimate['gst_amount'] = 0.0;
+            $estimate['total_amount'] = $requestAmount;
+            $estimate['amount_with_gst'] = $requestAmount;
+            $estimate['amount_display'] = '₹'.number_format($requestAmount, 2);
+            $estimate['total_amount_display'] = '₹'.number_format($requestAmount, 2);
+            $estimate['amount_with_gst_display'] = '₹'.number_format($requestAmount, 2);
+            $estimate['rate_per_gram'] = $rate > 0 ? $rate : $liveRate;
+            $estimate['client_calculated'] = true;
+            $estimate['estimated_asset_quantity'] = [
+                'value' => $requestGrams,
+                'unit' => 'grams',
+                'label' => 'GRAMS OF '.ucfirst($data['metal_type']),
+                'display' => $estimate['weight_grams_display'],
+            ];
+            $grams = $requestGrams;
+        } elseif ($requestGrams !== null) {
             $estimate = $this->estimateFromWeight($data['metal_type'], $requestGrams);
             $estimate = $this->withUserContext($user, $estimate);
-            $estimate['input_mode'] = $data['input_mode'];
+            $estimate['input_mode'] = $data['input_mode'] ?? 'weight';
 
-            if (isset($data['amount']) && (float) $data['amount'] > 0) {
-                $amount = round((float) $data['amount'], 2);
+            if ($requestAmount !== null) {
+                $amount = $requestAmount;
                 $gstIncluded = (bool) config('buy_metal.gst_included_for_currency_mode', false);
 
                 if ($gstIncluded) {
@@ -96,8 +144,8 @@ class MetalPurchaseService
             $estimate = $this->estimate(
                 $user,
                 $data['metal_type'],
-                $data['input_mode'],
-                isset($data['amount']) ? (float) $data['amount'] : null,
+                $data['input_mode'] ?? 'currency',
+                $requestAmount,
                 null,
             );
             $grams = round((float) ($estimate['weight_grams'] ?? 0), 4);
@@ -119,7 +167,7 @@ class MetalPurchaseService
             ]);
         }
 
-        $result = DB::transaction(function () use ($user, $estimate, $data, $grams): array {
+        $result = DB::transaction(function () use ($user, $estimate, $data, $grams, $clientCalculated): array {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
 
             $investmentData = [
@@ -127,12 +175,17 @@ class MetalPurchaseService
                 'metal_type' => $estimate['metal_type'],
                 'type' => 'buy',
                 'quantity_grams' => $grams, // exact request grams when provided
+                'remaining_grams' => $grams,
                 'rate_per_gram' => $estimate['rate_per_gram'],
                 'amount' => $estimate['taxable_amount'],
                 'gst_amount' => $estimate['gst_amount'],
                 'total_amount' => $estimate['total_amount'],
                 'status' => 'completed',
-                'notes' => 'Mobile buy metal (direct insert, '.$estimate['input_mode'].')',
+                'hold_started_at' => now(),
+                'purpose' => 'hold',
+                'notes' => $clientCalculated
+                    ? 'Holdings purchase (mobile-calculated)'
+                    : 'Mobile buy metal (direct insert, '.$estimate['input_mode'].')',
             ];
 
             if (! empty($data['transaction_id'])) {

@@ -201,8 +201,9 @@ class MetalWithdrawalService
         }
 
         $hours = max(0, (int) config('withdraw.auto_approve_hours', 2));
+        $sourceLotId = isset($data['source_lot_id']) ? (int) $data['source_lot_id'] : null;
 
-        $withdrawal = DB::transaction(function () use ($user, $assetSource, $estimate, $bank, $hours, $data): MetalWithdrawal {
+        $withdrawal = DB::transaction(function () use ($user, $assetSource, $estimate, $bank, $hours, $data, $sourceLotId): MetalWithdrawal {
             $sigPlanId = null;
             if ($assetSource === 'sig') {
                 $sigPlanId = $this->activeSigPlan($user)?->id;
@@ -222,6 +223,7 @@ class MetalWithdrawalService
                 'account_number' => $bank['account_number'],
                 'ifsc_code' => $bank['ifsc_code'],
                 'sig_plan_id' => $sigPlanId,
+                'source_lot_id' => $sourceLotId,
                 'requested_at' => now(),
                 'auto_approve_at' => $hours > 0 ? now()->addHours($hours) : null,
             ]);
@@ -316,6 +318,12 @@ class MetalWithdrawalService
                     'notes' => 'Metal withdrawal '.$withdrawal->reference_id.($auto ? ' (auto-approved)' : ''),
                 ]);
 
+                $this->holdings->consumeHoldLots(
+                    (int) $user->id,
+                    (string) $withdrawal->metal_type,
+                    (float) $withdrawal->quantity_grams,
+                    $withdrawal->source_lot_id ? (int) $withdrawal->source_lot_id : null,
+                );
                 $this->holdings->recalculateForUser($user->id);
             }
 
