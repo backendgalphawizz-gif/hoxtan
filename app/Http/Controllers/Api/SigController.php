@@ -223,9 +223,12 @@ class SigController extends Controller
                 'asset_source' => 'sig',
                 'endpoint' => '/api/v1/withdraw',
                 'method' => 'POST',
+                'payload_example' => [
+                    'amount' => 1400,
+                ],
                 'auto_approve_hours' => (int) config('withdraw.auto_approve_hours', 2),
                 'message' => $canWithdraw
-                    ? 'SIG stopped. You can now request withdrawal of your remaining SIG balance. Request appears in admin and auto-approves after 2 hours to your registered bank account.'
+                    ? 'SIG stopped. Send only amount to withdraw from SIG. Request goes to admin and auto-approves after 2 hours to your bank.'
                     : 'SIG stopped. There is no remaining SIG balance to withdraw.',
             ],
         ], 'SIG stopped.');

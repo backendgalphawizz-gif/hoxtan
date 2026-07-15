@@ -322,14 +322,15 @@ class JewelleryOrderResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('listing_type')
-                    ->label('Type')
+                    ->label('Order Type')
                     ->options([
                         'buy' => 'Buy',
                         'sell' => 'Sell',
                     ]),
                 Tables\Filters\SelectFilter::make('status')
+                    ->label('Status')
                     ->options([
-                        'pending' => 'Pending',
+                        'pending' => 'Pending / Pending for Acceptance',
                         'processing' => 'Processing',
                         'accepted' => 'Accepted',
                         'pickup_scheduling' => 'Pickup Scheduling',
@@ -338,13 +339,14 @@ class JewelleryOrderResource extends Resource
                         'failed' => 'Failed',
                         'cancelled' => 'Cancelled',
                     ]),
+                FilamentDateFilters::tableFilter('ordered_date', 'created_at', 'Order Date'),
                 Tables\Filters\SelectFilter::make('driver_id')
                     ->label('Driver')
                     ->relationship('driver', 'name')
                     ->searchable()
                     ->preload(),
-                FilamentDateFilters::tableFilter('ordered_date', 'created_at', 'Order Date'),
-            ])
+            ], layout: Tables\Enums\FiltersLayout::AboveContent)
+            ->filtersFormColumns(4)
             ->actions([
                 FilamentTableActions::view()
                     ->url(fn (JewelleryOrderListing $record): string => $record->isSell()

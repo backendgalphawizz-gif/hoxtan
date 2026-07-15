@@ -155,9 +155,7 @@ class SigApiTest extends TestCase
         ]);
 
         $create = $this->postJson('/api/v1/withdraw', [
-            'asset_source' => 'sig',
-            'input_mode' => 'weight',
-            'weight_grams' => 0.2,
+            'amount' => 1400,
         ]);
 
         $create->assertCreated()

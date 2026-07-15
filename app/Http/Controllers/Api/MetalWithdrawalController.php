@@ -119,6 +119,28 @@ class MetalWithdrawalController extends Controller
      */
     protected function validatedCreateRequest(Request $request): array
     {
+        // SIG shortcut — body can be only { "amount": 1400 }
+        if (
+            $request->filled('amount')
+            && ! $request->filled('input_mode')
+            && ! $request->filled('weight_grams')
+            && (
+                ! $request->filled('asset_source')
+                || $request->input('asset_source') === 'sig'
+            )
+        ) {
+            $data = $request->validate([
+                'amount' => ['required', 'numeric', 'min:'.config('withdraw.min_amount', 1000)],
+                'asset_source' => ['nullable', Rule::in(['sig'])],
+            ]);
+
+            return [
+                'asset_source' => 'sig',
+                'input_mode' => 'currency',
+                'amount' => (float) $data['amount'],
+            ];
+        }
+
         return $this->validatedEstimateRequest($request);
     }
 }

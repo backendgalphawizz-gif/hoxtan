@@ -74,10 +74,11 @@ return [
             'label' => 'Withdraw SIG',
             'description' => 'Request payout of remaining SIG metal to your registered bank account.',
             'endpoint' => 'POST /api/v1/withdraw',
+            'payload_example' => ['amount' => 1400],
             'available_when' => ['stopped'],
             'modal' => [
                 'title' => 'Withdraw SIG?',
-                'message' => 'Your withdrawal request will be sent to admin. If not actioned within 2 hours it will auto-approve and credit your bank account.',
+                'message' => 'Enter amount only. Request goes to admin and auto-approves after 2 hours to your bank account.',
                 'confirm_label' => 'Request Withdrawal',
             ],
         ],
