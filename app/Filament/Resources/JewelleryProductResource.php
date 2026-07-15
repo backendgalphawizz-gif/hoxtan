@@ -181,6 +181,10 @@ class JewelleryProductResource extends Resource
                             ->collapsible()
                             ->reorderable()
                             ->orderColumn('sort_order')
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, Get $get): void {
+                                static::syncVariantPrices($set, $get);
+                            })
                             ->schema([
                                 Forms\Components\Select::make('size')
                                     ->label('Size')
@@ -196,24 +200,25 @@ class JewelleryProductResource extends Resource
                                     ->suffix('g')
                                     ->required()
                                     ->minValue(0.001)
-                                    ->live(debounce: 400)
+                                    ->live(debounce: 300)
                                     ->afterStateUpdated(function (Set $set, Get $get): void {
-                                        $pricing = JewelleryPricing::calculate(
-                                            $get('../metal_type'),
-                                            $get('weight_grams'),
-                                            $get('../making_charge_percent'),
-                                            $get('../discount_type'),
-                                            $get('../discount_value'),
-                                        );
-                                        $set('price', $pricing['total']);
+                                        $set('price', static::variantPriceForItem($get));
                                     }),
-                                Forms\Components\TextInput::make('price')
+                                Forms\Components\Placeholder::make('price_display')
                                     ->label('Price')
-                                    ->prefix('₹')
-                                    ->numeric()
-                                    ->disabled()
+                                    ->content(function (Get $get): HtmlString {
+                                        $total = static::variantPriceForItem($get);
+
+                                        return new HtmlString(
+                                            '<div class="text-sm font-semibold text-gray-900 dark:text-gray-100">'
+                                            .e(FilamentFormat::inr($total))
+                                            .'</div>'
+                                        );
+                                    }),
+                                Forms\Components\Hidden::make('price')
+                                    ->default(0)
                                     ->dehydrated()
-                                    ->default(0),
+                                    ->dehydrateStateUsing(fn ($state, Get $get) => static::variantPriceForItem($get)),
                                 Forms\Components\Toggle::make('is_active')
                                     ->label('Active')
                                     ->default(true)
@@ -459,6 +464,35 @@ class JewelleryProductResource extends Resource
         }
 
         $set('variants', $variants);
+    }
+
+    /**
+     * Resolve parent form values from inside a repeater item (Filament nesting varies).
+     */
+    protected static function rootFormValue(Get $get, string $key): mixed
+    {
+        foreach ([$key, '../'.$key, '../../'.$key, '../../../'.$key] as $path) {
+            $value = $get($path);
+
+            if ($value !== null && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    protected static function variantPriceForItem(Get $get): float
+    {
+        $pricing = JewelleryPricing::calculate(
+            static::rootFormValue($get, 'metal_type'),
+            $get('weight_grams'),
+            static::rootFormValue($get, 'making_charge_percent'),
+            static::rootFormValue($get, 'discount_type'),
+            static::rootFormValue($get, 'discount_value'),
+        );
+
+        return (float) $pricing['total'];
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Investment;
 use App\Models\JewelleryOrder;
+use App\Models\MetalWithdrawal;
 use App\Models\OldGoldBooking;
 use App\Models\Redemption;
 use App\Models\SigInstallment;
@@ -154,6 +155,43 @@ class AccountTransactionPayload
             meta: [
                 'booking_id' => $booking->id,
                 'booking_number_display' => '#'.$booking->booking_number,
+            ],
+        );
+    }
+
+    public static function fromHoldingsSell(MetalWithdrawal $withdrawal): array
+    {
+        $metal = ucfirst((string) $withdrawal->metal_type);
+        $statusLabels = [
+            'pending' => 'Pending',
+            'approved' => 'Approved',
+            'paid' => 'Paid',
+            'rejected' => 'Rejected',
+            'cancelled' => 'Cancelled',
+        ];
+
+        return self::base(
+            id: 'holdings_sell:'.$withdrawal->id,
+            sourceType: 'holdings_sell',
+            category: 'sell',
+            referenceId: $withdrawal->reference_id,
+            title: $metal.' Holdings Sell',
+            subtitle: 'Digital '.$withdrawal->metal_type.' holdings sell',
+            amount: (float) $withdrawal->amount,
+            direction: 'credit',
+            status: (string) $withdrawal->status,
+            statusLabel: $statusLabels[$withdrawal->status] ?? Str::headline((string) $withdrawal->status),
+            occurredAt: $withdrawal->requested_at ?? $withdrawal->created_at,
+            metalType: $withdrawal->metal_type,
+            quantityGrams: $withdrawal->quantity_grams !== null ? (float) $withdrawal->quantity_grams : null,
+            meta: [
+                'withdrawal_id' => $withdrawal->id,
+                'source_lot_id' => $withdrawal->source_lot_id,
+                'from_holdings' => true,
+                'rate_per_gram' => $withdrawal->rate_per_gram !== null ? (float) $withdrawal->rate_per_gram : null,
+                'investment_id' => $withdrawal->investment_id,
+                'auto_approve_at' => $withdrawal->auto_approve_at?->toIso8601String(),
+                'payout_reference' => $withdrawal->payout_reference,
             ],
         );
     }

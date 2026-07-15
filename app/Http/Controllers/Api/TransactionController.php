@@ -25,7 +25,7 @@ class TransactionController extends Controller
     {
         $data = $request->validate([
             'filter' => ['nullable', 'string', Rule::in([
-                'all', 'buy', 'sell', 'wallet', 'sig', 'jewellery', 'redemption', 'gold', 'silver',
+                'all', 'buy', 'sell', 'holdings', 'wallet', 'sig', 'jewellery', 'redemption', 'gold', 'silver',
             ])],
             'metal_type' => ['nullable', 'string', Rule::in(['gold', 'silver'])],
             'page' => ['nullable', 'integer', 'min:1'],

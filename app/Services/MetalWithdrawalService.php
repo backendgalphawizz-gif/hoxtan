@@ -220,7 +220,7 @@ class MetalWithdrawalService
             $notes = implode(' | ', $parts);
         }
 
-        $withdrawal = DB::transaction(function () use ($user, $assetSource, $estimate, $bank, $hours, $data, $sourceLotId, $notes): MetalWithdrawal {
+        $withdrawal = DB::transaction(function () use ($user, $assetSource, $estimate, $bank, $hours, $data, $sourceLotId, $notes, $fromHoldings): MetalWithdrawal {
             $sigPlanId = null;
             if ($assetSource === 'sig') {
                 $sigPlanId = $this->activeSigPlan($user)?->id;
@@ -241,6 +241,7 @@ class MetalWithdrawalService
                 'ifsc_code' => $bank['ifsc_code'],
                 'sig_plan_id' => $sigPlanId,
                 'source_lot_id' => $sourceLotId,
+                'from_holdings' => $fromHoldings,
                 'admin_notes' => $notes,
                 'requested_at' => now(),
                 'auto_approve_at' => $hours > 0 ? now()->addHours($hours) : null,
@@ -452,6 +453,9 @@ class MetalWithdrawalService
             'paid_at' => $withdrawal->paid_at?->toIso8601String(),
             'payout_reference' => $withdrawal->payout_reference,
             'rejection_reason' => $withdrawal->rejection_reason,
+            'from_holdings' => (bool) $withdrawal->from_holdings,
+            'source_lot_id' => $withdrawal->source_lot_id,
+            'investment_id' => $withdrawal->investment_id,
         ];
     }
 

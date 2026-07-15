@@ -52,6 +52,7 @@ return [
         ['value' => 'all', 'label' => 'All'],
         ['value' => 'buy', 'label' => 'Buy'],
         ['value' => 'sell', 'label' => 'Sell'],
+        ['value' => 'holdings', 'label' => 'Holdings Sell'],
         ['value' => 'wallet', 'label' => 'Wallet'],
         ['value' => 'sig', 'label' => 'SIG'],
         ['value' => 'jewellery', 'label' => 'Jewellery'],

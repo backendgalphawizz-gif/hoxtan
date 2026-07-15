@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Investment;
 use App\Models\JewelleryOrder;
+use App\Models\MetalWithdrawal;
 use App\Models\OldGoldBooking;
 use App\Models\Redemption;
 use App\Models\SigInstallment;
@@ -79,6 +80,7 @@ class AccountActivityService
             'jewellery_order' => $this->findJewelleryOrder($user, $sourceId),
             'old_gold' => $this->findOldGold($user, $sourceId),
             'redemption' => $this->findRedemption($user, $sourceId),
+            'holdings_sell' => $this->findHoldingsSell($user, $sourceId),
             default => null,
         };
     }
@@ -91,6 +93,13 @@ class AccountActivityService
         $items = collect();
 
         if ($this->includesFilter($filter, ['all', 'buy', 'sell'])) {
+            $linkedSellInvestmentIds = MetalWithdrawal::query()
+                ->where('user_id', $user->id)
+                ->where('from_holdings', true)
+                ->whereNotNull('investment_id')
+                ->pluck('investment_id')
+                ->all();
+
             $investments = $user->investments()
                 ->with('holdingCertificate')
                 ->latest('id')
@@ -98,6 +107,11 @@ class AccountActivityService
                 ->get();
 
             foreach ($investments as $investment) {
+                // Avoid duplicating holdings sells (shown via holdings_sell source).
+                if ($investment->type === 'sell' && in_array($investment->id, $linkedSellInvestmentIds, true)) {
+                    continue;
+                }
+
                 $payload = AccountTransactionPayload::fromInvestment($investment);
 
                 if ($filter === 'buy' && $payload['category'] !== 'buy') {
@@ -110,6 +124,21 @@ class AccountActivityService
 
                 $items->push($payload);
             }
+        }
+
+        if ($this->includesFilter($filter, ['all', 'sell', 'holdings'])) {
+            MetalWithdrawal::query()
+                ->where('user_id', $user->id)
+                ->where(function ($q): void {
+                    $q->where('from_holdings', true)
+                        ->orWhereNotNull('source_lot_id');
+                })
+                ->latest('id')
+                ->limit(100)
+                ->get()
+                ->each(fn (MetalWithdrawal $withdrawal) => $items->push(
+                    AccountTransactionPayload::fromHoldingsSell($withdrawal),
+                ));
         }
 
         if ($includeWallet && $this->includesFilter($filter, ['all', 'wallet'])) {
@@ -206,6 +235,61 @@ class AccountActivityService
         $redemption = $user->redemptions()->find($id);
 
         return $redemption ? AccountTransactionPayload::fromRedemption($redemption) : null;
+    }
+
+    protected function findHoldingsSell(User $user, int $id): ?array
+    {
+        $withdrawal = MetalWithdrawal::query()
+            ->where('user_id', $user->id)
+            ->where(function ($q): void {
+                $q->where('from_holdings', true)
+                    ->orWhereNotNull('source_lot_id');
+            })
+            ->find($id);
+
+        return $withdrawal ? AccountTransactionPayload::fromHoldingsSell($withdrawal) : null;
+    }
+
+    /**
+     * Sell-only holdings transactions for the holdings screen.
+     *
+     * @return array{transactions: list<array<string, mixed>>, pagination: array<string, int|bool>}
+     */
+    public function listHoldingsSellTransactions(
+        User $user,
+        int $page = 1,
+        int $perPage = 20,
+        ?string $metalType = null,
+    ): array {
+        $query = MetalWithdrawal::query()
+            ->where('user_id', $user->id)
+            ->where(function ($q): void {
+                $q->where('from_holdings', true)
+                    ->orWhereNotNull('source_lot_id');
+            })
+            ->when($metalType, fn ($q) => $q->where('metal_type', $metalType))
+            ->latest('id');
+
+        $total = (clone $query)->count();
+        $items = $query
+            ->forPage($page, $perPage)
+            ->get()
+            ->map(fn (MetalWithdrawal $withdrawal) => AccountTransactionPayload::fromHoldingsSell($withdrawal))
+            ->values();
+
+        return [
+            'transactions' => $items->all(),
+            'filter' => 'sell',
+            'metal_type' => $metalType,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'has_more' => ($page * $perPage) < $total,
+                'showing' => $items->count(),
+            ],
+        ];
     }
 
     /**

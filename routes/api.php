@@ -201,6 +201,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/holdings/config', [HoldingsController::class, 'config']);
         Route::get('/holdings', [HoldingsController::class, 'index']);
         Route::get('/holdings/performance', [HoldingsController::class, 'performance']);
+        Route::get('/holdings/transactions', [HoldingsController::class, 'transactions']);
         Route::post('/holdings/purchase', [HoldingsController::class, 'purchase']);
         Route::post('/holdings/sell', [HoldingsController::class, 'sell']);
         Route::post('/holdings/claim-bonus', [HoldingsController::class, 'claimBonus']);

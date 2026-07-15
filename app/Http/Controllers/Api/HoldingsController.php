@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AccountActivityService;
 use App\Services\HoldingLotService;
 use App\Services\HoldingsPerformanceService;
 use App\Support\ApiResponse;
@@ -48,6 +49,36 @@ class HoldingsController extends Controller
             $data['metal_type'] ?? (string) config('holdings.default_metal_type', 'gold'),
             (int) ($data['months'] ?? config('holdings.default_months', 12)),
         ));
+    }
+
+    public function transactions(Request $request, AccountActivityService $activity): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $data = $request->validate([
+            'metal_type' => ['nullable', Rule::in(['gold', 'silver'])],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $result = $activity->listHoldingsSellTransactions(
+            $user,
+            (int) ($data['page'] ?? 1),
+            (int) ($data['per_page'] ?? 20),
+            $data['metal_type'] ?? null,
+        );
+
+        return ApiResponse::successList(
+            $result['transactions'],
+            '',
+            200,
+            [
+                'filter' => 'sell',
+                'metal_type' => $result['metal_type'] ?? null,
+                'pagination' => $result['pagination'] ?? [],
+            ],
+        );
     }
 
     public function purchase(Request $request, HoldingLotService $lots): JsonResponse

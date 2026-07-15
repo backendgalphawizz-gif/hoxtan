@@ -102,6 +102,11 @@ class User extends Authenticatable
         return $this->hasMany(Investment::class);
     }
 
+    public function metalWithdrawals(): HasMany
+    {
+        return $this->hasMany(MetalWithdrawal::class);
+    }
+
     public function investmentGoals(): HasMany
     {
         return $this->hasMany(InvestmentGoal::class);
