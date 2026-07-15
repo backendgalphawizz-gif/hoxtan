@@ -14,15 +14,16 @@ use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Component;
+use RuntimeException;
 
 class FilamentImmediateExportService
 {
     /**
-     * Build the export synchronously, then trigger download via a normal GET.
+     * Build the export synchronously, then download in-browser via a Blob.
      *
-     * Do not return a StreamedResponse from Livewire — that leaves the page CSRF
-     * token stale and shows "This page has expired" (419) on the next action,
-     * and can open an expired page in a new window.
+     * Avoids:
+     * - Returning StreamedResponse from Livewire (stale CSRF / 419 Page Expired)
+     * - A second authenticated GET download (session race → 419 / expired tab)
      *
      * @param  list<int|string>|null  $selectedKeys
      */
@@ -32,28 +33,34 @@ class FilamentImmediateExportService
         string $format = 'csv',
         ?array $selectedKeys = null,
     ): void {
+        $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
         $export = $this->buildExport($livewire, $exporterClass, $format, $selectedKeys);
 
-        $format = ExportFormat::tryFrom($format)?->value ?? ExportFormat::Csv->value;
+        $payload = $this->buildBrowserDownloadPayload($export, $format);
 
-        $url = route('filament.exports.download', [
-            'export' => $export,
-            'format' => $format,
-        ], absolute: false);
-
-        // Delay slightly so the Livewire response can finish writing the session
-        // before the download GET uses the same cookie (avoids AuthenticateSession races).
         $livewire->js('(() => {
-            const href = '.json_encode($url).';
-            window.setTimeout(() => {
+            try {
+                const payload = '.json_encode($payload, JSON_THROW_ON_ERROR).';
+                const binary = atob(payload.content);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: payload.mime });
+                const objectUrl = URL.createObjectURL(blob);
                 const link = document.createElement("a");
-                link.href = href;
+                link.href = objectUrl;
+                link.download = payload.filename;
                 link.rel = "noopener";
                 link.style.display = "none";
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
-            }, 250);
+                window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+            } catch (error) {
+                console.error("Export download failed", error);
+                window.alert("Export ready, but the browser could not start the download. Please try again.");
+            }
         })()');
 
         Notification::make()
@@ -61,6 +68,49 @@ class FilamentImmediateExportService
             ->body('Your download should start shortly.')
             ->success()
             ->send();
+    }
+
+    /**
+     * @return array{filename: string, mime: string, content: string}
+     */
+    protected function buildBrowserDownloadPayload(Export $export, string $format): array
+    {
+        $disk = $export->getFileDisk();
+        $directory = $export->getFileDirectory();
+
+        if (! $disk->exists($directory)) {
+            throw new RuntimeException('Export file directory was not created.');
+        }
+
+        if ($format === ExportFormat::Xlsx->value) {
+            $path = $directory.DIRECTORY_SEPARATOR.$export->file_name.'.xlsx';
+
+            if (! $disk->exists($path)) {
+                throw new RuntimeException('Excel export file was not created.');
+            }
+
+            return [
+                'filename' => $export->file_name.'.xlsx',
+                'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'content' => base64_encode($disk->get($path)),
+            ];
+        }
+
+        $csv = (string) $disk->get($directory.DIRECTORY_SEPARATOR.'headers.csv');
+
+        foreach ($disk->files($directory) as $file) {
+            if (str($file)->endsWith('headers.csv') || ! str($file)->endsWith('.csv')) {
+                continue;
+            }
+
+            $csv .= (string) $disk->get($file);
+        }
+
+        return [
+            'filename' => $export->file_name.'.csv',
+            'mime' => 'text/csv;charset=utf-8',
+            'content' => base64_encode($csv),
+        ];
     }
 
     /**
