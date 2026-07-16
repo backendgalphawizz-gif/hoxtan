@@ -51,17 +51,20 @@ class SurepassPanKycApiTest extends TestCase
         $user = User::factory()->create([
             'name' => 'Alexander Vance',
             'phone' => '9876543210',
+            'date_of_birth' => '1990-04-12',
             'kyc_status' => 'pending',
         ]);
         Sanctum::actingAs($user);
 
-        $this->postJson('/api/v1/kyc/pan/request-otp', [
+        $this->postJson('/api/v1/kyc/pan/verify', [
             'pan_number' => 'ABCDE1234F',
         ])
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.verified', true)
             ->assertJsonPath('data.otp_required', false)
+            ->assertJsonPath('data.name_matched', true)
+            ->assertJsonPath('data.dob_matched', true)
             ->assertJsonPath('data.kyc.steps.0.status', 'verified')
             ->assertJsonPath('data.pan.full_name', 'ALEXANDER VANCE');
 
@@ -81,6 +84,44 @@ class SurepassPanKycApiTest extends TestCase
                 && $request['id_number'] === 'ABCDE1234F'
                 && $request->hasHeader('Authorization', 'Bearer test-token');
         });
+    }
+
+    public function test_pan_verification_fails_when_name_or_dob_does_not_match_profile(): void
+    {
+        Http::fake([
+            'kyc-api.surepass.app/api/v1/pan/pan-comprehensive' => Http::response([
+                'success' => true,
+                'status_code' => 200,
+                'message' => 'Success',
+                'data' => [
+                    'client_id' => 'pan_mismatch',
+                    'pan_number' => 'HLCPP0624P',
+                    'full_name' => 'GOUTAM PATIDAR',
+                    'category' => 'person',
+                    'dob' => '2005-01-25',
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create([
+            'name' => 'Wrong Name',
+            'date_of_birth' => '1999-01-01',
+            'kyc_status' => 'pending',
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/kyc/pan/verify', [
+            'pan_number' => 'HLCPP0624P',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('data.errors.pan_number.0', 'PAN name does not match your registered full name.')
+            ->assertJsonPath('data.errors.pan_number.1', 'PAN date of birth does not match your registered date of birth.');
+
+        $this->assertDatabaseMissing('kyc_details', [
+            'user_id' => $user->id,
+            'pan_verification_status' => 'verified',
+        ]);
     }
 
     public function test_pan_verification_fails_when_surepass_rejects(): void

@@ -128,6 +128,16 @@ class KycService
         $detail = $this->getOrCreateDetail($user);
         $data = is_array($providerResponse['data'] ?? null) ? $providerResponse['data'] : [];
         $fullName = $data['full_name'] ?? $data['name'] ?? null;
+        $dob = $data['dob'] ?? $data['date_of_birth'] ?? null;
+
+        // Surepass (and similar) return identity fields — require match with profile before verifying.
+        if (filled($fullName) || filled($dob)) {
+            $this->assertPanIdentityMatchesUser(
+                $user,
+                is_string($fullName) ? $fullName : null,
+                is_string($dob) ? $dob : null,
+            );
+        }
 
         $updates = [
             'pan_number' => $panNumber,
@@ -139,7 +149,6 @@ class KycService
             $updates['full_name'] = $fullName;
         }
 
-        $dob = $data['dob'] ?? $data['date_of_birth'] ?? null;
         if (filled($dob) && is_string($dob)) {
             try {
                 $updates['date_of_birth'] = \Illuminate\Support\Carbon::parse($dob)->toDateString();
@@ -162,10 +171,61 @@ class KycService
                 'full_name' => $fullName,
                 'aadhaar_linked' => $data['aadhaar_linked'] ?? null,
                 'category' => $data['category'] ?? null,
-                'dob' => $data['dob'] ?? $data['date_of_birth'] ?? null,
+                'dob' => $dob,
             ],
+            'name_matched' => true,
+            'dob_matched' => true,
             'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
         ];
+    }
+
+    /**
+     * Match Surepass PAN full_name + dob against the user's profile name and date of birth.
+     */
+    protected function assertPanIdentityMatchesUser(User $user, ?string $providerFullName, ?string $providerDob): void
+    {
+        $errors = [];
+
+        if (filled($providerFullName)) {
+            $userName = trim((string) $user->name);
+
+            if ($userName === '') {
+                $errors['pan_number'][] = 'Please update your full name in your profile before verifying PAN.';
+            } elseif ($this->normalizePersonName($userName) !== $this->normalizePersonName($providerFullName)) {
+                $errors['pan_number'][] = 'PAN name does not match your registered full name.';
+            }
+        }
+
+        if (filled($providerDob)) {
+            $userDob = $user->date_of_birth?->toDateString();
+
+            if (blank($userDob)) {
+                $errors['pan_number'][] = 'Please update your date of birth in your profile before verifying PAN.';
+            } else {
+                try {
+                    $providerDobNormalized = \Illuminate\Support\Carbon::parse($providerDob)->toDateString();
+                } catch (\Throwable) {
+                    throw ValidationException::withMessages([
+                        'pan_number' => ['PAN date of birth could not be verified. Please try again.'],
+                    ]);
+                }
+
+                if ($userDob !== $providerDobNormalized) {
+                    $errors['pan_number'][] = 'PAN date of birth does not match your registered date of birth.';
+                }
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    protected function normalizePersonName(string $name): string
+    {
+        $normalized = preg_replace('/\s+/u', ' ', strtoupper(trim($name)));
+
+        return is_string($normalized) ? $normalized : '';
     }
 
     /**
