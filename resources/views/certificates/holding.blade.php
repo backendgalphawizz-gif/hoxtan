@@ -6,13 +6,14 @@
     <title>Certificate {{ $certificate->certificate_number }}</title>
     <style>
         :root {
-            --cert-maroon: #8f1932;
+            --cert-frame: #d8a0ad;
+            --cert-frame-dark: #8f1932;
             --cert-gold: #c5a059;
             --cert-gold-light: #e8d4a8;
-            --cert-navy: #003366;
-            --cert-text: #1a1a1a;
-            --cert-muted: #666666;
-            --cert-border: #d9d9d9;
+            --cert-text: #111111;
+            --cert-muted: #777777;
+            --cert-border: #cccccc;
+            --cert-table-head: #f0f0f0;
         }
 
         @page {
@@ -26,327 +27,254 @@
 
         body {
             margin: 0;
-            padding: 0;
+            padding: 18px;
             font-family: Arial, Helvetica, sans-serif;
             color: var(--cert-text);
             background: #ffffff;
-            font-size: 12px;
-            line-height: 1.45;
+            font-size: 11.5px;
+            line-height: 1.42;
         }
 
-        .certificate {
+        .certificate-frame {
             position: relative;
-            min-height: 100vh;
-            padding: 2.25rem 3.25rem 2rem;
+            min-height: calc(100vh - 36px);
+            border: 3px double var(--cert-frame);
             background: #ffffff;
+            padding: 34px 42px 28px;
         }
 
-        .certificate::before,
-        .certificate::after {
-            content: '';
+        .certificate-frame__bar {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 14px;
+            background: var(--cert-frame-dark);
+        }
+
+        .certificate-content {
+            position: relative;
+            padding-bottom: 18px;
+        }
+
+        .certificate-watermark {
             position: absolute;
             top: 0;
-            bottom: 0;
-            width: 1.35rem;
-            background: var(--cert-maroon);
-        }
-
-        .certificate::before {
-            left: 0;
-        }
-
-        .certificate::after {
             right: 0;
-        }
-
-        .certificate__inner {
-            position: relative;
-            z-index: 1;
-        }
-
-        .certificate__pattern {
-            position: absolute;
-            top: 0.5rem;
-            right: 0;
-            width: 7.5rem;
-            height: 7.5rem;
-            opacity: 0.35;
+            width: 110px;
+            height: 110px;
+            opacity: 0.28;
             pointer-events: none;
         }
 
-        .certificate__pattern span {
+        .certificate-watermark span {
             position: absolute;
             display: block;
-            border: 2px solid var(--cert-gold-light);
-            background: rgba(197, 160, 89, 0.08);
+            border: 1.5px solid var(--cert-gold-light);
+            background: rgba(197, 160, 89, 0.06);
         }
 
-        .certificate__pattern span:nth-child(1) {
-            width: 3.5rem;
-            height: 3.5rem;
+        .certificate-watermark span:nth-child(1) {
+            width: 52px;
+            height: 52px;
             top: 0;
             right: 0;
         }
 
-        .certificate__pattern span:nth-child(2) {
-            width: 3rem;
-            height: 3rem;
-            top: 1.25rem;
-            right: 2.25rem;
+        .certificate-watermark span:nth-child(2) {
+            width: 42px;
+            height: 42px;
+            top: 18px;
+            right: 34px;
         }
 
-        .certificate__pattern span:nth-child(3) {
-            width: 2.5rem;
-            height: 2.5rem;
-            top: 2.75rem;
-            right: 0.5rem;
+        .certificate-watermark span:nth-child(3) {
+            width: 34px;
+            height: 34px;
+            top: 42px;
+            right: 8px;
         }
 
-        .certificate__brand {
+        .certificate-brand {
             text-align: center;
-            margin-bottom: 1.25rem;
+            margin: 0 0 18px;
         }
 
-        .certificate__brand img {
-            max-height: 3.25rem;
+        .certificate-brand img {
+            height: 42px;
             width: auto;
             display: inline-block;
         }
 
-        .certificate__brand-fallback {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .certificate__brand-icon {
-            width: 2.75rem;
-            height: 2.75rem;
-            border-radius: 9999px;
-            border: 2px solid var(--cert-gold);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--cert-gold);
-            font-weight: 700;
-            font-size: 1.25rem;
-        }
-
-        .certificate__brand-name {
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            color: var(--cert-gold);
-        }
-
-        .certificate__title {
-            margin: 0 0 1.5rem;
+        .certificate-title {
+            margin: 0 0 22px;
             text-align: center;
             font-family: "Times New Roman", Times, serif;
-            font-size: 1.65rem;
+            font-size: 24px;
             font-weight: 700;
-            letter-spacing: 0.02em;
-            color: #111111;
+            letter-spacing: 0.01em;
+            color: #000000;
         }
 
-        .certificate__meta {
-            margin-bottom: 1.35rem;
-            font-size: 12px;
+        .certificate-meta {
+            margin-bottom: 16px;
+            font-size: 11.5px;
         }
 
-        .certificate__meta-row {
-            margin-bottom: 0.2rem;
+        .certificate-meta div {
+            margin-bottom: 2px;
         }
 
-        .certificate__meta-row strong {
+        .certificate-meta strong {
             font-weight: 700;
         }
 
-        .certificate__intro {
-            margin: 0 0 1rem;
+        .certificate-intro {
+            margin: 0 0 12px;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         table.particulars {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 1.35rem;
-            font-size: 12px;
+            margin-bottom: 22px;
+            font-size: 11.5px;
         }
 
         table.particulars th,
         table.particulars td {
             border: 1px solid var(--cert-border);
-            padding: 0.55rem 0.7rem;
+            padding: 7px 10px;
             text-align: left;
             vertical-align: top;
         }
 
-        table.particulars th {
-            width: 52%;
-            background: #f3f3f3;
+        table.particulars thead th {
+            background: var(--cert-table-head);
             font-weight: 700;
         }
 
-        .certificate__partners {
-            display: table;
-            width: 100%;
-            margin: 1.5rem 0 1.25rem;
-            table-layout: fixed;
+        table.particulars tbody th {
+            width: 54%;
+            font-weight: 400;
+            background: #ffffff;
         }
 
-        .certificate__partner {
-            display: table-cell;
+        .certificate-partners {
+            width: 100%;
+            margin: 24px 0 18px;
+            border-collapse: collapse;
+        }
+
+        .certificate-partners td {
             width: 50%;
             text-align: center;
             vertical-align: top;
-            padding: 0 1rem;
+            padding: 0 18px;
         }
 
-        .certificate__partner-logo {
-            max-height: 2.5rem;
+        .certificate-partners img {
+            height: 34px;
             width: auto;
-            margin-bottom: 0.35rem;
-        }
-
-        .certificate__partner-brand {
-            font-size: 1.35rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            color: var(--cert-gold);
-            margin-bottom: 0.2rem;
-        }
-
-        .certificate__partner-brand--navy {
-            color: var(--cert-navy);
-            letter-spacing: 0.02em;
-        }
-
-        .certificate__partner-brand--navy::before {
-            content: '|||';
             display: inline-block;
-            margin-right: 0.35rem;
-            font-weight: 700;
-            letter-spacing: -0.08em;
+            margin-bottom: 6px;
         }
 
-        .certificate__partner-tagline {
+        .certificate-partners__label {
             font-size: 11px;
+            font-weight: 700;
             color: var(--cert-text);
         }
 
-        .certificate__narrative {
-            margin: 0 0 0.9rem;
+        .certificate-narrative {
+            margin: 0 0 10px;
             text-align: justify;
-            font-size: 11.5px;
+            font-size: 11px;
         }
 
-        .certificate__parties {
-            display: table;
+        .certificate-parties {
             width: 100%;
-            margin-top: 1.5rem;
-            table-layout: fixed;
+            margin-top: 22px;
+            border-collapse: collapse;
         }
 
-        .certificate__party {
-            display: table-cell;
+        .certificate-parties td {
             width: 50%;
             vertical-align: top;
-            padding-right: 1.5rem;
-            font-size: 11px;
+            padding-right: 22px;
+            font-size: 10.5px;
         }
 
-        .certificate__party:last-child {
+        .certificate-parties td:last-child {
             padding-right: 0;
-            padding-left: 1.5rem;
+            padding-left: 22px;
         }
 
-        .certificate__party-logo {
-            max-height: 1.75rem;
+        .certificate-parties img {
+            height: 24px;
             width: auto;
-            margin-bottom: 0.45rem;
+            display: block;
+            margin-bottom: 8px;
         }
 
-        .certificate__party-brand {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--cert-maroon);
-            margin-bottom: 0.45rem;
-            letter-spacing: 0.03em;
-        }
-
-        .certificate__party-brand--navy {
-            color: var(--cert-navy);
-        }
-
-        .certificate__party-brand--navy::before {
-            content: '|||';
-            display: inline-block;
-            margin-right: 0.25rem;
-            letter-spacing: -0.08em;
-        }
-
-        .certificate__party h3 {
-            margin: 0 0 0.35rem;
-            font-size: 11px;
+        .certificate-parties h3 {
+            margin: 0 0 4px;
+            font-size: 10.5px;
             font-weight: 700;
             text-decoration: underline;
         }
 
-        .certificate__party .name {
+        .certificate-parties .name {
             font-weight: 700;
-            margin-bottom: 0.2rem;
+            margin-bottom: 2px;
         }
 
-        .certificate__footer-note {
-            margin-top: 1.75rem;
-            font-size: 11px;
+        .certificate-footer-note {
+            margin-top: 22px;
+            font-size: 10.5px;
             color: var(--cert-muted);
             font-style: italic;
-            text-align: left;
+            text-align: center;
         }
 
         @media print {
             body {
+                padding: 0;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+            }
+
+            .certificate-frame {
+                min-height: 100vh;
+                border-width: 2px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="certificate">
-        <div class="certificate__inner">
-            <div class="certificate__pattern" aria-hidden="true">
+    <div class="certificate-frame">
+        <div class="certificate-content">
+            <div class="certificate-watermark" aria-hidden="true">
                 <span></span>
                 <span></span>
                 <span></span>
             </div>
 
-            <div class="certificate__brand">
+            <div class="certificate-brand">
                 @if ($brandLogo)
                     <img src="{{ $brandLogo }}" alt="{{ $appName }}">
-                @else
-                    <div class="certificate__brand-fallback">
-                        <span class="certificate__brand-icon">H</span>
-                        <span class="certificate__brand-name">{{ strtoupper($appName) }}</span>
-                    </div>
                 @endif
             </div>
 
-            <h1 class="certificate__title">PROOF OF HOLDING CERTIFICATE</h1>
+            <h1 class="certificate-title">PROOF OF HOLDING CERTIFICATE</h1>
 
-            <div class="certificate__meta">
-                <div class="certificate__meta-row">
-                    <strong>Certificate No.:</strong> {{ $certificate->certificate_number }}
-                </div>
-                <div class="certificate__meta-row">
-                    <strong>Date of Issue:</strong> {{ $issuedAtDisplay }}
-                </div>
+            <div class="certificate-meta">
+                <div><strong>Certificate No.:</strong> {{ $certificate->certificate_number }}</div>
+                <div><strong>Date of Issue:</strong> {{ $issuedAtDisplay }}</div>
             </div>
 
-            <p class="certificate__intro">This is to certify your {{ $providerLabel }} holdings:</p>
+            <p class="certificate-intro">This is to certify your {{ $providerLabel }} holdings:</p>
 
             <table class="particulars">
                 <thead>
@@ -357,102 +285,91 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Account Holder Name</td>
+                        <th>Account Holder Name</th>
                         <td>{{ $certificate->account_holder_name }}</td>
                     </tr>
                     <tr>
-                        <td>{{ $holdingLabel }} (as of {{ $issuedAtDisplay }})</td>
+                        <th>{{ $holdingLabel }} (as of {{ $issuedAtDisplay }})</th>
                         <td>{{ $holdingDisplay }}</td>
                     </tr>
                     <tr>
-                        <td>Purity</td>
+                        <th>Purity</th>
                         <td>{{ $certificate->purity }}</td>
                     </tr>
                     <tr>
-                        <td>Frequency of Physical Vault Audit</td>
+                        <th>Frequency of Physical Vault Audit</th>
                         <td>{{ $vaultAuditFrequency }}</td>
                     </tr>
                 </tbody>
             </table>
 
-            <div class="certificate__partners">
-                <div class="certificate__partner">
-                    @if ($brandLogo)
-                        <img src="{{ $brandLogo }}" alt="{{ $appName }}" class="certificate__partner-logo">
-                    @else
-                        <div class="certificate__partner-brand">{{ strtoupper($appName) }}</div>
-                    @endif
-                    <div class="certificate__partner-tagline">{{ $brandTagline }}</div>
-                </div>
-                <div class="certificate__partner">
-                    @if ($custodianLogo)
-                        <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}" class="certificate__partner-logo">
-                    @else
-                        <div class="certificate__partner-brand certificate__partner-brand--navy">
-                            {{ strtoupper($custodian['name'] ?? 'CUSTODIAN') }}
-                        </div>
-                    @endif
-                    <div class="certificate__partner-tagline">{{ $custodian['tagline'] ?? 'Custodian Vault' }}</div>
-                </div>
-            </div>
-
-            <p class="certificate__narrative">
-                {{ $custodyNote }}
-            </p>
-
-            <p class="certificate__narrative">
-                {{ $trusteeNote }}
-            </p>
-
-            <div class="certificate__parties">
-                <div class="certificate__party">
-                    @if ($trusteeLogo)
-                        <img src="{{ $trusteeLogo }}" alt="{{ $trustee['name'] ?? 'Trustee' }}" class="certificate__party-logo">
-                    @else
-                        <div class="certificate__party-brand">{{ strtoupper($trustee['name'] ?? 'TRUSTEE') }}</div>
-                    @endif
-                    <h3>{{ $trustee['title'] ?? 'Trustee Administrator Details' }}:</h3>
-                    <div class="name">{{ $trustee['name'] ?? '' }}</div>
-                    <div>Registered Office:</div>
-                    @foreach (($trustee['registered_office_lines'] ?? []) as $line)
-                        @if (filled($line))
-                            <div>{{ $line }}</div>
+            <table class="certificate-partners">
+                <tr>
+                    <td>
+                        @if ($brandLogo)
+                            <img src="{{ $brandLogo }}" alt="{{ $appName }}">
                         @endif
-                    @endforeach
-                    @if (! empty($trustee['phone']))
-                        <div>Phone : {{ $trustee['phone'] }}</div>
-                    @endif
-                    @if (! empty($trustee['cin']))
-                        <div>CIN: {{ $trustee['cin'] }}</div>
-                    @endif
-                </div>
-                <div class="certificate__party">
-                    @if ($custodianLogo)
-                        <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}" class="certificate__party-logo">
-                    @else
-                        <div class="certificate__party-brand certificate__party-brand--navy">
-                            {{ strtoupper($custodian['name'] ?? 'CUSTODIAN') }}
-                        </div>
-                    @endif
-                    <h3>{{ $custodian['title'] ?? 'Custodian Details' }}:</h3>
-                    <div class="name">{{ $custodian['name'] ?? '' }}</div>
-                    <div>Registered Office:</div>
-                    @foreach (($custodian['registered_office_lines'] ?? []) as $line)
-                        @if (filled($line))
-                            <div>{{ $line }}</div>
+                        <div class="certificate-partners__label">{{ $brandTagline }}</div>
+                    </td>
+                    <td>
+                        @if ($custodianLogo)
+                            <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
                         @endif
-                    @endforeach
-                    @if (! empty($custodian['phone']))
-                        <div>Phone : {{ $custodian['phone'] }}</div>
-                    @endif
-                    @if (! empty($custodian['cin']))
-                        <div>CIN: {{ $custodian['cin'] }}</div>
-                    @endif
-                </div>
-            </div>
+                        <div class="certificate-partners__label">{{ $custodian['tagline'] ?? 'Custodian Vault' }}</div>
+                    </td>
+                </tr>
+            </table>
 
-            <p class="certificate__footer-note">(This document is system-generated and does not require a signature.)</p>
+            <p class="certificate-narrative">{{ $custodyNote }}</p>
+            <p class="certificate-narrative">{{ $trusteeNote }}</p>
+
+            <table class="certificate-parties">
+                <tr>
+                    <td>
+                        @if ($trusteeLogo)
+                            <img src="{{ $trusteeLogo }}" alt="{{ $trustee['name'] ?? 'Trustee' }}">
+                        @endif
+                        <h3>{{ $trustee['title'] ?? 'Trustee Administrator Details' }}:</h3>
+                        <div class="name">{{ $trustee['name'] ?? '' }}</div>
+                        <div>Registered Office:</div>
+                        @foreach (($trustee['registered_office_lines'] ?? []) as $line)
+                            @if (filled($line))
+                                <div>{{ $line }}</div>
+                            @endif
+                        @endforeach
+                        @if (! empty($trustee['phone']))
+                            <div>Phone : {{ $trustee['phone'] }}</div>
+                        @endif
+                        @if (! empty($trustee['cin']))
+                            <div>CIN: {{ $trustee['cin'] }}</div>
+                        @endif
+                    </td>
+                    <td>
+                        @if ($custodianLogo)
+                            <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
+                        @endif
+                        <h3>{{ $custodian['title'] ?? 'Custodian Details' }}:</h3>
+                        <div class="name">{{ $custodian['name'] ?? '' }}</div>
+                        <div>Registered Office:</div>
+                        @foreach (($custodian['registered_office_lines'] ?? []) as $line)
+                            @if (filled($line))
+                                <div>{{ $line }}</div>
+                            @endif
+                        @endforeach
+                        @if (! empty($custodian['phone']))
+                            <div>Phone : {{ $custodian['phone'] }}</div>
+                        @endif
+                        @if (! empty($custodian['cin']))
+                            <div>CIN: {{ $custodian['cin'] }}</div>
+                        @endif
+                    </td>
+                </tr>
+            </table>
+
+            <p class="certificate-footer-note">(This document is system-generated and does not require a signature.)</p>
         </div>
+
+        <div class="certificate-frame__bar" aria-hidden="true"></div>
     </div>
 </body>
 </html>
