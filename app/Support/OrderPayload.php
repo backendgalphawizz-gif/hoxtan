@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\JewelleryOrder;
 use App\Models\JewelleryOrderItem;
 use App\Models\Payment;
+use App\Models\Driver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -12,7 +13,7 @@ class OrderPayload
 {
     public static function make(JewelleryOrder $order, bool $detailed = false, bool $includeDeliveryOtp = true): array
     {
-        $order->loadMissing(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice']);
+        $order->loadMissing(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice', 'driver']);
 
         $firstItem = $order->items->first();
         $itemTitle = $firstItem?->product?->name ?? 'Jewellery Order';
@@ -53,6 +54,9 @@ class OrderPayload
             'ordered_date' => $order->created_at?->format('d M Y'),
             'ordered_at_display' => $order->created_at?->format('d F Y'),
             'updated_at' => $order->updated_at?->toIso8601String(),
+            'driver_id' => $order->driver_id,
+            'driver_assigned_at' => $order->driver_assigned_at?->toIso8601String(),
+            'driver' => self::driver($order),
             'tracking' => self::tracking($order),
             'tracking_details' => self::trackingDetails($order),
             'items' => $order->items
@@ -297,6 +301,38 @@ class OrderPayload
      *     address_type: ?string
      * }
      */
+    /**
+     * Customer-facing assigned driver details (null when not assigned).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function driver(JewelleryOrder $order): ?array
+    {
+        $order->loadMissing('driver');
+
+        if (! $order->driver_id || ! $order->driver) {
+            return null;
+        }
+
+        $driver = $order->driver;
+        $profileImageUrl = filled($driver->profile_image)
+            ? AssetUrl::publicStorage($driver->profile_image)
+            : null;
+
+        return [
+            'id' => $driver->id,
+            'name' => $driver->name,
+            'phone' => $driver->phone,
+            'phone_display' => '+91 '.$driver->phone,
+            'image_url' => $profileImageUrl,
+            'vehicle_type' => $driver->vehicle_type,
+            'vehicle_type_label' => Driver::vehicleTypeOptions()[$driver->vehicle_type] ?? $driver->vehicle_type,
+            'vehicle_number' => $driver->vehicle_number,
+            'assigned_at' => $order->driver_assigned_at?->toIso8601String(),
+            'assigned_at_display' => $order->driver_assigned_at?->format('d F Y, h:i A'),
+        ];
+    }
+
     public static function deliveryAddress(JewelleryOrder $order): array
     {
         return [
