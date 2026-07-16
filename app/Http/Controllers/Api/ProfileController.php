@@ -91,7 +91,7 @@ class ProfileController extends Controller
         ])->all();
 
         if (array_key_exists('email', $updates) && blank($updates['email'])) {
-            $updates['email'] = $user->phone.'@hoxtan.app';
+            $updates['email'] = null;
         }
 
         if ($photoPath = ProfilePhotoStorage::storeForUser($user, $request)) {
