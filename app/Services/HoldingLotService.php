@@ -18,6 +18,7 @@ class HoldingLotService
         protected MetalWithdrawalService $withdrawals,
         protected MetalRateService $metalRates,
         protected UserHoldingsService $holdings,
+        protected HoldingCertificateService $certificates,
     ) {}
 
     /**
@@ -355,6 +356,7 @@ class HoldingLotService
             ->where('user_id', $user->id)
             ->where('type', 'buy')
             ->where('status', 'completed')
+            ->with('holdingCertificate')
             ->where(function ($q): void {
                 $q->whereNull('purpose')->orWhere('purpose', '!=', 'hold_bonus');
             })
@@ -399,6 +401,9 @@ class HoldingLotService
             && ! $sellRequestPending
             && ($sellUnlockedAt === null || ! $sellUnlockedAt->isFuture());
 
+        $certificate = $this->certificates->payload($lot->holdingCertificate);
+        $certificateUrl = is_array($certificate) ? ($certificate['download_url'] ?? null) : null;
+
         return [
             'id' => $lot->id,
             'reference_id' => $lot->reference_id,
@@ -430,6 +435,8 @@ class HoldingLotService
             'can_sell' => $canSell,
             'sell_request_pending' => $sellRequestPending,
             'sell_unlocks_at' => $sellUnlockedAt?->toIso8601String(),
+            'certificate' => $certificate,
+            'certificate_url' => $certificateUrl,
         ];
     }
 

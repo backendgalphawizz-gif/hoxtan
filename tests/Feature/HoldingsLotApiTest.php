@@ -54,10 +54,17 @@ class HoldingsLotApiTest extends TestCase
                             'bonus_due_at_display',
                             'bonus_eligible',
                             'can_sell',
+                            'certificate_url',
+                            'certificate',
                         ],
                     ],
                 ],
             ]);
+
+        $firstLot = $list->json('data.lots.0');
+        $this->assertNotEmpty($firstLot['certificate_url'] ?? null);
+        $this->assertStringContainsString('/certificates/', $firstLot['certificate_url']);
+        $this->assertNotEmpty($firstLot['certificate']['certificate_number'] ?? null);
 
         $this->assertDatabaseHas('investments', [
             'user_id' => $user->id,
