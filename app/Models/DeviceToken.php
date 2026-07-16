@@ -11,6 +11,7 @@ class DeviceToken extends Model
         'tokenable_type',
         'tokenable_id',
         'fcm_token',
+        'token',
         'token_hash',
         'platform',
         'device_name',

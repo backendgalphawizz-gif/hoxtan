@@ -12,6 +12,7 @@ class Invoice extends Model
         'user_id',
         'investment_id',
         'jewellery_order_id',
+        'old_gold_booking_id',
         'subtotal',
         'gst_amount',
         'total_amount',
@@ -49,18 +50,36 @@ class Invoice extends Model
         return $this->belongsTo(JewelleryOrder::class);
     }
 
+    public function oldGoldBooking(): BelongsTo
+    {
+        return $this->belongsTo(OldGoldBooking::class);
+    }
+
     public function isJewellery(): bool
     {
         return $this->jewellery_order_id !== null;
     }
 
+    public function isSellJewellery(): bool
+    {
+        return $this->old_gold_booking_id !== null;
+    }
+
     public function sourceType(): string
     {
+        if ($this->isSellJewellery()) {
+            return 'sell_jewellery';
+        }
+
         return $this->isJewellery() ? 'jewellery' : 'investment';
     }
 
     public function sourceReference(): ?string
     {
+        if ($this->isSellJewellery()) {
+            return $this->oldGoldBooking?->booking_number;
+        }
+
         if ($this->isJewellery()) {
             return $this->jewelleryOrder?->order_number;
         }

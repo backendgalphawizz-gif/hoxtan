@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OldGoldBooking;
 use App\Models\User;
 use App\Services\BlockedPincodeService;
+use App\Services\InvoiceService;
 use App\Services\SellJewelleryService;
 use App\Support\ApiResponse;
 use App\Support\SellJewelleryPayload;
@@ -90,11 +91,16 @@ class SellJewelleryController extends Controller
         ));
     }
 
-    public function show(Request $request, OldGoldBooking $booking): JsonResponse
+    public function show(Request $request, OldGoldBooking $booking, InvoiceService $invoices): JsonResponse
     {
         $this->ensureOwnedByUser($request, $booking);
 
-        $booking->loadMissing('driver');
+        $booking->load(['invoice']);
+
+        if (! $booking->invoice) {
+            $invoices->generateForOldGoldBooking($booking);
+            $booking->load('invoice');
+        }
 
         return ApiResponse::success([
             'request' => SellJewelleryPayload::make($booking, detailed: true),

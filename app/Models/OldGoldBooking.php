@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\DriverAssignmentNotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class OldGoldBooking extends Model
 {
@@ -103,6 +104,11 @@ class OldGoldBooking extends Model
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    public function invoice(): HasOne
+    {
+        return $this->hasOne(Invoice::class);
     }
 
     public function userAddress(): BelongsTo

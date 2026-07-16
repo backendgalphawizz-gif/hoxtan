@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Investment;
 use App\Models\Invoice;
 use App\Models\JewelleryOrder;
+use App\Models\OldGoldBooking;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 
@@ -104,6 +105,49 @@ class InvoiceService
         return $invoice;
     }
 
+    public function generateForOldGoldBooking(OldGoldBooking $booking): ?Invoice
+    {
+        if (! in_array($booking->status, ['completed', 'picked_up'], true)) {
+            return null;
+        }
+
+        if (Invoice::query()->where('old_gold_booking_id', $booking->id)->exists()) {
+            return Invoice::query()->where('old_gold_booking_id', $booking->id)->first();
+        }
+
+        $booking->loadMissing(['user', 'payment']);
+        $invoiceNumber = $this->nextInvoiceNumber();
+        $amount = (float) ($booking->final_amount ?? $booking->quoted_amount ?? 0);
+
+        $invoice = Invoice::create([
+            'invoice_number' => $invoiceNumber,
+            'user_id' => $booking->user_id,
+            'old_gold_booking_id' => $booking->id,
+            'subtotal' => $amount,
+            'gst_amount' => 0,
+            'total_amount' => $amount,
+            'metal_type' => $booking->metal_type,
+            'quantity_grams' => $booking->estimated_weight_grams,
+            'rate_per_gram' => $booking->rate_per_gram,
+            'issued_at' => now(),
+        ]);
+
+        $html = View::make('invoices.sell-jewellery', [
+            'invoice' => $invoice,
+            'booking' => $booking,
+            'user' => $booking->user,
+            'appName' => $this->settings->get('app_name', 'HOXTAN'),
+            'supportEmail' => $this->settings->get('support_email', ''),
+            'supportPhone' => $this->settings->get('support_phone', ''),
+        ])->render();
+
+        $path = 'invoices/'.$invoiceNumber.'.html';
+        Storage::disk('local')->put($path, $html);
+        $invoice->update(['file_path' => $path]);
+
+        return $invoice;
+    }
+
     public function isJewelleryOrderFullyPaid(JewelleryOrder $order): bool
     {
         if ($order->isEmi()) {
@@ -139,13 +183,18 @@ class InvoiceService
      */
     public function apiPayload(Invoice $invoice): array
     {
-        $invoice->loadMissing(['investment:id,reference_id,type', 'jewelleryOrder:id,order_number']);
+        $invoice->loadMissing([
+            'investment:id,reference_id,type',
+            'jewelleryOrder:id,order_number',
+            'oldGoldBooking:id,booking_number',
+        ]);
 
         return [
             'invoice_number' => $invoice->invoice_number,
             'source_type' => $invoice->sourceType(),
             'investment_reference' => $invoice->investment?->reference_id,
             'order_number' => $invoice->jewelleryOrder?->order_number,
+            'booking_number' => $invoice->oldGoldBooking?->booking_number,
             'metal_type' => $invoice->metal_type,
             'quantity_grams' => $invoice->quantity_grams !== null ? (float) $invoice->quantity_grams : null,
             'total_amount' => (float) $invoice->total_amount,

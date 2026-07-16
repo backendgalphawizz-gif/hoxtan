@@ -11,7 +11,7 @@ class SellJewelleryPayload
 {
     public static function make(OldGoldBooking $booking, bool $detailed = false, bool $includeDeliveryOtp = true): array
     {
-        $booking->loadMissing('driver');
+        $booking->loadMissing(['invoice']);
 
         $payload = [
             'id' => $booking->id,
@@ -49,10 +49,15 @@ class SellJewelleryPayload
             'submitted_time' => $booking->created_at?->format('H:i').' GMT',
             'submitted_at_display' => $booking->created_at?->format('M d, Y | h:i A'),
             'completed_at' => $booking->completed_at?->toIso8601String(),
-            'driver_id' => $booking->driver_id,
-            'driver_assigned_at' => $booking->driver_assigned_at?->toIso8601String(),
-            'driver' => self::driver($booking),
-            'invoice' => null,
+            'invoice_url' => $booking->invoice
+                ? route('api.invoices.download', $booking->invoice)
+                : null,
+            'invoice' => $booking->invoice ? [
+                'invoice_number' => $booking->invoice->invoice_number,
+                'total_amount' => (float) $booking->invoice->total_amount,
+                'issued_at' => $booking->invoice->issued_at?->toIso8601String(),
+                'download_url' => route('api.invoices.download', $booking->invoice),
+            ] : null,
         ];
 
         if ($includeDeliveryOtp) {

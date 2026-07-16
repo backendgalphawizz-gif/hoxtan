@@ -4,6 +4,7 @@ namespace App\Filament\Resources\JewelleryOrderResource\Pages;
 
 use App\Filament\Resources\JewelleryOrderResource;
 use App\Models\OldGoldBooking;
+use App\Services\InvoiceService;
 use Filament\Actions;
 use Filament\Forms\Form;
 use Filament\Resources\Pages\EditRecord;
@@ -67,6 +68,10 @@ class EditSellJewelleryOrder extends EditRecord
         }
 
         $record->update($data);
+
+        if (($data['status'] ?? $record->status) === 'completed') {
+            app(InvoiceService::class)->generateForOldGoldBooking($record->fresh());
+        }
 
         return $record;
     }
