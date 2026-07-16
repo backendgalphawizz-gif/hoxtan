@@ -37,6 +37,7 @@ Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/app/config', [AppConfigController::class, 'index']);
+    Route::get('/config', [AppConfigController::class, 'index']);
     Route::get('/app/faqs', [AppConfigController::class, 'faqs']);
     Route::get('/app/pages/{slug}', [AppConfigController::class, 'page']);
 
