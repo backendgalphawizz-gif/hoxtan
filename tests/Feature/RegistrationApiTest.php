@@ -41,11 +41,13 @@ class RegistrationApiTest extends TestCase
         $details = $this->postJson('/api/v1/register/details', [
             'registration_token' => $registrationToken,
             'name' => 'Rahul Sharma',
+            'date_of_birth' => '1995-06-15',
         ]);
 
         $details->assertOk()
             ->assertJsonPath('data.name', 'Rahul Sharma')
-            ->assertJsonPath('data.phone', '9876543210');
+            ->assertJsonPath('data.phone', '9876543210')
+            ->assertJsonPath('data.date_of_birth', '1995-06-15');
 
         $complete = $this->postJson('/api/v1/register/mpin', [
             'registration_token' => $registrationToken,
@@ -54,10 +56,19 @@ class RegistrationApiTest extends TestCase
 
         $complete->assertCreated()
             ->assertJsonPath('success', true)
-            ->assertJsonStructure(['data' => ['token', 'mpin', 'mpin_length', 'user' => ['id', 'name', 'phone', 'referral_code']]])
+            ->assertJsonStructure(['data' => ['token', 'mpin', 'mpin_length', 'user' => ['id', 'name', 'phone', 'referral_code', 'date_of_birth']]])
             ->assertJsonPath('data.user.name', 'Rahul Sharma')
+            ->assertJsonPath('data.user.date_of_birth', '1995-06-15')
             ->assertJsonPath('data.mpin', '1234')
             ->assertJsonPath('message', 'M-PIN created successfully.');
+
+        $this->assertDatabaseHas('users', [
+            'phone' => '9876543210',
+            'name' => 'Rahul Sharma',
+        ]);
+        $created = User::query()->where('phone', '9876543210')->first();
+        $this->assertNotNull($created);
+        $this->assertSame('1995-06-15', $created->date_of_birth?->toDateString());
 
         $this->assertDatabaseHas('users', [
             'phone' => '9876543210',

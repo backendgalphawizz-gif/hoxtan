@@ -192,9 +192,12 @@ class RegistrationController extends AuthController
         $data = $request->validate([
             'registration_token' => ['required', 'string', 'size:64'],
             'name' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z\s]+$/'],
+            'date_of_birth' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
             'referral_code' => ['nullable', 'string', 'max:12'],
         ], [
             'name.regex' => 'Full name may only contain letters and spaces.',
+            'date_of_birth.before' => 'You must be at least 18 years old.',
+            'date_of_birth.after' => 'Please enter a valid date of birth.',
         ]);
 
         if (filled($data['referral_code'] ?? null) && ! $referrals->findReferrerByCode($data['referral_code'])) {
@@ -207,11 +210,13 @@ class RegistrationController extends AuthController
             $data['registration_token'],
             $data['name'],
             $data['referral_code'] ?? null,
+            $data['date_of_birth'] ?? null,
         );
 
         return ApiResponse::success([
             'phone' => $session['phone'],
             'name' => $session['name'],
+            'date_of_birth' => $session['date_of_birth'] ?? null,
             'referral_code' => $session['referral_code'],
         ], 'Profile details saved.');
     }
@@ -267,6 +272,7 @@ class RegistrationController extends AuthController
             $session['phone'],
             $data['mpin'],
             $session['referral_code'] ?? null,
+            $session['date_of_birth'] ?? null,
         );
 
         $fcmToken = FcmTokenRequest::from($request)

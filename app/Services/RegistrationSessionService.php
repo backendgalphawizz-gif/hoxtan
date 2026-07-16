@@ -28,6 +28,7 @@ class RegistrationSessionService
         $session = [
             'phone' => $phone,
             'name' => null,
+            'date_of_birth' => null,
             'referral_code' => null,
             'created_at' => now()->timestamp,
             'fcm_token' => filled($extra['fcm_token'] ?? null) ? (string) $extra['fcm_token'] : null,
@@ -56,12 +57,17 @@ class RegistrationSessionService
         return $session;
     }
 
-    public function updateProfile(string $token, string $name, ?string $referralCode = null): array
-    {
+    public function updateProfile(
+        string $token,
+        string $name,
+        ?string $referralCode = null,
+        ?string $dateOfBirth = null,
+    ): array {
         $session = $this->get($token);
         $ttl = config('otp.registration_session_ttl', 1800);
 
         $session['name'] = trim($name);
+        $session['date_of_birth'] = filled($dateOfBirth) ? $dateOfBirth : null;
         $session['referral_code'] = filled($referralCode)
             ? strtoupper(trim($referralCode))
             : null;

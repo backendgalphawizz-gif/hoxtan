@@ -39,6 +39,7 @@ class CreateUser extends BaseCreateRecord
             'is_verified' => true,
             'is_blocked' => false,
             'is_employee' => false,
+            'date_of_birth' => $data['date_of_birth'] ?? null,
             'nominee_name' => $data['nominee_name'] ?? null,
             'nominee_relation' => $data['nominee_relation'] ?? null,
             'nominee_phone' => $data['nominee_phone'] ?? null,

@@ -60,6 +60,10 @@ class UserResource extends Resource
                         Infolists\Components\TextEntry::make('name'),
                         Infolists\Components\TextEntry::make('phone')->label('Mobile'),
                         Infolists\Components\TextEntry::make('email')->placeholder('—'),
+                        Infolists\Components\TextEntry::make('date_of_birth')
+                            ->label('Date of Birth')
+                            ->date('d M Y')
+                            ->placeholder('—'),
                         Infolists\Components\TextEntry::make('kyc_status')
                             ->label('KYC Status')
                             ->badge()
@@ -198,6 +202,13 @@ class UserResource extends Resource
                         FilamentFormFields::mobile()
                             ->required()
                             ->unique(ignoreRecord: true),
+                        Forms\Components\DatePicker::make('date_of_birth')
+                            ->label('Date of Birth')
+                            ->native(false)
+                            ->displayFormat('d/m/Y')
+                            ->maxDate(now()->subYears(18))
+                            ->minDate(now()->subYears(100))
+                            ->helperText('User must be at least 18 years old.'),
                         FilamentFormFields::mpin()
                             ->required(fn (string $operation) => $operation === 'create')
                             ->visible(fn (string $operation) => $operation === 'create'),
