@@ -42,6 +42,18 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
+        // Accept common client alias for date of birth.
+        if ($request->filled('dob') && ! $request->filled('date_of_birth')) {
+            $request->merge(['date_of_birth' => $request->input('dob')]);
+        }
+
+        $bankFieldsPresent = $request->hasAny([
+            'account_holder_name',
+            'bank_name',
+            'account_number',
+            'ifsc_code',
+        ]);
+
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:100', 'regex:/^[A-Za-z\s]+$/'],
             'email' => [
@@ -53,6 +65,7 @@ class ProfileController extends Controller
             'primary_residence' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'string', Rule::in(['male', 'female', 'other'])],
             'date_of_birth' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
+            'dob' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
             'market_alerts' => ['nullable', 'boolean'],
             'profile_photo' => ['nullable'],
             'image' => ['nullable'],
@@ -71,16 +84,18 @@ class ProfileController extends Controller
             'nominee_relation' => ['nullable', 'string', 'max:50'],
             'nominee_phone' => ['nullable', 'string', 'regex:/^\d{10}$/'],
             'nominee_date_of_birth' => ['nullable', 'date', 'before:today'],
-            'account_holder_name' => ['required', 'string', 'max:100', 'regex:'.FilamentFormFields::NAME_REGEX],
-            'bank_name' => ['required', 'string', 'max:100'],
-            'account_number' => ['required', 'string', 'min:6', 'max:30', 'regex:/^\d+$/'],
-            'ifsc_code' => ['required', 'string', 'size:11', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'],
+            'account_holder_name' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'max:100', 'regex:'.FilamentFormFields::NAME_REGEX],
+            'bank_name' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'max:100'],
+            'account_number' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'min:6', 'max:30', 'regex:/^\d+$/'],
+            'ifsc_code' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'size:11', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'],
         ], [
             'account_holder_name.regex' => 'Account holder name may only contain letters and spaces.',
             'account_number.regex' => 'Account number must contain digits only.',
             'ifsc_code.regex' => 'Invalid IFSC code format.',
             'date_of_birth.before' => 'You must be at least 18 years old.',
             'date_of_birth.after' => 'Please enter a valid date of birth.',
+            'dob.before' => 'You must be at least 18 years old.',
+            'dob.after' => 'Please enter a valid date of birth.',
         ]);
 
         $updates = collect($data)->only([
@@ -120,17 +135,19 @@ class ProfileController extends Controller
             $user->update($updates);
         }
 
-        $detail = $kyc->getOrCreateDetail($user->fresh());
-        $detail->update([
-            'account_holder_name' => $data['account_holder_name'],
-            'bank_name' => $data['bank_name'],
-            'account_number' => $data['account_number'],
-            'ifsc_code' => strtoupper($data['ifsc_code']),
-            'bank_verification_status' => $detail->bank_verification_status === 'verified'
-                ? 'verified'
-                : 'pending',
-            'bank_submitted_at' => now(),
-        ]);
+        if ($bankFieldsPresent) {
+            $detail = $kyc->getOrCreateDetail($user->fresh());
+            $detail->update([
+                'account_holder_name' => $data['account_holder_name'],
+                'bank_name' => $data['bank_name'],
+                'account_number' => $data['account_number'],
+                'ifsc_code' => strtoupper($data['ifsc_code']),
+                'bank_verification_status' => $detail->bank_verification_status === 'verified'
+                    ? 'verified'
+                    : 'pending',
+                'bank_submitted_at' => now(),
+            ]);
+        }
 
         return ApiResponse::success([
             'user' => UserProfilePayload::make($user->fresh()),
