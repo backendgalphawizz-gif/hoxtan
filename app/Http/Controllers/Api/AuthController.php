@@ -135,8 +135,8 @@ class AuthController extends Controller
                 $device = $fcm->registerToken(
                     $user,
                     $fcmToken,
-                    $request?->input('platform'),
-                    $request?->input('device_name'),
+                    $request ? FcmTokenRequest::platform($request) : null,
+                    $request ? FcmTokenRequest::deviceName($request) : null,
                 );
                 $fcmRegistered = true;
                 $deviceTokenId = $device->id;

@@ -76,7 +76,21 @@ class FirebaseCloudMessagingService
             throw new \InvalidArgumentException('FCM token is empty.');
         }
 
+        if (! $owner->exists || blank($owner->getKey())) {
+            throw new \InvalidArgumentException('Cannot register FCM token for an unsaved owner.');
+        }
+
+        $platform = is_string($platform) && $platform !== '' ? strtolower(trim($platform)) : null;
+        $deviceName = is_string($deviceName) && trim($deviceName) !== '' ? trim($deviceName) : null;
+
         $hash = hash('sha256', $token);
+        $columns = Schema::getColumnListing('device_tokens');
+        $hasFcmToken = in_array('fcm_token', $columns, true);
+        $hasToken = in_array('token', $columns, true);
+
+        if (! $hasFcmToken && ! $hasToken) {
+            throw new \RuntimeException('device_tokens table is missing fcm_token/token column.');
+        }
 
         DeviceToken::query()
             ->where('token_hash', $hash)
@@ -93,14 +107,14 @@ class FirebaseCloudMessagingService
         ];
 
         // Keep both columns in sync when legacy `token` still exists (e.g. SQLite rename path).
-        if ($this->hasFcmTokenColumn()) {
+        if ($hasFcmToken) {
             $payload['fcm_token'] = $token;
         }
-        if (Schema::hasColumn('device_tokens', 'token')) {
+        if ($hasToken) {
             $payload['token'] = $token;
         }
 
-        return DeviceToken::query()->updateOrCreate(
+        $device = DeviceToken::query()->updateOrCreate(
             [
                 'tokenable_type' => $owner::class,
                 'tokenable_id' => $owner->getKey(),
@@ -108,6 +122,16 @@ class FirebaseCloudMessagingService
             ],
             $payload,
         );
+
+        // Guard against mass-assignment / schema-cache misses leaving the token blank.
+        if ($hasFcmToken && blank($device->fcm_token)) {
+            $device->forceFill(['fcm_token' => $token])->save();
+        }
+        if ($hasToken && blank($device->getAttribute('token'))) {
+            $device->forceFill(['token' => $token])->save();
+        }
+
+        return $device->fresh() ?? $device;
     }
 
     public function removeToken(Model $owner, string $token): void
