@@ -5,21 +5,18 @@ namespace App\Services;
 use App\Models\JewelleryEmiPlan;
 use App\Models\JewelleryOrder;
 use App\Models\JewelleryOrderEmiInstallment;
-use App\Models\Payment;
 use App\Models\User;
 use App\Support\DeliveryOtp;
 use App\Support\JewelleryEmiPayload;
 use App\Support\KycPayload;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class JewelleryEmiService
 {
     public function __construct(
         protected WalletService $wallet,
-        protected RazorpayService $razorpay,
         protected ReferralService $referrals,
     ) {}
 
@@ -50,8 +47,8 @@ class JewelleryEmiService
             'wallet_balance_display' => '₹'.number_format($walletBalance, 2),
             'can_pay' => $pending->isNotEmpty(),
             'shortfall' => round(max(0, $amount - $walletBalance), 2),
-            'default_payment_method' => 'razorpay',
-            'payment_methods' => ['razorpay', 'wallet'],
+            'default_payment_method' => 'direct',
+            'payment_methods' => ['direct', 'wallet'],
             'installments' => $pending->map(fn (JewelleryOrderEmiInstallment $row): array => [
                 'id' => $row->id,
                 'installment_number' => (int) $row->installment_number,
@@ -62,16 +59,16 @@ class JewelleryEmiService
     }
 
     /**
-     * Start force-pay of all remaining EMIs.
-     * - razorpay: creates Razorpay order (client must verify after payment)
-     * - wallet: debits wallet and marks EMIs paid immediately
+     * Pay all remaining EMIs immediately.
+     * - direct (default): marks EMIs paid on API hit (no gateway)
+     * - wallet: debits wallet then marks EMIs paid
      *
      * @return array<string, mixed>
      */
     public function payAllRemaining(
         JewelleryOrder $order,
         User $user,
-        string $paymentMethod = 'razorpay',
+        string $paymentMethod = 'direct',
     ): array {
         $this->assertPayableEmiOrder($order, $user);
         KycPayload::assertCanPerformTransactions($user);
@@ -79,90 +76,20 @@ class JewelleryEmiService
         $paymentMethod = strtolower(trim($paymentMethod));
 
         return match ($paymentMethod) {
-            'razorpay' => $this->initiateRazorpayPayAll($order, $user),
+            'direct' => $this->settlePayAllDirect($order, $user),
             'wallet' => $this->settlePayAllWithWallet($order, $user),
             default => throw ValidationException::withMessages([
-                'payment_method' => ['Supported payment methods: razorpay, wallet.'],
+                'payment_method' => ['Supported payment methods: direct, wallet.'],
             ]),
         };
     }
 
     /**
-     * Verify Razorpay payment and mark all remaining EMIs paid.
-     *
      * @return array<string, mixed>
      */
-    public function verifyRazorpayPayAll(
-        JewelleryOrder $order,
-        User $user,
-        string $razorpayOrderId,
-        string $razorpayPaymentId,
-        string $razorpaySignature,
-    ): array {
-        $this->assertPayableEmiOrder($order, $user);
-
-        $payment = Payment::query()
-            ->where('user_id', $user->id)
-            ->where('payable_type', JewelleryOrder::class)
-            ->where('payable_id', $order->id)
-            ->where('gateway', 'razorpay')
-            ->where('gateway_reference', $razorpayOrderId)
-            ->latest('id')
-            ->first();
-
-        if (! $payment) {
-            throw ValidationException::withMessages([
-                'razorpay_order_id' => ['Razorpay order not found for this EMI payment.'],
-            ]);
-        }
-
-        if ($payment->status === 'completed') {
-            $order = $order->fresh([
-                'items.product',
-                'items.variant',
-                'payment',
-                'emiInstallments',
-                'invoice',
-                'driver',
-                'user',
-            ]);
-
-            return $this->payAllResultPayload(
-                amount: round((float) $payment->amount, 2),
-                installmentsPaid: 0,
-                installmentIds: [],
-                paymentMethod: 'razorpay',
-                order: $order,
-                user: $user,
-                checkout: null,
-                alreadyCompleted: true,
-            );
-        }
-
-        $this->razorpay->verifyPaymentSignature($razorpayOrderId, $razorpayPaymentId, $razorpaySignature);
-
-        $gatewayPayment = $this->razorpay->fetchPayment($razorpayPaymentId);
-
-        if (! in_array($gatewayPayment['status'], ['captured', 'authorized'], true)) {
-            throw ValidationException::withMessages([
-                'razorpay_payment_id' => ['Razorpay payment is not successful yet.'],
-            ]);
-        }
-
-        if (($gatewayPayment['order_id'] ?? '') !== $razorpayOrderId) {
-            throw ValidationException::withMessages([
-                'razorpay_order_id' => ['Razorpay order mismatch.'],
-            ]);
-        }
-
-        $expectedPaise = (int) round(((float) $payment->amount) * 100);
-        if ((int) $gatewayPayment['amount'] !== $expectedPaise) {
-            throw ValidationException::withMessages([
-                'amount' => ['Paid amount does not match the EMI pay-all total.'],
-            ]);
-        }
-
-        return DB::transaction(function () use ($order, $user, $payment, $razorpayPaymentId): array {
+    protected function settlePayAllDirect(JewelleryOrder $order, User $user): array
+    {
+        return DB::transaction(function () use ($order, $user): array {
             $pending = $order->emiInstallments()
                 ->where('status', 'pending')
                 ->orderBy('installment_number')
@@ -170,51 +97,22 @@ class JewelleryEmiService
                 ->get();
 
             if ($pending->isEmpty()) {
-                $payment->update([
-                    'status' => 'completed',
-                    'gateway_payment_id' => $razorpayPaymentId,
-                    'paid_at' => now(),
-                    'failure_reason' => 'No pending EMIs at verify time',
+                throw ValidationException::withMessages([
+                    'emi' => ['All EMIs for this order are already paid.'],
                 ]);
-
-                $order = $order->fresh([
-                    'items.product',
-                    'items.variant',
-                    'payment',
-                    'emiInstallments',
-                    'invoice',
-                    'driver',
-                    'user',
-                ]);
-
-                return $this->payAllResultPayload(
-                    amount: round((float) $payment->amount, 2),
-                    installmentsPaid: 0,
-                    installmentIds: [],
-                    paymentMethod: 'razorpay',
-                    order: $order,
-                    user: $user,
-                    checkout: null,
-                    alreadyCompleted: true,
-                );
             }
 
+            $amount = round((float) $pending->sum('amount'), 2);
             $paidIds = [];
+
             foreach ($pending as $installment) {
                 $this->markInstallmentPaid(
                     $installment,
                     null,
-                    'Paid via Razorpay force pay-all ('.$razorpayPaymentId.')',
+                    'Paid via force pay-all (direct)',
                 );
                 $paidIds[] = $installment->id;
             }
-
-            $payment->update([
-                'status' => 'completed',
-                'gateway_payment_id' => $razorpayPaymentId,
-                'paid_at' => now(),
-                'failure_reason' => null,
-            ]);
 
             $order = $order->fresh([
                 'items.product',
@@ -227,95 +125,14 @@ class JewelleryEmiService
             ]);
 
             return $this->payAllResultPayload(
-                amount: round((float) $payment->amount, 2),
+                amount: $amount,
                 installmentsPaid: count($paidIds),
                 installmentIds: $paidIds,
-                paymentMethod: 'razorpay',
+                paymentMethod: 'direct',
                 order: $order,
-                user: $user,
-                checkout: null,
+                user: $user->fresh(),
             );
         });
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function initiateRazorpayPayAll(JewelleryOrder $order, User $user): array
-    {
-        $pending = $order->emiInstallments()
-            ->where('status', 'pending')
-            ->orderBy('installment_number')
-            ->get();
-
-        if ($pending->isEmpty()) {
-            throw ValidationException::withMessages([
-                'emi' => ['All EMIs for this order are already paid.'],
-            ]);
-        }
-
-        $amount = round((float) $pending->sum('amount'), 2);
-        $reference = 'EMIALL-'.$order->id.'-'.strtoupper(Str::random(8));
-
-        $payment = Payment::query()->create([
-            'reference_id' => $reference,
-            'user_id' => $user->id,
-            'payable_type' => JewelleryOrder::class,
-            'payable_id' => $order->id,
-            'amount' => $amount,
-            'currency' => 'INR',
-            'status' => 'pending',
-            'gateway' => 'razorpay',
-        ]);
-
-        $razorpayOrder = $this->razorpay->createOrder($amount, $reference, [
-            'type' => 'jewellery_emi_pay_all',
-            'jewellery_order_id' => (string) $order->id,
-            'payment_id' => (string) $payment->id,
-            'pending_count' => (string) $pending->count(),
-        ]);
-
-        $payment->update([
-            'gateway_reference' => $razorpayOrder['id'],
-        ]);
-
-        return $this->payAllResultPayload(
-            amount: $amount,
-            installmentsPaid: 0,
-            installmentIds: [],
-            paymentMethod: 'razorpay',
-            order: $order->fresh([
-                'items.product',
-                'items.variant',
-                'payment',
-                'emiInstallments',
-                'invoice',
-                'driver',
-                'user',
-            ]),
-            user: $user,
-            checkout: [
-                'payment_id' => $payment->id,
-                'reference_id' => $payment->reference_id,
-                'key' => $this->razorpay->keyId(),
-                'order_id' => $razorpayOrder['id'],
-                'amount' => $razorpayOrder['amount'],
-                'currency' => $razorpayOrder['currency'],
-                'name' => config('app.name', 'Hoxtan'),
-                'description' => 'Pay all remaining EMIs for order '.($order->order_number ?: '#'.$order->id),
-                'prefill' => [
-                    'name' => $user->name,
-                    'contact' => $user->phone,
-                    'email' => $user->email,
-                ],
-                'notes' => [
-                    'jewellery_order_id' => (string) $order->id,
-                    'type' => 'jewellery_emi_pay_all',
-                ],
-                'next_api' => '/api/v1/orders/'.$order->id.'/emi/pay-all/verify',
-            ],
-            requiresVerification: true,
-        );
     }
 
     /**
@@ -383,14 +200,12 @@ class JewelleryEmiService
                 paymentMethod: 'wallet',
                 order: $order,
                 user: $user->fresh(),
-                checkout: null,
             );
         });
     }
 
     /**
      * @param  list<int>  $installmentIds
-     * @param  array<string, mixed>|null  $checkout
      * @return array<string, mixed>
      */
     protected function payAllResultPayload(
@@ -400,9 +215,6 @@ class JewelleryEmiService
         string $paymentMethod,
         JewelleryOrder $order,
         User $user,
-        ?array $checkout,
-        bool $requiresVerification = false,
-        bool $alreadyCompleted = false,
     ): array {
         return [
             'amount_paid' => $amount,
@@ -410,12 +222,9 @@ class JewelleryEmiService
             'installments_paid' => $installmentsPaid,
             'installment_ids' => $installmentIds,
             'payment_method' => $paymentMethod,
-            'requires_verification' => $requiresVerification,
-            'already_completed' => $alreadyCompleted,
             'wallet_balance' => round((float) $user->wallet_balance, 2),
             'fully_paid' => $order->emiInstallmentsFullyPaid(),
             'delivery_unlocked' => $order->isDeliveryEligible(),
-            'razorpay' => $checkout,
             'order' => $order,
         ];
     }
