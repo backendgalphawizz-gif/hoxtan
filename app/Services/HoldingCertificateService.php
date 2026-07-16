@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\HoldingCertificate;
 use App\Models\Investment;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 
@@ -99,8 +100,16 @@ class HoldingCertificateService
             'issuedAtDisplay' => $certificate->issued_at?->format('d M Y'),
         ])->render();
 
-        $path = 'certificates/'.$certificate->certificate_number.'.html';
-        Storage::disk('local')->put($path, $html);
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'portrait');
+        $path = 'certificates/'.$certificate->certificate_number.'.pdf';
+
+        // Remove legacy HTML certificate if present.
+        $legacyHtml = 'certificates/'.$certificate->certificate_number.'.html';
+        if (Storage::disk('local')->exists($legacyHtml)) {
+            Storage::disk('local')->delete($legacyHtml);
+        }
+
+        Storage::disk('local')->put($path, $pdf->output());
         $certificate->update(['file_path' => $path]);
     }
 

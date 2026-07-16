@@ -24,8 +24,8 @@ class CertificateDownloadController
 
         return Storage::disk('local')->download(
             $certificate->file_path,
-            $certificate->certificate_number.'.html',
-            ['Content-Type' => 'text/html'],
+            $certificate->certificate_number.'.pdf',
+            ['Content-Type' => 'application/pdf'],
         );
     }
 }
