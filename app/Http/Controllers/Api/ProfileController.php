@@ -286,18 +286,8 @@ class ProfileController extends Controller
 
     public function downloadInvoice(Invoice $invoice, InvoiceService $invoices): StreamedResponse|JsonResponse
     {
-        if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
-            if ($invoice->jewellery_order_id) {
-                $order = $invoice->jewelleryOrder()->firstOrFail();
-                $invoices->generateForJewelleryOrder($order);
-            } elseif ($invoice->old_gold_booking_id) {
-                $booking = $invoice->oldGoldBooking()->firstOrFail();
-                $invoices->generateForOldGoldBooking($booking);
-            } elseif ($invoice->investment_id) {
-                $invoices->generateForInvestment($invoice->investment()->firstOrFail());
-            }
-            $invoice->refresh();
-        }
+        $invoices->writeFile($invoice);
+        $invoice->refresh();
 
         if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
             return ApiResponse::error('Invoice file not found.', [], 404);
@@ -305,8 +295,8 @@ class ProfileController extends Controller
 
         return Storage::disk('local')->download(
             $invoice->file_path,
-            $invoice->invoice_number.'.html',
-            ['Content-Type' => 'text/html'],
+            $invoice->invoice_number.'.pdf',
+            ['Content-Type' => 'application/pdf'],
         );
     }
 
