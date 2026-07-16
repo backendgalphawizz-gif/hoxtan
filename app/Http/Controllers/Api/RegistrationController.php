@@ -68,6 +68,8 @@ class RegistrationController extends AuthController
 
         $phone = PhoneRules::normalize($data['phone']);
         $fcmToken = FcmTokenRequest::from($request);
+        $platform = FcmTokenRequest::platform($request);
+        $deviceName = FcmTokenRequest::deviceName($request);
 
         $otp->verifyRegistrationOtp($phone, $data['otp']);
 
@@ -85,9 +87,9 @@ class RegistrationController extends AuthController
 
                 if (filled($readableMpin)) {
                     $token = $existingUser->createToken('mobile-app')->plainTextToken;
-                    $fcmResult = $this->registerFcmToken($existingUser, $request, $fcm, $fcmToken);
+                    $fcmResult = $this->registerFcmToken($existingUser, $fcm, $fcmToken, $platform, $deviceName);
 
-                    return ApiResponse::success([
+                    return ApiResponse::success(array_merge([
                         'already_registered' => true,
                         'requires_mpin' => false,
                         'phone' => $phone,
@@ -96,15 +98,13 @@ class RegistrationController extends AuthController
                         'has_mpin' => true,
                         'mpin_legacy_hashed' => false,
                         'token' => $token,
-                        'fcm_token_registered' => $fcmResult['registered'],
-                        'device_token_id' => $fcmResult['device_token_id'],
                         'user' => $this->userPayload($existingUser),
-                    ], 'Login successful.');
+                    ], $this->fcmResponseMeta($fcmToken, $fcmResult)), 'Login successful.');
                 }
 
-                $fcmResult = $this->registerFcmToken($existingUser, $request, $fcm, $fcmToken);
+                $fcmResult = $this->registerFcmToken($existingUser, $fcm, $fcmToken, $platform, $deviceName);
 
-                return ApiResponse::success([
+                return ApiResponse::success(array_merge([
                     'already_registered' => true,
                     'requires_mpin' => true,
                     'phone' => $phone,
@@ -113,10 +113,8 @@ class RegistrationController extends AuthController
                     'has_mpin' => filled($existingUser->getRawOriginal('mpin')),
                     'mpin_legacy_hashed' => $existingUser->usesLegacyHashedMpin(),
                     'next_api' => '/api/v1/register/login-mpin',
-                    'fcm_token_registered' => $fcmResult['registered'],
-                    'device_token_id' => $fcmResult['device_token_id'],
                     'user' => $this->userPayload($existingUser),
-                ], $existingUser->usesLegacyHashedMpin()
+                ], $this->fcmResponseMeta($fcmToken, $fcmResult)), $existingUser->usesLegacyHashedMpin()
                     ? 'OTP verified. Please reset your M-PIN once using Forgot M-PIN or admin.'
                     : 'OTP verified. Please enter your M-PIN to login.');
             }
@@ -128,24 +126,22 @@ class RegistrationController extends AuthController
             }
 
             $token = $existingUser->createToken('mobile-app')->plainTextToken;
-            $fcmResult = $this->registerFcmToken($existingUser, $request, $fcm, $fcmToken);
+            $fcmResult = $this->registerFcmToken($existingUser, $fcm, $fcmToken, $platform, $deviceName);
 
-            return ApiResponse::success([
+            return ApiResponse::success(array_merge([
                 'already_registered' => true,
                 'phone' => $phone,
                 'mpin' => $existingUser->readableMpin() ?? $data['mpin'],
                 'mpin_length' => $mpinLength,
                 'token' => $token,
-                'fcm_token_registered' => $fcmResult['registered'],
-                'device_token_id' => $fcmResult['device_token_id'],
                 'user' => $this->userPayload($existingUser),
-            ], 'Login successful.');
+            ], $this->fcmResponseMeta($fcmToken, $fcmResult)), 'Login successful.');
         }
 
         $session = $sessions->create($phone, [
             'fcm_token' => $fcmToken,
-            'platform' => $request->input('platform'),
-            'device_name' => $request->input('device_name'),
+            'platform' => $platform,
+            'device_name' => $deviceName,
         ]);
 
         return ApiResponse::success([
@@ -156,6 +152,10 @@ class RegistrationController extends AuthController
             'phone' => $phone,
             'mpin_length' => $mpinLength,
             'fcm_token_received' => $fcmToken !== null,
+            'fcm_token_registered' => false,
+            'fcm_token_skipped_reason' => $fcmToken === null
+                ? 'empty_or_missing'
+                : 'saved_after_mpin',
         ], 'Mobile number verified successfully.');
     }
 
@@ -269,69 +269,48 @@ class RegistrationController extends AuthController
             $session['referral_code'] ?? null,
         );
 
-        $fcmToken = FcmTokenRequest::from($request) ?? (filled($session['fcm_token'] ?? null) ? (string) $session['fcm_token'] : null);
-        $platform = $request->input('platform') ?? ($session['platform'] ?? null);
-        $deviceName = $request->input('device_name') ?? ($session['device_name'] ?? null);
+        $fcmToken = FcmTokenRequest::from($request)
+            ?? (filled($session['fcm_token'] ?? null) ? (string) $session['fcm_token'] : null);
+        $platform = FcmTokenRequest::platform($request)
+            ?? (filled($session['platform'] ?? null) ? (string) $session['platform'] : null);
+        $deviceName = FcmTokenRequest::deviceName($request)
+            ?? (filled($session['device_name'] ?? null) ? (string) $session['device_name'] : null);
 
-        $fcmResult = ['registered' => false, 'device_token_id' => null];
-        if ($fcmToken !== null) {
-            try {
-                $device = $fcm->registerToken(
-                    $user,
-                    $fcmToken,
-                    is_string($platform) ? $platform : null,
-                    is_string($deviceName) ? $deviceName : null,
-                );
-                $fcmResult = [
-                    'registered' => true,
-                    'device_token_id' => $device->id,
-                ];
-            } catch (\Throwable $e) {
-                Log::error('User FCM token save failed during registration', [
-                    'user_id' => $user->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+        $fcmResult = $this->registerFcmToken($user, $fcm, $fcmToken, $platform, $deviceName);
 
         $sessions->forget($data['registration_token'], $session['phone']);
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 
-        return ApiResponse::success([
+        return ApiResponse::success(array_merge([
             'mpin' => $data['mpin'],
             'mpin_length' => $length,
             'token' => $token,
-            'fcm_token_registered' => $fcmResult['registered'],
-            'device_token_id' => $fcmResult['device_token_id'],
             'user' => $this->userPayload($user),
-        ], 'M-PIN created successfully.', 201);
+        ], $this->fcmResponseMeta($fcmToken, $fcmResult)), 'M-PIN created successfully.', 201);
     }
 
     /**
-     * @return array{registered: bool, device_token_id: int|null}
+     * @return array{registered: bool, device_token_id: int|null, error: string|null}
      */
     protected function registerFcmToken(
         User $user,
-        Request $request,
         FirebaseCloudMessagingService $fcm,
         ?string $fcmToken,
+        ?string $platform = null,
+        ?string $deviceName = null,
     ): array {
         if ($fcmToken === null) {
-            return ['registered' => false, 'device_token_id' => null];
+            return ['registered' => false, 'device_token_id' => null, 'error' => null];
         }
 
         try {
-            $device = $fcm->registerToken(
-                $user,
-                $fcmToken,
-                $request->input('platform'),
-                $request->input('device_name'),
-            );
+            $device = $fcm->registerToken($user, $fcmToken, $platform, $deviceName);
 
             return [
                 'registered' => true,
                 'device_token_id' => $device->id,
+                'error' => null,
             ];
         } catch (\Throwable $e) {
             Log::error('User FCM token save failed', [
@@ -339,7 +318,32 @@ class RegistrationController extends AuthController
                 'error' => $e->getMessage(),
             ]);
 
-            return ['registered' => false, 'device_token_id' => null];
+            return [
+                'registered' => false,
+                'device_token_id' => null,
+                'error' => $e->getMessage(),
+            ];
         }
+    }
+
+    /**
+     * @param  array{registered: bool, device_token_id: int|null, error?: string|null}  $fcmResult
+     * @return array<string, mixed>
+     */
+    protected function fcmResponseMeta(?string $fcmToken, array $fcmResult): array
+    {
+        $meta = [
+            'fcm_token_registered' => (bool) ($fcmResult['registered'] ?? false),
+            'device_token_id' => $fcmResult['device_token_id'] ?? null,
+        ];
+
+        if ($fcmToken === null) {
+            $meta['fcm_token_skipped_reason'] = 'empty_or_missing';
+        } elseif (! ($fcmResult['registered'] ?? false)) {
+            $meta['fcm_token_skipped_reason'] = 'save_failed';
+            $meta['fcm_token_error'] = $fcmResult['error'] ?? 'Unable to save FCM token.';
+        }
+
+        return $meta;
     }
 }

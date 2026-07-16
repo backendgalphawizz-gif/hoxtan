@@ -345,6 +345,8 @@ class RegistrationApiTest extends TestCase
 
         $verify->assertOk()
             ->assertJsonPath('data.already_registered', false)
-            ->assertJsonPath('data.fcm_token_received', false);
+            ->assertJsonPath('data.fcm_token_received', false)
+            ->assertJsonPath('data.fcm_token_registered', false)
+            ->assertJsonPath('data.fcm_token_skipped_reason', 'empty_or_missing');
     }
 }

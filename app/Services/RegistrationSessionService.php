@@ -25,16 +25,17 @@ class RegistrationSessionService
         $ttl = config('otp.registration_session_ttl', 1800);
         $token = Str::random(64);
 
-        Cache::put($this->sessionCacheKey($token), array_merge([
+        $session = [
             'phone' => $phone,
             'name' => null,
             'referral_code' => null,
             'created_at' => now()->timestamp,
-        ], array_filter([
-            'fcm_token' => $extra['fcm_token'] ?? null,
-            'platform' => $extra['platform'] ?? null,
-            'device_name' => $extra['device_name'] ?? null,
-        ], fn ($value) => filled($value))), $ttl);
+            'fcm_token' => filled($extra['fcm_token'] ?? null) ? (string) $extra['fcm_token'] : null,
+            'platform' => filled($extra['platform'] ?? null) ? (string) $extra['platform'] : null,
+            'device_name' => filled($extra['device_name'] ?? null) ? (string) $extra['device_name'] : null,
+        ];
+
+        Cache::put($this->sessionCacheKey($token), $session, $ttl);
 
         return [
             'token' => $token,
