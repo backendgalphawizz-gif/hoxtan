@@ -49,13 +49,7 @@ class UserProfilePayload
                 'date_of_birth_display' => $user->nominee_date_of_birth?->format('d/m/Y'),
             ],
             'pan' => self::pan($user),
-            'bank' => [
-                'account_holder_name' => $user->kycDetail?->account_holder_name,
-                'bank_name' => $user->kycDetail?->bank_name,
-                'account_number' => $user->kycDetail?->account_number,
-                'ifsc_code' => $user->kycDetail?->ifsc_code,
-                'verification_status' => $user->kycDetail?->bank_verification_status,
-            ],
+            'bank' => self::bank($user),
         ];
     }
 
@@ -75,6 +69,26 @@ class UserProfilePayload
             'verification_status' => $detail?->pan_verification_status,
             'verified' => $detail?->pan_verification_status === 'verified',
             'verified_at' => $detail?->pan_verified_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected static function bank(User $user): array
+    {
+        $detail = $user->kycDetail;
+
+        return [
+            'account_holder_name' => $detail?->account_holder_name,
+            'bank_name' => $detail?->bank_name,
+            'account_number' => $detail?->account_number,
+            'account_number_masked' => KycPayload::maskAccount($detail?->account_number),
+            'ifsc_code' => $detail?->ifsc_code,
+            'upi_id' => $detail?->upi_id,
+            'verification_status' => $detail?->bank_verification_status,
+            'verified' => in_array($detail?->bank_verification_status, ['verified', 'approved'], true),
+            'submitted_at' => $detail?->bank_submitted_at?->toIso8601String(),
         ];
     }
 

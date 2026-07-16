@@ -326,27 +326,79 @@ class KycService
     {
         $this->assertKycEditable($user);
 
-        $detail = $this->getOrCreateDetail($user);
-        $providerResponse = $this->provider->submitBankVerification($data, $user);
+        $data['ifsc_code'] = strtoupper((string) $data['ifsc_code']);
+        $data['account_number'] = preg_replace('/\s+/', '', (string) $data['account_number']) ?? '';
 
+        $providerResponse = $this->provider->submitBankVerification($data, $user);
+        $providerData = is_array($providerResponse['data'] ?? null) ? $providerResponse['data'] : [];
+        $status = (string) ($providerResponse['status'] ?? 'pending');
+        $providerFullName = isset($providerData['full_name']) && is_string($providerData['full_name'])
+            ? $providerData['full_name']
+            : null;
+
+        if ($status === 'verified' && filled($providerFullName)) {
+            $this->assertBankAccountHolderNameMatches(
+                (string) $data['account_holder_name'],
+                $providerFullName,
+            );
+        }
+
+        $ifscDetails = is_array($providerData['ifsc_details'] ?? null) ? $providerData['ifsc_details'] : [];
+        $bankName = $data['bank_name']
+            ?? ($ifscDetails['bank'] ?? null)
+            ?? ($ifscDetails['BANK'] ?? null);
+
+        $detail = $this->getOrCreateDetail($user);
         $detail->update([
-            'account_holder_name' => $data['account_holder_name'],
-            'bank_name' => $data['bank_name'],
+            'account_holder_name' => filled($providerFullName)
+                ? $providerFullName
+                : $data['account_holder_name'],
+            'bank_name' => $bankName,
             'account_number' => $data['account_number'],
-            'ifsc_code' => strtoupper($data['ifsc_code']),
-            'upi_id' => $data['upi_id'] ?? null,
-            'bank_verification_status' => $providerResponse['status'] ?? 'pending',
+            'ifsc_code' => $data['ifsc_code'],
+            'upi_id' => $data['upi_id'] ?? ($providerData['upi_id'] ?? null),
+            'bank_verification_status' => $status,
             'bank_submitted_at' => now(),
         ]);
 
-        $this->syncUserKycStatus($user->fresh(), $detail->fresh());
+        $detail = $detail->fresh();
+        $this->syncUserKycStatus($user->fresh(), $detail);
+
+        $verified = $status === 'verified';
 
         return [
-            'message' => 'Bank details submitted successfully.',
+            'message' => $verified
+                ? (string) ($providerResponse['message'] ?? 'Bank account verified successfully.')
+                : 'Bank details submitted successfully.',
+            'verified' => $verified,
+            'name_matched' => $verified && filled($providerFullName),
             'provider_reference' => $providerResponse['provider_reference'] ?? null,
             'provider_message' => $providerResponse['message'] ?? null,
-            'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
+            'bank' => [
+                'account_holder_name' => $detail->account_holder_name,
+                'bank_name' => $detail->bank_name,
+                'account_number_masked' => KycPayload::maskAccount($detail->account_number),
+                'ifsc_code' => $detail->ifsc_code,
+                'upi_id' => $detail->upi_id,
+                'verification_status' => $detail->bank_verification_status,
+                'account_exists' => $providerData['account_exists'] ?? null,
+                'remarks' => $providerData['remarks'] ?? null,
+                'ifsc_details' => $ifscDetails !== [] ? $ifscDetails : null,
+            ],
+            'kyc' => KycPayload::overview($user->fresh(), $detail),
         ];
+    }
+
+    /**
+     * Match Surepass bank full_name against the submitted account_holder_name only.
+     */
+    protected function assertBankAccountHolderNameMatches(string $accountHolderName, string $providerFullName): void
+    {
+        if ($this->normalizePersonName($accountHolderName) !== $this->normalizePersonName($providerFullName)) {
+            throw ValidationException::withMessages([
+                'account_holder_name' => ['Account holder name does not match the name registered with the bank.'],
+            ]);
+        }
     }
 
     /**

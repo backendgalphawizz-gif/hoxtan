@@ -14,7 +14,6 @@ return [
     'purities' => [
         'gold' => [
             ['value' => '22K', 'label' => '22K'],
-            
         ],
         'silver' => [
             ['value' => '999', 'label' => '999 Fine Silver'],
@@ -25,7 +24,7 @@ return [
             ['value' => '22K', 'label' => '22K'],
             ['value' => '999', 'label' => '999 Fine Silver'],
             ['value' => '925', 'label' => '925 Sterling Silver'],
-          
+            
         ],
     ],
 
