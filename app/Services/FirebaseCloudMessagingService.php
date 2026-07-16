@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Schema;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Exception\MessagingException;
 use Kreait\Firebase\Factory;
+use Kreait\Firebase\Messaging\AndroidConfig;
+use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 use Throwable;
@@ -194,14 +196,34 @@ class FirebaseCloudMessagingService
 
         $unique = $tokens->filter()->unique()->values()->all();
 
+        $recipientMeta = collect($recipients)
+            ->filter(fn ($r) => $r instanceof Model)
+            ->map(fn (Model $r) => [
+                'type' => $r::class,
+                'id' => $r->getKey(),
+            ])
+            ->values()
+            ->all();
+
         if ($unique === []) {
             Log::warning('FCM skipped: no device tokens for recipients', [
                 'title' => $title,
                 'type' => $type,
+                'recipients' => $recipientMeta,
             ]);
         }
 
         $result = $this->sendToTokens($unique, $title, $body, $data);
+
+        Log::info('FCM sendToOwners result', [
+            'title' => $title,
+            'type' => $type,
+            'recipients' => $recipientMeta,
+            'tokens' => count($unique),
+            'success' => $result['success'] ?? 0,
+            'failure' => $result['failure'] ?? 0,
+            'firebase_ready' => $this->messaging() !== null,
+        ]);
 
         return array_merge($result, [
             'tokens' => count($unique),
@@ -240,9 +262,40 @@ class FirebaseCloudMessagingService
             }
         }
 
-        $message = CloudMessage::new()
-            ->withNotification(Notification::create($title, $body))
-            ->withData($stringData);
+        $channelId = (string) config('firebase.android_channel_id', 'hoxtan_default');
+
+        $buildMessage = function (?string $registrationToken = null) use ($title, $body, $stringData, $channelId): CloudMessage {
+            $message = CloudMessage::new()
+                ->withNotification(Notification::create($title, $body))
+                ->withData($stringData)
+                ->withAndroidConfig(AndroidConfig::fromArray([
+                    'priority' => 'high',
+                    'notification' => [
+                        'channel_id' => $channelId,
+                        'sound' => 'default',
+                        'default_vibrate_timings' => true,
+                    ],
+                ]))
+                ->withApnsConfig(ApnsConfig::fromArray([
+                    'headers' => [
+                        'apns-priority' => '10',
+                    ],
+                    'payload' => [
+                        'aps' => [
+                            'sound' => 'default',
+                            'content-available' => 1,
+                        ],
+                    ],
+                ]));
+
+            if ($registrationToken !== null) {
+                $message = $message->withToken($registrationToken);
+            }
+
+            return $message;
+        };
+
+        $message = $buildMessage();
 
         $success = 0;
         $failure = 0;
@@ -259,12 +312,7 @@ class FirebaseCloudMessagingService
                 // Fallback: send one-by-one
                 foreach ($chunk as $registrationToken) {
                     try {
-                        $messaging->send(
-                            CloudMessage::new()
-                                ->withToken($registrationToken)
-                                ->withNotification(Notification::create($title, $body))
-                                ->withData($stringData)
-                        );
+                        $messaging->send($buildMessage($registrationToken));
                         $success++;
                     } catch (Throwable $inner) {
                         $failure++;

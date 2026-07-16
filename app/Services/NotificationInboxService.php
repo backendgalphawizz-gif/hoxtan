@@ -13,6 +13,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class NotificationInboxService
 {
@@ -42,7 +43,15 @@ class NotificationInboxService
         ]);
 
         if ($push) {
-            $this->fcm->sendToOwners([$user], $title, $body, $data, $type);
+            try {
+                $this->fcm->sendToOwners([$user], $title, $body, $data, $type);
+            } catch (\Throwable $e) {
+                Log::warning('User FCM push failed', [
+                    'user_id' => $user->id,
+                    'type' => $type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return $notification;
@@ -79,7 +88,58 @@ class NotificationInboxService
         });
 
         if ($push && $count > 0) {
-            $this->fcm->sendToOwners($users, $title, $body, $data, $type);
+            try {
+                $this->fcm->sendToOwners($users, $title, $body, $data, $type);
+            } catch (\Throwable $e) {
+                Log::warning('Users FCM push failed', [
+                    'count' => $count,
+                    'type' => $type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  Collection<int, Driver>|iterable<Driver>  $drivers
+     * @param  array<string, mixed>  $data
+     */
+    public function notifyDrivers(
+        iterable $drivers,
+        string $title,
+        string $body,
+        ?string $type = null,
+        array $data = [],
+        bool $push = true,
+    ): int {
+        $drivers = collect($drivers)->unique('id')->values();
+        $count = 0;
+
+        DB::transaction(function () use ($drivers, $title, $body, $type, $data, &$count): void {
+            foreach ($drivers as $driver) {
+                DriverNotification::create([
+                    'driver_id' => $driver->id,
+                    'title' => $title,
+                    'body' => $body,
+                    'type' => $type,
+                    'data' => $data === [] ? null : $data,
+                ]);
+                $count++;
+            }
+        });
+
+        if ($push && $count > 0) {
+            try {
+                $this->fcm->sendToOwners($drivers, $title, $body, $data, $type);
+            } catch (\Throwable $e) {
+                Log::warning('Drivers FCM push failed', [
+                    'count' => $count,
+                    'type' => $type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return $count;
@@ -151,8 +211,13 @@ class NotificationInboxService
         if ($push) {
             try {
                 $this->fcm->sendToOwners([$driver], $title, $body, $data, $type);
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
                 // Inbox row is already saved; push failures must not roll that back.
+                Log::warning('Driver FCM push failed', [
+                    'driver_id' => $driver->id,
+                    'type' => $type,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 

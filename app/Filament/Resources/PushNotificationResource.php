@@ -54,17 +54,33 @@ class PushNotificationResource extends Resource
                             ->options([
                                 'all' => 'All Users',
                                 'specific' => 'Specific Users',
+                                'all_drivers' => 'All Drivers',
+                                'specific_drivers' => 'Specific Drivers',
                             ])
                             ->required()
                             ->default('all')
                             ->live(),
                         Forms\Components\Select::make('target_user_ids')
-                            ->label('Target Users')
+                            ->label(fn (Forms\Get $get) => in_array($get('target'), ['all_drivers', 'specific_drivers'], true)
+                                ? 'Target Drivers'
+                                : 'Target Users')
                             ->multiple()
-                            ->options(fn () => User::query()->pluck('name', 'id'))
+                            ->options(function (Forms\Get $get) {
+                                if (in_array($get('target'), ['all_drivers', 'specific_drivers'], true)) {
+                                    return \App\Models\Driver::query()
+                                        ->where('is_active', true)
+                                        ->orderBy('name')
+                                        ->get()
+                                        ->mapWithKeys(fn ($driver) => [
+                                            $driver->id => trim($driver->name.' ('.$driver->phone.')'),
+                                        ]);
+                                }
+
+                                return User::query()->pluck('name', 'id');
+                            })
                             ->searchable()
-                            ->visible(fn (Forms\Get $get) => $get('target') === 'specific')
-                            ->required(fn (Forms\Get $get) => $get('target') === 'specific'),
+                            ->visible(fn (Forms\Get $get) => in_array($get('target'), ['specific', 'specific_drivers'], true))
+                            ->required(fn (Forms\Get $get) => in_array($get('target'), ['specific', 'specific_drivers'], true)),
                         Forms\Components\Select::make('status')
                             ->options([
                                 'draft' => 'Draft',
@@ -104,7 +120,17 @@ class PushNotificationResource extends Resource
                         'primary' => 'all',
                         'success' => 'investors',
                         'warning' => 'specific',
-                    ]),
+                        'info' => 'all_drivers',
+                        'danger' => 'specific_drivers',
+                    ])
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'all' => 'All Users',
+                        'investors' => 'Investors',
+                        'specific' => 'Specific Users',
+                        'all_drivers' => 'All Drivers',
+                        'specific_drivers' => 'Specific Drivers',
+                        default => (string) $state,
+                    }),
                 Tables\Columns\BadgeColumn::make('status')
                     ->colors([
                         'gray' => 'draft',
@@ -143,6 +169,8 @@ class PushNotificationResource extends Resource
                     ->options([
                         'all' => 'All Users',
                         'specific' => 'Specific Users',
+                        'all_drivers' => 'All Drivers',
+                        'specific_drivers' => 'Specific Drivers',
                     ]),
                 FilamentDateFilters::tableFilter('scheduled_date', 'scheduled_at', 'Scheduled Date', allowFuture: true),
                 FilamentDateFilters::tableFilter('created_date', 'created_at', 'Created Date'),
@@ -164,7 +192,7 @@ class PushNotificationResource extends Resource
 
                         Notification::make()
                             ->title('Push notification sent')
-                            ->body('Notification "'.$record->title.'" delivered to '.$count.' users.')
+                            ->body('Notification "'.$record->title.'" delivered to '.$count.' recipients.')
                             ->success()
                             ->send();
                     }),

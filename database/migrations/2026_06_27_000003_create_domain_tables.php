@@ -165,7 +165,7 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->text('body');
-            $table->enum('target', ['all', 'investors', 'specific'])->default('all');
+            $table->enum('target', ['all', 'investors', 'specific', 'all_drivers', 'specific_drivers'])->default('all');
             $table->json('target_user_ids')->nullable();
             $table->enum('status', ['draft', 'scheduled', 'sent', 'failed'])->default('draft');
             $table->timestamp('scheduled_at')->nullable();

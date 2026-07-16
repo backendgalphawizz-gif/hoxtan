@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Driver;
 use App\Models\JewelleryOrder;
 use App\Models\OldGoldBooking;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -40,6 +41,20 @@ class DriverAssignmentNotificationService
             'order_number' => (string) $ref,
             'screen' => 'driver_delivery_detail',
         ]);
+
+        if ($order->user) {
+            $this->notifyCustomerAfterCommit(
+                $order->user,
+                'Driver assigned',
+                "A delivery driver has been assigned for your order {$ref}.",
+                'order_driver_assigned',
+                [
+                    'order_id' => (string) $order->id,
+                    'order_number' => (string) $ref,
+                    'screen' => 'order_detail',
+                ],
+            );
+        }
     }
 
     public function notifySellPickupAssigned(OldGoldBooking $booking): void
@@ -53,6 +68,7 @@ class DriverAssignmentNotificationService
             return;
         }
 
+        $booking->loadMissing(['user']);
         $ref = $booking->booking_number ?: ('#'.$booking->id);
         $area = $this->areaHint($booking->pickup_address);
         $title = 'New Assigned Order';
@@ -66,6 +82,20 @@ class DriverAssignmentNotificationService
             'booking_number' => (string) $ref,
             'screen' => 'driver_pickup_detail',
         ]);
+
+        if ($booking->user) {
+            $this->notifyCustomerAfterCommit(
+                $booking->user,
+                'Pickup driver assigned',
+                "A driver has been assigned for your sell jewellery pickup {$ref}.",
+                'sell_driver_assigned',
+                [
+                    'booking_id' => (string) $booking->id,
+                    'booking_number' => (string) $ref,
+                    'screen' => 'sell_detail',
+                ],
+            );
+        }
     }
 
     public function notifyJewelleryDeliveryCompleted(JewelleryOrder $order): void
@@ -122,6 +152,32 @@ class DriverAssignmentNotificationService
     {
         $send = function () use ($driver, $title, $body, $type, $data): void {
             $this->notify($driver, $title, $body, $type, $data);
+        };
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($send);
+
+            return;
+        }
+
+        $send();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function notifyCustomerAfterCommit(User $user, string $title, string $body, string $type, array $data = []): void
+    {
+        $send = function () use ($user, $title, $body, $type, $data): void {
+            try {
+                $this->inbox->notifyUser($user, $title, $body, $type, $data, push: true);
+            } catch (Throwable $e) {
+                Log::warning('Customer assignment notification failed', [
+                    'user_id' => $user->id,
+                    'type' => $type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         };
 
         if (DB::transactionLevel() > 0) {

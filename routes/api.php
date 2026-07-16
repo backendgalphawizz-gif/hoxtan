@@ -94,6 +94,8 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware(['auth:sanctum', 'driver.api'])->group(function (): void {
             Route::post('/logout', [DriverAuthController::class, 'logout']);
+            Route::post('/device-token', [DriverAuthController::class, 'registerDevice']);
+            Route::delete('/device-token', [DriverAuthController::class, 'removeDevice']);
             Route::get('/profile', [DriverProfileController::class, 'show']);
             Route::put('/profile', [DriverProfileController::class, 'update']);
             Route::post('/profile', [DriverProfileController::class, 'update']);
