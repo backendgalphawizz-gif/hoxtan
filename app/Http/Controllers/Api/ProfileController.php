@@ -52,7 +52,7 @@ class ProfileController extends Controller
             ],
             'primary_residence' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'string', Rule::in(['male', 'female', 'other'])],
-            'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'date_of_birth' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
             'market_alerts' => ['nullable', 'boolean'],
             'profile_photo' => ['nullable'],
             'image' => ['nullable'],
@@ -79,6 +79,8 @@ class ProfileController extends Controller
             'account_holder_name.regex' => 'Account holder name may only contain letters and spaces.',
             'account_number.regex' => 'Account number must contain digits only.',
             'ifsc_code.regex' => 'Invalid IFSC code format.',
+            'date_of_birth.before' => 'You must be at least 18 years old.',
+            'date_of_birth.after' => 'Please enter a valid date of birth.',
         ]);
 
         $updates = collect($data)->only([

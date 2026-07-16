@@ -16,7 +16,7 @@ class UserRegistrationService
         protected WalletService $wallet,
     ) {}
 
-    public function register(string $name, string $phone, string $mpin, ?string $referralCode = null): User
+    public function register(string $name, string $phone, string $mpin, ?string $referralCode = null, ?string $dateOfBirth = null): User
     {
         $phone = preg_replace('/\D/', '', $phone) ?? $phone;
 
@@ -34,13 +34,14 @@ class UserRegistrationService
             ]);
         }
 
-        return DB::transaction(function () use ($name, $phone, $mpin, $referrer): User {
+        return DB::transaction(function () use ($name, $phone, $mpin, $referrer, $dateOfBirth): User {
             $user = User::create([
                 'name' => $name,
                 'phone' => $phone,
                 'email' => null,
                 'password' => Hash::make(Str::random(40)),
                 'mpin' => $mpin,
+                'date_of_birth' => filled($dateOfBirth) ? $dateOfBirth : null,
                 'referral_code' => ReferralService::generateUniqueCode(),
                 'referred_by_id' => $referrer?->id,
                 'role' => 'user',

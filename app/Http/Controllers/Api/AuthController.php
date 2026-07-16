@@ -22,9 +22,13 @@ class AuthController extends Controller
             array_merge([
                 'name' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z\s]+$/'],
                 'phone' => ['required', 'string', 'regex:/^\d{10}$/'],
+                'date_of_birth' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
                 'referral_code' => ['nullable', 'string', 'max:12'],
             ], MpinRules::validationRules()),
-            MpinRules::validationMessages(),
+            array_merge(MpinRules::validationMessages(), [
+                'date_of_birth.before' => 'You must be at least 18 years old.',
+                'date_of_birth.after' => 'Please enter a valid date of birth.',
+            ]),
         );
 
         $user = $registration->register(
@@ -32,6 +36,7 @@ class AuthController extends Controller
             $data['phone'],
             $data['mpin'],
             $data['referral_code'] ?? null,
+            $data['date_of_birth'] ?? null,
         );
 
         $token = $user->createToken('mobile-app')->plainTextToken;
@@ -91,6 +96,7 @@ class AuthController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'phone' => $user->phone,
+            'date_of_birth' => $user->date_of_birth?->toDateString(),
             'referral_code' => $user->referral_code,
             'wallet_balance' => (float) $user->wallet_balance,
             'gold_holdings' => (float) $user->gold_holdings,
