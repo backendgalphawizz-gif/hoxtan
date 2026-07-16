@@ -123,7 +123,7 @@ class SellJewelleryService
 
     public function listRequests(User $user, string $filter = 'all', int $perPage = 10): array
     {
-        $query = $user->oldGoldBookings()->latest('id');
+        $query = $user->oldGoldBookings()->with('driver')->latest('id');
 
         if ($filter === 'pending') {
             $query->where('status', 'pending');

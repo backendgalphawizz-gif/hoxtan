@@ -63,12 +63,9 @@ class OrderPayload
                 ->map(fn (JewelleryOrderItem $item) => self::item($item))
                 ->values()
                 ->all(),
-            'invoice' => $order->invoice ? [
-                'invoice_number' => $order->invoice->invoice_number,
-                'total_amount' => (float) $order->invoice->total_amount,
-                'issued_at' => $order->invoice->issued_at?->toIso8601String(),
-                'download_url' => route('api.invoices.download', $order->invoice),
-            ] : null,
+            'invoice' => $order->invoice
+                ? app(\App\Services\InvoiceService::class)->apiPayload($order->invoice)
+                : null,
         ];
 
         if ($includeDeliveryOtp) {

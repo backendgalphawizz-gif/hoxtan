@@ -101,7 +101,7 @@ class AccountActivityService
                 ->all();
 
             $investments = $user->investments()
-                ->with('holdingCertificate')
+                ->with(['holdingCertificate', 'invoice'])
                 ->latest('id')
                 ->limit(100)
                 ->get();
@@ -191,7 +191,7 @@ class AccountActivityService
 
     protected function findInvestment(User $user, int $id): ?array
     {
-        $investment = $user->investments()->with('holdingCertificate')->find($id);
+        $investment = $user->investments()->with(['holdingCertificate', 'invoice'])->find($id);
 
         return $investment ? AccountTransactionPayload::fromInvestment($investment) : null;
     }

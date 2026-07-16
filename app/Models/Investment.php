@@ -56,6 +56,11 @@ class Investment extends Model
         return $this->hasOne(HoldingCertificate::class);
     }
 
+    public function invoice(): HasOne
+    {
+        return $this->hasOne(Invoice::class);
+    }
+
     protected static function booted(): void
     {
         static::creating(function (Investment $investment) {

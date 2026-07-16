@@ -19,7 +19,7 @@ class AccountTransactionPayload
     {
         $metal = ucfirst((string) $investment->metal_type);
         $type = $investment->type === 'sell' ? 'sell' : 'buy';
-        $investment->loadMissing('holdingCertificate');
+        $investment->loadMissing(['holdingCertificate', 'invoice']);
 
         $meta = [
             'investment_id' => $investment->id,
@@ -32,6 +32,12 @@ class AccountTransactionPayload
             $certificate = app(HoldingCertificateService::class)
                 ->payload($investment->holdingCertificate);
             $meta['certificate_number'] = $investment->holdingCertificate->certificate_number;
+        }
+
+        $invoice = $investment->invoice;
+        if ($invoice) {
+            $meta['invoice_number'] = $invoice->invoice_number;
+            $meta['invoice_download_url'] = route('api.invoices.download', $invoice);
         }
 
         $payload = self::base(
@@ -52,6 +58,9 @@ class AccountTransactionPayload
         );
 
         $payload['certificate'] = $certificate;
+        $payload['invoice'] = $invoice
+            ? app(\App\Services\InvoiceService::class)->apiPayload($invoice)
+            : null;
 
         return $payload;
     }
@@ -127,7 +136,7 @@ class AccountTransactionPayload
             $meta['invoice_download_url'] = route('api.invoices.download', $invoice);
         }
 
-        return self::base(
+        $payload = self::base(
             id: 'jewellery_order:'.$order->id,
             sourceType: 'jewellery_order',
             category: 'jewellery',
@@ -143,11 +152,17 @@ class AccountTransactionPayload
             quantityGrams: null,
             meta: $meta,
         );
+
+        $payload['invoice'] = $invoice
+            ? app(\App\Services\InvoiceService::class)->apiPayload($invoice)
+            : null;
+
+        return $payload;
     }
 
     public static function fromOldGoldBooking(OldGoldBooking $booking): array
     {
-        return self::base(
+        $payload = self::base(
             id: 'old_gold:'.$booking->id,
             sourceType: 'old_gold',
             category: 'sell',
@@ -166,6 +181,10 @@ class AccountTransactionPayload
                 'booking_number_display' => '#'.$booking->booking_number,
             ],
         );
+
+        $payload['invoice'] = null;
+
+        return $payload;
     }
 
     public static function fromHoldingsSell(MetalWithdrawal $withdrawal): array
@@ -270,6 +289,7 @@ class AccountTransactionPayload
                 ? $occurredAt->format('H:i').' • '.$occurredAt->format('d F Y')
                 : null,
             'meta' => $meta,
+            'invoice' => null,
         ];
     }
 }

@@ -94,6 +94,8 @@ class SellJewelleryController extends Controller
     {
         $this->ensureOwnedByUser($request, $booking);
 
+        $booking->loadMissing('driver');
+
         return ApiResponse::success([
             'request' => SellJewelleryPayload::make($booking, detailed: true),
         ]);
