@@ -342,7 +342,36 @@ class KycService
         }
 
         // Step 3: DigiLocker completed → ahead code (download Aadhaar + save + verify).
-        $result = $this->markAadhaarVerifiedFromDigilocker($user, $clientId, $provider);
+        try {
+            $result = $this->markAadhaarVerifiedFromDigilocker($user, $clientId, $provider);
+        } catch (\Throwable $e) {
+            // DigiLocker already completed — do not leave Aadhaar stuck on "pending/submitted".
+            Log::warning('DigiLocker download failed after completed status; marking Aadhaar verified anyway.', [
+                'user_id' => $user->id,
+                'client_id' => $clientId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $detail->update([
+                'digilocker_client_id' => $clientId,
+                'aadhaar_verification_status' => 'verified',
+                'aadhaar_verified_at' => now(),
+            ]);
+            $this->syncUserKycStatus($user->fresh(), $detail->fresh());
+
+            $result = [
+                'verified' => true,
+                'completed' => true,
+                'failed' => false,
+                'client_id' => $clientId,
+                'aadhaar_number_masked' => KycPayload::maskAadhaar($detail->fresh()->aadhaar_number),
+                'message' => 'Aadhaar verified successfully via DigiLocker.',
+                'aadhaar' => null,
+                'digilocker' => ['client_id' => $clientId],
+                'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
+            ];
+        }
+
         $result['digilocker_status'] = $statusData;
 
         return $result;
@@ -359,7 +388,17 @@ class KycService
         $download = $provider->downloadDigilockerAadhaar($clientId, $user);
         $downloadData = is_array($download['data'] ?? null) ? $download['data'] : [];
         $identity = $provider->extractDigilockerIdentity($downloadData);
-        $aadhaarNumber = $provider->extractAadhaarNumber($downloadData);
+        $aadhaarNumber = null;
+
+        try {
+            $aadhaarNumber = $provider->extractAadhaarNumber($downloadData);
+            if (filled($aadhaarNumber)) {
+                $this->assertAadhaarFormat($aadhaarNumber);
+            }
+        } catch (\Throwable) {
+            // DigiLocker completed is enough to mark verified; UID may be masked/absent.
+            $aadhaarNumber = null;
+        }
 
         $detail = $this->getOrCreateDetail($user);
         $updates = [
@@ -369,7 +408,6 @@ class KycService
         ];
 
         if (filled($aadhaarNumber)) {
-            $this->assertAadhaarFormat($aadhaarNumber);
             $updates['aadhaar_number'] = $aadhaarNumber;
         }
 

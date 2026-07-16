@@ -194,12 +194,11 @@ class KycPayload
 
     public static function stepStatusLabel(?string $status): string
     {
-        $normalized = match ($status) {
-            'otp_sent', 'submitted' => 'pending',
-            default => $status,
-        };
-
-        return config('kyc.step_statuses.'.$normalized, Str::headline(str_replace('_', ' ', (string) $status)));
+        // Keep submitted/otp_sent as their own labels (not remapped to Pending).
+        return config(
+            'kyc.step_statuses.'.$status,
+            Str::headline(str_replace('_', ' ', (string) $status))
+        );
     }
 
     public static function userKycStatusLabel(?string $status): string

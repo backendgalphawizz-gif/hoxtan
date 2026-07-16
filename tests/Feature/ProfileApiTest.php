@@ -52,7 +52,9 @@ class ProfileApiTest extends TestCase
             ->assertJsonPath('data.user.pan.pan_number_masked', 'HLXXXXX24P')
             ->assertJsonPath('data.user.pan.dob', '2005-01-25')
             ->assertJsonPath('data.user.pan.verified', true)
-            ->assertJsonPath('data.user.pan.verification_status', 'verified');
+            ->assertJsonPath('data.user.pan.verification_status', 'verified')
+            ->assertJsonPath('data.user.aadhaar.verified', false)
+            ->assertJsonPath('data.user.aadhaar.verification_status', 'action_required');
     }
 
     public function test_update_profile(): void

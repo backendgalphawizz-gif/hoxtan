@@ -49,6 +49,7 @@ class UserProfilePayload
                 'date_of_birth_display' => $user->nominee_date_of_birth?->format('d/m/Y'),
             ],
             'pan' => self::pan($user),
+            'aadhaar' => self::aadhaar($user),
             'bank' => self::bank($user),
         ];
     }
@@ -69,6 +70,26 @@ class UserProfilePayload
             'verification_status' => $detail?->pan_verification_status,
             'verified' => $detail?->pan_verification_status === 'verified',
             'verified_at' => $detail?->pan_verified_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected static function aadhaar(User $user): array
+    {
+        $detail = $user->kycDetail;
+
+        return [
+            'aadhaar_number' => KycPayload::maskAadhaar($detail?->aadhaar_number),
+            'aadhaar_number_masked' => KycPayload::maskAadhaar($detail?->aadhaar_number),
+            'full_name' => $detail?->full_name,
+            'dob' => $detail?->date_of_birth?->toDateString(),
+            'dob_display' => $detail?->date_of_birth?->format('d/m/Y'),
+            'digilocker_client_id' => $detail?->digilocker_client_id,
+            'verification_status' => $detail?->aadhaar_verification_status ?: 'action_required',
+            'verified' => $detail?->aadhaar_verification_status === 'verified',
+            'verified_at' => $detail?->aadhaar_verified_at?->toIso8601String(),
         ];
     }
 
