@@ -78,6 +78,10 @@ return [
             'label' => 'Purchase Invoices',
             'group' => 'Investment Management',
         ],
+        'holding_certificates' => [
+            'label' => 'Holding Certificates',
+            'group' => 'Investment Management',
+        ],
         'redemption_requests' => [
             'label' => 'Redemption Requests',
             'group' => 'Redemption Management',
