@@ -48,14 +48,17 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
     Route::get('/jewellery/sub-sub-categories', [JewelleryController::class, 'subSubCategories']);
+    Route::get('/jewellery/sub-sub-categories/{subSubCategory}', [JewelleryController::class, 'showSubSubCategory']);
     Route::get('/jewellery/filters', [JewelleryController::class, 'filters']);
     Route::get('/jewellery/emi-plans', [JewelleryController::class, 'emiPlans']);
     Route::get('/jewellery/products', [JewelleryController::class, 'products']);
     Route::get('/jewellery/products/{product}', [JewelleryController::class, 'show']);
 
-    // Public certificate download (no auth token required).
+    // Public certificate / invoice download (no auth token required).
     Route::get('/certificates/{certificate}/download', [ProfileController::class, 'downloadCertificate'])
         ->name('api.certificates.download');
+    Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
+        ->name('api.invoices.download');
     Route::get('/products/{product}', [JewelleryController::class, 'show']);
 
     Route::get('/register/config', [RegistrationController::class, 'config']);
@@ -143,8 +146,6 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/profile/close', [ProfileController::class, 'closeAccount']);
         Route::get('/referral-stats', [ProfileController::class, 'referralStats']);
         Route::get('/invoices', [ProfileController::class, 'invoices']);
-        Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
-            ->name('api.invoices.download');
 
         Route::get('/orders/config', [OrderController::class, 'config']);
         Route::get('/orders', [OrderController::class, 'index']);
