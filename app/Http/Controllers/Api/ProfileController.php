@@ -251,7 +251,11 @@ class ProfileController extends Controller
     {
         $invoices = $request->user()
             ->invoices()
-            ->with(['investment:id,reference_id,type', 'jewelleryOrder:id,order_number'])
+            ->with([
+                'investment:id,reference_id,type',
+                'jewelleryOrder:id,order_number',
+                'oldGoldBooking:id,booking_number',
+            ])
             ->latest('issued_at')
             ->get()
             ->map(fn (Invoice $invoice) => app(InvoiceService::class)->apiPayload($invoice));
@@ -271,6 +275,9 @@ class ProfileController extends Controller
             if ($invoice->jewellery_order_id) {
                 $order = $invoice->jewelleryOrder()->firstOrFail();
                 $invoices->generateForJewelleryOrder($order);
+            } elseif ($invoice->old_gold_booking_id) {
+                $booking = $invoice->oldGoldBooking()->firstOrFail();
+                $invoices->generateForOldGoldBooking($booking);
             } else {
                 $invoices->generateForInvestment($invoice->investment()->firstOrFail());
             }
