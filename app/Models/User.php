@@ -80,10 +80,6 @@ class User extends Authenticatable
             if (blank($user->referral_code)) {
                 $user->referral_code = ReferralService::generateUniqueCode();
             }
-
-            if (blank($user->email) && filled($user->phone)) {
-                $user->email = $user->phone.'@hoxtan.app';
-            }
         });
     }
 

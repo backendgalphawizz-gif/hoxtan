@@ -217,11 +217,18 @@ class KycPayload
 
     public static function maskAadhaar(?string $aadhaar): ?string
     {
-        if (blank($aadhaar) || strlen($aadhaar) < 12) {
+        if (blank($aadhaar)) {
+            return null;
+        }
+
+        $compact = strtoupper((string) preg_replace('/[\s\-]+/', '', $aadhaar));
+        $lastFour = substr($compact, -4);
+
+        if ($lastFour === '' || ! ctype_digit($lastFour)) {
             return $aadhaar;
         }
 
-        return 'XXXX XXXX '.substr($aadhaar, -4);
+        return 'XXXX XXXX '.$lastFour;
     }
 
     public static function maskAccount(?string $account): ?string

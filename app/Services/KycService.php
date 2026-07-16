@@ -288,14 +288,27 @@ class KycService
 
         if ($detail->aadhaar_verification_status === 'verified'
             && $detail->digilocker_client_id === $clientId) {
+            // Backfill Aadhaar number when verification completed but UID was never saved.
+            if (blank($detail->aadhaar_number)) {
+                try {
+                    return $this->markAadhaarVerifiedFromDigilocker($user, $clientId, $this->surepassProvider());
+                } catch (\Throwable $e) {
+                    Log::warning('DigiLocker Aadhaar backfill failed after prior verification.', [
+                        'user_id' => $user->id,
+                        'client_id' => $clientId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return [
                 'verified' => true,
                 'completed' => true,
                 'failed' => false,
                 'client_id' => $clientId,
-                'aadhaar_number_masked' => KycPayload::maskAadhaar($detail->aadhaar_number),
+                'aadhaar_number_masked' => KycPayload::maskAadhaar($detail->fresh()->aadhaar_number),
                 'message' => 'Aadhaar already verified.',
-                'kyc' => KycPayload::overview($user, $detail),
+                'kyc' => KycPayload::overview($user, $detail->fresh()),
             ];
         }
 
@@ -388,17 +401,8 @@ class KycService
         $download = $provider->downloadDigilockerAadhaar($clientId, $user);
         $downloadData = is_array($download['data'] ?? null) ? $download['data'] : [];
         $identity = $provider->extractDigilockerIdentity($downloadData);
-        $aadhaarNumber = null;
-
-        try {
-            $aadhaarNumber = $provider->extractAadhaarNumber($downloadData);
-            if (filled($aadhaarNumber)) {
-                $this->assertAadhaarFormat($aadhaarNumber);
-            }
-        } catch (\Throwable) {
-            // DigiLocker completed is enough to mark verified; UID may be masked/absent.
-            $aadhaarNumber = null;
-        }
+        // Surepass DigiLocker typically returns masked UID (XXXX-XXXX-1234); still persist it.
+        $aadhaarNumber = $provider->extractAadhaarNumber($downloadData);
 
         $detail = $this->getOrCreateDetail($user);
         $updates = [
@@ -444,6 +448,7 @@ class KycService
         }
 
         $detail->update($updates);
+        $this->syncUserProfileFromAadhaar($user, $identity);
         $this->syncUserKycStatus($user->fresh(), $detail->fresh());
 
         return [
@@ -451,13 +456,15 @@ class KycService
             'completed' => true,
             'failed' => false,
             'client_id' => $clientId,
-            'aadhaar_number_masked' => KycPayload::maskAadhaar($aadhaarNumber),
+            'aadhaar_number_masked' => KycPayload::maskAadhaar($aadhaarNumber ?? $detail->fresh()->aadhaar_number),
             'message' => 'Aadhaar verified successfully via DigiLocker.',
             'aadhaar' => [
                 'full_name' => $identity['name'],
                 'dob' => $identity['date_of_birth'],
                 'gender' => $identity['gender'],
                 'address' => $identity['address'],
+                'aadhaar_number' => KycPayload::maskAadhaar($aadhaarNumber),
+                'aadhaar_number_masked' => KycPayload::maskAadhaar($aadhaarNumber),
             ],
             'digilocker' => [
                 'client_id' => $downloadData['client_id'] ?? $clientId,
@@ -465,6 +472,45 @@ class KycService
             ],
             'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
         ];
+    }
+
+    /**
+     * Mirror DigiLocker identity onto the user profile when fields are empty.
+     *
+     * @param  array{name: ?string, date_of_birth: ?string, gender: ?string, address: ?array<string, mixed>}  $identity
+     */
+    protected function syncUserProfileFromAadhaar(User $user, array $identity): void
+    {
+        $profileUpdates = [];
+
+        if (blank($user->name) && filled($identity['name'])) {
+            $profileUpdates['name'] = $identity['name'];
+        }
+
+        if (blank($user->date_of_birth) && filled($identity['date_of_birth'])) {
+            try {
+                $profileUpdates['date_of_birth'] = \Illuminate\Support\Carbon::parse($identity['date_of_birth'])->toDateString();
+            } catch (\Throwable) {
+                // Ignore unparseable DOB from provider.
+            }
+        }
+
+        if (blank($user->gender) && filled($identity['gender'])) {
+            $gender = strtoupper(trim((string) $identity['gender']));
+            $profileUpdates['gender'] = match ($gender) {
+                'M', 'MALE' => 'male',
+                'F', 'FEMALE' => 'female',
+                'O', 'OTHER', 'TRANSGENDER' => 'other',
+                default => null,
+            };
+            if ($profileUpdates['gender'] === null) {
+                unset($profileUpdates['gender']);
+            }
+        }
+
+        if ($profileUpdates !== []) {
+            $user->update($profileUpdates);
+        }
     }
 
     protected function surepassProvider(): SurepassKycVerificationProvider

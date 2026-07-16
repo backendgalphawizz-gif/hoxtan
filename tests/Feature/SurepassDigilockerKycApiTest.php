@@ -180,6 +180,76 @@ class SurepassDigilockerKycApiTest extends TestCase
             'state' => 'Maharashtra',
             'pincode' => '400001',
         ]);
+
+        $this->getJson('/api/v1/profile')
+            ->assertOk()
+            ->assertJsonPath('data.user.aadhaar.verified', true)
+            ->assertJsonPath('data.user.aadhaar.aadhaar_number', 'XXXX XXXX 9012')
+            ->assertJsonPath('data.user.aadhaar.aadhaar_number_masked', 'XXXX XXXX 9012');
+    }
+
+    public function test_digilocker_status_persists_masked_aadhaar_on_profile(): void
+    {
+        Http::fake([
+            'kyc-api.surepass.app/api/v1/digilocker/status/*' => Http::response([
+                'success' => true,
+                'status_code' => 200,
+                'message' => 'Success',
+                'data' => [
+                    'status' => 'completed',
+                    'completed' => true,
+                    'failed' => false,
+                    'aadhaar_linked' => true,
+                ],
+            ], 200),
+            'kyc-api.surepass.app/api/v1/digilocker/download-aadhaar/*' => Http::response([
+                'success' => true,
+                'status_code' => 200,
+                'message' => 'Aadhaar downloaded successfully',
+                'data' => [
+                    'aadhaar_number' => 'XXXX-XXXX-9012',
+                    'name' => 'RAJ KUMAR',
+                    'date_of_birth' => '01-01-1990',
+                    'gender' => 'M',
+                    'aadhaar_xml_data' => [
+                        'full_name' => 'RAJ KUMAR',
+                        'masked_aadhaar' => 'XXXXXXXX9012',
+                        'dob' => '01-01-1990',
+                        'gender' => 'M',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create([
+            'kyc_status' => 'pending',
+            'date_of_birth' => null,
+            'gender' => null,
+        ]);
+        $user->kycDetail()->create([
+            'full_name' => 'Test User',
+            'digilocker_client_id' => 'digilocker_masked',
+            'aadhaar_verification_status' => 'submitted',
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/digilocker/status/digilocker_masked')
+            ->assertOk()
+            ->assertJsonPath('data.verified', true)
+            ->assertJsonPath('data.aadhaar_number_masked', 'XXXX XXXX 9012');
+
+        $this->assertDatabaseHas('kyc_details', [
+            'user_id' => $user->id,
+            'aadhaar_number' => 'XXXXXXXX9012',
+            'aadhaar_verification_status' => 'verified',
+            'full_name' => 'RAJ KUMAR',
+        ]);
+
+        $this->getJson('/api/v1/profile')
+            ->assertOk()
+            ->assertJsonPath('data.user.aadhaar.verified', true)
+            ->assertJsonPath('data.user.aadhaar.aadhaar_number', 'XXXX XXXX 9012')
+            ->assertJsonPath('data.user.aadhaar.aadhaar_number_masked', 'XXXX XXXX 9012');
     }
 
     public function test_digilocker_status_rejects_foreign_client_id(): void

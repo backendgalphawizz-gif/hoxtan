@@ -38,7 +38,7 @@ class UserRegistrationService
             $user = User::create([
                 'name' => $name,
                 'phone' => $phone,
-                'email' => $phone.'@hoxtan.app',
+                'email' => null,
                 'password' => Hash::make(Str::random(40)),
                 'mpin' => $mpin,
                 'referral_code' => ReferralService::generateUniqueCode(),

@@ -134,7 +134,8 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
     }
 
     /**
-     * @return array<string, mixed>|null
+     * DigiLocker usually returns a masked UID (e.g. XXXX-XXXX-1234 / XXXXXXXX1234).
+     * Prefer a full 12-digit number when present; otherwise persist the masked form.
      */
     public function extractAadhaarNumber(array $data): ?string
     {
@@ -151,18 +152,62 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
             data_get($data, 'digilocker_metadata.uid'),
         ];
 
-        foreach ($candidates as $candidate) {
-            $digits = preg_replace('/\D/', '', (string) $candidate) ?? '';
+        $masked = null;
 
-            if (strlen($digits) === 12) {
-                return $digits;
+        foreach ($candidates as $candidate) {
+            $normalized = self::normalizeAadhaarValue($candidate);
+
+            if ($normalized === null) {
+                continue;
             }
+
+            if (preg_match('/^\d{12}$/', $normalized) === 1) {
+                return $normalized;
+            }
+
+            $masked ??= $normalized;
         }
 
-        // Last resort: scan nested payload for a 12-digit Aadhaar.
+        if ($masked !== null) {
+            return $masked;
+        }
+
+        // Last resort: scan nested payload for a full 12-digit Aadhaar.
         $json = json_encode($data) ?: '';
         if (preg_match('/\b(\d{12})\b/', $json, $matches) === 1) {
             return $matches[1];
+        }
+
+        // Or a masked XXXXXXXX1234 / XXXX-XXXX-1234 style value.
+        if (preg_match('/\b([Xx*]{4}[\s\-]?[Xx*]{4}[\s\-]?(\d{4}))\b/', $json, $matches) === 1) {
+            return self::normalizeAadhaarValue($matches[1]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize full or masked Aadhaar into a 12-character storage value.
+     */
+    public static function normalizeAadhaarValue(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $compact = strtoupper((string) preg_replace('/[\s\-]+/', '', (string) $value));
+
+        if ($compact === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{12}$/', $compact) === 1) {
+            return $compact;
+        }
+
+        // Surepass DigiLocker: XXXXXXXX1234 / XXXX****1234
+        if (preg_match('/^[X*]{8}(\d{4})$/', $compact, $matches) === 1) {
+            return str_repeat('X', 8).$matches[1];
         }
 
         return null;
