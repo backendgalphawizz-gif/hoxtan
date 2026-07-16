@@ -27,6 +27,7 @@ class JewelleryCheckoutService
         protected BlockedPincodeService $blockedPincodeService,
         protected JewelleryEmiService $emi,
         protected InvoiceService $invoices,
+        protected ReferralService $referrals,
     ) {}
 
     /**
@@ -210,6 +211,9 @@ class JewelleryCheckoutService
         $invoice = null;
         if ($paymentType === 'full') {
             $invoice = $this->invoices->generateForJewelleryOrder($order);
+            if ($order->user) {
+                $this->referrals->evaluatePendingBonusAfterCommit($order->user);
+            }
         }
 
         $emi = $this->emiContext(

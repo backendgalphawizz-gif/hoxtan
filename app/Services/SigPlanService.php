@@ -17,6 +17,7 @@ class SigPlanService
     public function __construct(
         protected MetalRateService $metalRates,
         protected GstService $gst,
+        protected ReferralService $referrals,
     ) {}
 
     /**
@@ -196,6 +197,13 @@ class SigPlanService
         ]);
 
         $this->syncStats($plan);
+
+        if (($data['status'] ?? 'success') === 'success') {
+            $user = $plan->user ?? User::query()->find($plan->user_id);
+            if ($user) {
+                $this->referrals->evaluatePendingBonusAfterCommit($user);
+            }
+        }
 
         return $installment;
     }
