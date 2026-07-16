@@ -21,7 +21,7 @@ class JewelleryInvoiceTest extends TestCase
 
     public function test_full_payment_buy_now_generates_invoice_and_lists_in_api(): void
     {
-        $user = User::factory()->create(['phone' => '9876500001', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876500001', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         $address = UserAddress::query()->create([
@@ -94,7 +94,7 @@ class JewelleryInvoiceTest extends TestCase
 
     public function test_emi_buy_now_does_not_generate_invoice_until_fully_paid(): void
     {
-        $user = User::factory()->create(['phone' => '9876500002', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876500002', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         $address = UserAddress::query()->create([

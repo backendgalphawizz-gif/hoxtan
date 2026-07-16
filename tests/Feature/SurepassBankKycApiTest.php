@@ -195,7 +195,7 @@ class SurepassBankKycApiTest extends TestCase
             ->assertJsonPath('data.errors.account_number.0', 'Invalid Account');
     }
 
-    public function test_bank_verify_auto_approves_kyc_when_pan_already_verified(): void
+    public function test_bank_verify_auto_approves_kyc_when_pan_and_aadhaar_already_verified(): void
     {
         Http::fake([
             'kyc-api.surepass.app/*' => Http::response([
@@ -211,7 +211,6 @@ class SurepassBankKycApiTest extends TestCase
         ]);
 
         $user = User::factory()->create([
-            'name' => 'Rahul joshi',
             'kyc_status' => 'pending',
         ]);
         $user->kycDetail()->create([
@@ -219,7 +218,9 @@ class SurepassBankKycApiTest extends TestCase
             'pan_number' => 'ABCDE1234F',
             'pan_verification_status' => 'verified',
             'pan_verified_at' => now(),
-            'aadhaar_verification_status' => 'action_required',
+            'aadhaar_verification_status' => 'verified',
+            'aadhaar_verified_at' => now(),
+            'aadhaar_number' => '123456789012',
             'face_verification_status' => 'pending',
             'bank_verification_status' => 'pending',
         ]);

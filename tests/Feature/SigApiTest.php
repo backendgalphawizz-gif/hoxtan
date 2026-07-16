@@ -51,7 +51,7 @@ class SigApiTest extends TestCase
 
     public function test_user_can_activate_pause_resume_and_stop_sig(): void
     {
-        $user = User::factory()->create(['phone' => '9876543211', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876543211', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         $activate = $this->postJson('/api/v1/sig/activate', [

@@ -6,6 +6,7 @@ use App\Events\UserAssetsUpdated;
 use App\Models\Investment;
 use App\Models\MetalWithdrawal;
 use App\Models\User;
+use App\Support\KycPayload;
 use App\Support\WalletHoldingsSnapshot;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -131,6 +132,8 @@ class HoldingLotService
      */
     public function sell(User $user, array $data): array
     {
+        KycPayload::assertCanPerformTransactions($user);
+
         $lotId = (int) ($data['lot_id'] ?? 0);
         $sellAfterHours = (int) config('holdings.sell_after_hours', 48);
 

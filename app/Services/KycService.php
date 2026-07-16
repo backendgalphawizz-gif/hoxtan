@@ -648,7 +648,7 @@ class KycService
     }
 
     /**
-     * When Surepass has verified PAN + bank, mark KYC approved without admin action.
+     * When Surepass has verified PAN, Aadhaar, and bank, mark KYC approved without admin action.
      */
     public function autoApproveSurepassKycIfEligible(User $user, KycDetail $detail): bool
     {
@@ -658,7 +658,7 @@ class KycService
 
         $detailUpdates = [
             'reviewed_at' => now(),
-            'face_verification_notes' => 'Auto-approved: PAN and bank verified via Surepass.',
+            'face_verification_notes' => 'Auto-approved: PAN, Aadhaar, and bank verified via Surepass.',
         ];
 
         if (blank($detail->submitted_at)) {

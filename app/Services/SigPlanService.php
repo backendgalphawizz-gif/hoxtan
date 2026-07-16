@@ -8,6 +8,7 @@ use App\Models\SigPlan;
 use App\Models\User;
 use App\Services\GstService;
 use App\Services\MetalRateService;
+use App\Support\KycPayload;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -78,6 +79,7 @@ class SigPlanService
         return DB::transaction(function () use ($data, $adminId): SigPlan {
             /** @var User $user */
             $user = User::query()->with('kycDetail')->findOrFail($data['user_id']);
+            KycPayload::assertCanPerformTransactions($user);
 
             $plan = SigPlan::query()->create([
                 'user_id' => $user->id,

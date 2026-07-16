@@ -111,7 +111,7 @@ class JewelleryCheckoutEmiTest extends TestCase
 
     public function test_buy_now_with_emi_plan_stores_tenure_and_total_emi_cost(): void
     {
-        $user = User::factory()->create(['phone' => '9876543221', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876543221', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         UserAddress::query()->create([
@@ -172,7 +172,7 @@ class JewelleryCheckoutEmiTest extends TestCase
 
     public function test_buy_now_with_tenure_and_total_emi_cost_without_plan(): void
     {
-        $user = User::factory()->create(['phone' => '9876543226', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876543226', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         UserAddress::query()->create([
@@ -222,7 +222,7 @@ class JewelleryCheckoutEmiTest extends TestCase
 
     public function test_buy_now_with_full_payment_does_not_error(): void
     {
-        $user = User::factory()->create(['phone' => '9876543227', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876543227', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         $address = UserAddress::query()->create([
@@ -267,7 +267,7 @@ class JewelleryCheckoutEmiTest extends TestCase
 
     public function test_tenure_and_total_emi_cost_are_required_when_payment_type_is_emi_without_plan(): void
     {
-        $user = User::factory()->create(['phone' => '9876543222', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876543222', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         UserAddress::query()->create([
@@ -295,7 +295,8 @@ class JewelleryCheckoutEmiTest extends TestCase
         $this->postJson('/api/v1/jewellery/checkout/buy-now', [
             'product_id' => $product->id,
             'payment_type' => 'emi',
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['tenure', 'total_emi_cost']);
+        ])->assertStatus(422)
+            ->assertJsonPath('data.errors.tenure.0', 'The tenure field is required.')
+            ->assertJsonPath('data.errors.total_emi_cost.0', 'The total emi cost field is required.');
     }
 }

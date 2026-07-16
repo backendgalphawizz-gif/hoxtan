@@ -82,7 +82,7 @@ class UserResource extends Resource
 
                 Infolists\Components\Section::make('KYC Details')
                     ->description(fn (User $record): ?string => $record->kycDetail && KycPayload::isSurepassPanBankVerified($record->kycDetail)
-                        ? 'PAN and bank verified via Surepass — no manual admin approval required.'
+                        ? 'PAN, Aadhaar, and bank verified via Surepass — no manual admin approval required.'
                         : null)
                     ->schema([
                         Infolists\Components\TextEntry::make('kycDetail.full_name')

@@ -6,6 +6,7 @@ use App\Models\OldGoldBooking;
 use App\Models\User;
 use App\Models\UserAddress;
 use App\Support\DeliveryOtp;
+use App\Support\KycPayload;
 use App\Support\SellJewelleryPayload;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -85,6 +86,8 @@ class SellJewelleryService
      */
     public function createRequest(User $user, array $data, array $files): OldGoldBooking
     {
+        KycPayload::assertCanPerformTransactions($user);
+
         $estimate = $this->estimate(
             $data['metal_type'],
             (float) $data['weight_grams'],

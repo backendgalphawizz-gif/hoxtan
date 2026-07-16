@@ -123,7 +123,7 @@ class JewelleryCheckoutVariantTest extends TestCase
      */
     protected function sizedProductFixture(): array
     {
-        $user = User::factory()->create(['phone' => '9876500101', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876500101', 'mpin' => '1234']);
 
         $address = UserAddress::query()->create([
             'user_id' => $user->id,

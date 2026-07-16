@@ -18,7 +18,7 @@ class SellJewelleryApiTest extends TestCase
     {
         Storage::fake('public');
 
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'phone' => '9876543211',
             'mpin' => '1234',
         ]);
@@ -122,7 +122,7 @@ class SellJewelleryApiTest extends TestCase
     {
         Storage::fake('public');
 
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'phone' => '9876543212',
             'mpin' => '1234',
         ]);

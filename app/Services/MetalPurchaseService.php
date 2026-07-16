@@ -6,6 +6,7 @@ use App\Events\UserAssetsUpdated;
 use App\Models\Investment;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\KycPayload;
 use App\Support\WalletHoldingsSnapshot;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -48,6 +49,8 @@ class MetalPurchaseService
      */
     public function purchase(User $user, array $data): array
     {
+        KycPayload::assertCanPerformTransactions($user);
+
         $data['metal_type'] = strtolower((string) ($data['metal_type'] ?? 'gold'));
         if (! in_array($data['metal_type'], ['gold', 'silver'], true)) {
             $data['metal_type'] = 'gold';
