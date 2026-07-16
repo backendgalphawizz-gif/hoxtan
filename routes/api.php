@@ -51,6 +51,10 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/jewellery/emi-plans', [JewelleryController::class, 'emiPlans']);
     Route::get('/jewellery/products', [JewelleryController::class, 'products']);
     Route::get('/jewellery/products/{product}', [JewelleryController::class, 'show']);
+
+    // Public certificate download (no auth token required).
+    Route::get('/certificates/{certificate}/download', [ProfileController::class, 'downloadCertificate'])
+        ->name('api.certificates.download');
     Route::get('/products/{product}', [JewelleryController::class, 'show']);
 
     Route::get('/register/config', [RegistrationController::class, 'config']);
@@ -140,8 +144,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/invoices', [ProfileController::class, 'invoices']);
         Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
             ->name('api.invoices.download');
-        Route::get('/certificates/{certificate}/download', [ProfileController::class, 'downloadCertificate'])
-            ->name('api.certificates.download');
 
         Route::get('/orders/config', [OrderController::class, 'config']);
         Route::get('/orders', [OrderController::class, 'index']);
