@@ -265,6 +265,12 @@ class KycService
     }
 
     /**
+     * Flow:
+     * 1) Call Surepass GET /api/v1/digilocker/status/{client_id}
+     * 2) Use that DigiLocker response
+     * 3) If completed=true → download Aadhaar + mark verified (ahead logic)
+     * 4) If completed=false → return DigiLocker status as-is for mobile to keep polling
+     *
      * @return array<string, mixed>
      */
     public function checkDigilockerStatus(User $user, string $clientId): array
@@ -293,12 +299,15 @@ class KycService
             ];
         }
 
+        // Step 1: DigiLocker status API (Surepass).
         $provider = $this->surepassProvider();
         $statusResult = $provider->getDigilockerStatus($clientId, $user);
         $statusData = is_array($statusResult['data'] ?? null) ? $statusResult['data'] : [];
-        $completed = ($statusData['completed'] ?? false) === true;
+        $completed = ($statusData['completed'] ?? false) === true
+            || ($statusData['status'] ?? null) === 'completed';
         $failed = ($statusData['failed'] ?? false) === true;
 
+        // Step 2: Act on DigiLocker response.
         if ($failed) {
             $detail->update([
                 'digilocker_client_id' => $clientId,
@@ -317,6 +326,7 @@ class KycService
                 $detail->update(['digilocker_client_id' => $clientId]);
             }
 
+            // Return DigiLocker response as-is — mobile keeps polling.
             return [
                 'verified' => false,
                 'completed' => false,
@@ -331,7 +341,11 @@ class KycService
             ];
         }
 
-        return $this->markAadhaarVerifiedFromDigilocker($user, $clientId, $provider);
+        // Step 3: DigiLocker completed → ahead code (download Aadhaar + save + verify).
+        $result = $this->markAadhaarVerifiedFromDigilocker($user, $clientId, $provider);
+        $result['digilocker_status'] = $statusData;
+
+        return $result;
     }
 
     /**
@@ -344,51 +358,50 @@ class KycService
     ): array {
         $download = $provider->downloadDigilockerAadhaar($clientId, $user);
         $downloadData = is_array($download['data'] ?? null) ? $download['data'] : [];
+        $identity = $provider->extractDigilockerIdentity($downloadData);
         $aadhaarNumber = $provider->extractAadhaarNumber($downloadData);
-
-        if (blank($aadhaarNumber)) {
-            throw ValidationException::withMessages([
-                'digilocker' => ['Aadhaar number could not be retrieved from DigiLocker. Please try again.'],
-            ]);
-        }
-
-        $this->assertAadhaarFormat($aadhaarNumber);
 
         $detail = $this->getOrCreateDetail($user);
         $updates = [
             'digilocker_client_id' => $clientId,
-            'aadhaar_number' => $aadhaarNumber,
             'aadhaar_verification_status' => 'verified',
             'aadhaar_verified_at' => now(),
         ];
 
-        if (filled($downloadData['name'] ?? null) && is_string($downloadData['name'])) {
-            $updates['full_name'] = $downloadData['name'];
+        if (filled($aadhaarNumber)) {
+            $this->assertAadhaarFormat($aadhaarNumber);
+            $updates['aadhaar_number'] = $aadhaarNumber;
         }
 
-        if (filled($downloadData['date_of_birth'] ?? null) && is_string($downloadData['date_of_birth'])) {
+        if (filled($identity['name'])) {
+            $updates['full_name'] = $identity['name'];
+        }
+
+        if (filled($identity['date_of_birth'])) {
             try {
-                $updates['date_of_birth'] = \Illuminate\Support\Carbon::parse($downloadData['date_of_birth'])->toDateString();
+                $updates['date_of_birth'] = \Illuminate\Support\Carbon::parse($identity['date_of_birth'])->toDateString();
             } catch (\Throwable) {
                 // Ignore unparseable DOB from provider.
             }
         }
 
-        if (is_array($downloadData['address'] ?? null)) {
-            $address = collect($downloadData['address'])
+        if (is_array($identity['address'] ?? null)) {
+            $address = collect($identity['address'])
                 ->filter(fn ($value) => filled($value))
                 ->implode(', ');
             if (filled($address)) {
                 $updates['address'] = $address;
             }
-            if (filled($downloadData['address']['pincode'] ?? null)) {
-                $updates['pincode'] = (string) $downloadData['address']['pincode'];
+            if (filled($identity['address']['pincode'] ?? null)) {
+                $updates['pincode'] = (string) $identity['address']['pincode'];
             }
-            if (filled($downloadData['address']['state'] ?? null)) {
-                $updates['state'] = (string) $downloadData['address']['state'];
+            if (filled($identity['address']['state'] ?? null)) {
+                $updates['state'] = (string) $identity['address']['state'];
             }
-            if (filled($downloadData['address']['district'] ?? null)) {
-                $updates['city'] = (string) $downloadData['address']['district'];
+            if (filled($identity['address']['district'] ?? null)) {
+                $updates['city'] = (string) $identity['address']['district'];
+            } elseif (filled($identity['address']['vtc'] ?? null)) {
+                $updates['city'] = (string) $identity['address']['vtc'];
             }
         }
 
@@ -403,12 +416,15 @@ class KycService
             'aadhaar_number_masked' => KycPayload::maskAadhaar($aadhaarNumber),
             'message' => 'Aadhaar verified successfully via DigiLocker.',
             'aadhaar' => [
-                'full_name' => $downloadData['name'] ?? null,
-                'dob' => $downloadData['date_of_birth'] ?? null,
-                'gender' => $downloadData['gender'] ?? null,
-                'address' => $downloadData['address'] ?? null,
+                'full_name' => $identity['name'],
+                'dob' => $identity['date_of_birth'],
+                'gender' => $identity['gender'],
+                'address' => $identity['address'],
             ],
-            'digilocker' => $downloadData,
+            'digilocker' => [
+                'client_id' => $downloadData['client_id'] ?? $clientId,
+                'metadata' => $downloadData['digilocker_metadata'] ?? null,
+            ],
             'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
         ];
     }
