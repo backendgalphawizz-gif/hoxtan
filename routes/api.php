@@ -169,7 +169,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/kyc/bank/verify', [KycController::class, 'submitBank']);
 
         Route::post('/digilocker/initialize', [DigilockerController::class, 'initialize']);
-        Route::get('/digilocker/status/{clientId}', [DigilockerController::class, 'status'])
+        Route::match(['get', 'post'], '/digilocker/status/{clientId}', [DigilockerController::class, 'status'])
             ->where('clientId', '[A-Za-z0-9_\-]+');
 
         Route::get('/addresses', [AddressController::class, 'index']);
