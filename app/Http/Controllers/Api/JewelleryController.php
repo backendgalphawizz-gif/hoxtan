@@ -68,18 +68,43 @@ class JewelleryController extends Controller
     public function subSubCategories(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'sub_category_id' => ['required', 'integer', 'exists:jewellery_sub_categories,id'],
+            'sub_category_id' => ['nullable', 'integer', 'exists:jewellery_sub_categories,id'],
+            'category_id' => ['nullable', 'integer', 'exists:jewellery_categories,id'],
         ]);
 
         $subSubCategories = JewellerySubSubCategory::query()
-            ->where('jewellery_sub_category_id', $data['sub_category_id'])
             ->where('is_active', true)
+            ->when(
+                filled($data['sub_category_id'] ?? null),
+                fn (Builder $q) => $q->where('jewellery_sub_category_id', $data['sub_category_id'])
+            )
+            ->when(
+                filled($data['category_id'] ?? null) && blank($data['sub_category_id'] ?? null),
+                fn (Builder $q) => $q->whereHas('subCategory', function (Builder $inner) use ($data): void {
+                    $inner->where('jewellery_category_id', $data['category_id'])
+                        ->where('is_active', true);
+                })
+            )
+            ->orderBy('jewellery_sub_category_id')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->map(fn (JewellerySubSubCategory $subSub) => $this->subSubCategoryPayload($subSub));
+            ->map(fn (JewellerySubSubCategory $subSub) => $this->subSubCategoryPayload($subSub, includeParent: true));
 
         return ApiResponse::success(['sub_sub_categories' => $subSubCategories]);
+    }
+
+    public function showSubSubCategory(JewellerySubSubCategory $subSubCategory): JsonResponse
+    {
+        if (! $subSubCategory->is_active) {
+            return ApiResponse::error('Sub sub category not found.', [], 404);
+        }
+
+        $subSubCategory->loadMissing('subCategory');
+
+        return ApiResponse::success([
+            'sub_sub_category' => $this->subSubCategoryPayload($subSubCategory, includeParent: true),
+        ]);
     }
 
     public function emiPlans(Request $request, JewelleryEmiService $emi): JsonResponse

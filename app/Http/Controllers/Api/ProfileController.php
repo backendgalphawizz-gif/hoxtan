@@ -265,12 +265,8 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function downloadInvoice(Request $request, Invoice $invoice, InvoiceService $invoices): StreamedResponse|JsonResponse
+    public function downloadInvoice(Invoice $invoice, InvoiceService $invoices): StreamedResponse|JsonResponse
     {
-        if ($invoice->user_id !== $request->user()->id) {
-            return ApiResponse::error('Unauthorized.', [], 403);
-        }
-
         if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
             if ($invoice->jewellery_order_id) {
                 $order = $invoice->jewelleryOrder()->firstOrFail();
@@ -278,10 +274,14 @@ class ProfileController extends Controller
             } elseif ($invoice->old_gold_booking_id) {
                 $booking = $invoice->oldGoldBooking()->firstOrFail();
                 $invoices->generateForOldGoldBooking($booking);
-            } else {
+            } elseif ($invoice->investment_id) {
                 $invoices->generateForInvestment($invoice->investment()->firstOrFail());
             }
             $invoice->refresh();
+        }
+
+        if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
+            return ApiResponse::error('Invoice file not found.', [], 404);
         }
 
         return Storage::disk('local')->download(
