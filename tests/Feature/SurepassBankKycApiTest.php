@@ -91,6 +91,39 @@ class SurepassBankKycApiTest extends TestCase
         });
     }
 
+    public function test_bank_verify_succeeds_when_account_holder_matches_even_if_profile_name_differs(): void
+    {
+        Http::fake([
+            'kyc-api.surepass.app/*' => Http::response([
+                'success' => true,
+                'status_code' => 200,
+                'data' => [
+                    'client_id' => 'bank_verification_rahul',
+                    'account_exists' => true,
+                    'full_name' => 'RAHUL JOSHI',
+                    'remarks' => 'Transaction Successful',
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create([
+            'name' => 'Different Profile Name',
+            'kyc_status' => 'pending',
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/kyc/bank/verify', [
+            'account_holder_name' => 'Rahul joshi',
+            'bank_name' => 'Bank of Baroda',
+            'account_number' => '05050100009895',
+            'ifsc_code' => 'BARB0UJJAIN',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.verified', true)
+            ->assertJsonPath('data.name_matched', true)
+            ->assertJsonPath('data.bank.account_holder_name', 'RAHUL JOSHI');
+    }
+
     public function test_bank_verify_fails_when_name_does_not_match(): void
     {
         Http::fake([
@@ -107,7 +140,7 @@ class SurepassBankKycApiTest extends TestCase
         ]);
 
         $user = User::factory()->create([
-            'name' => 'Wrong Name',
+            'name' => 'Goutam Patidar',
             'kyc_status' => 'pending',
         ]);
         Sanctum::actingAs($user);
@@ -122,7 +155,7 @@ class SurepassBankKycApiTest extends TestCase
             ->assertJsonPath('success', false)
             ->assertJsonPath(
                 'data.errors.account_holder_name.0',
-                'Bank account holder name does not match the name registered with the bank.',
+                'Account holder name does not match the name registered with the bank.',
             );
 
         $this->assertDatabaseMissing('kyc_details', [

@@ -337,8 +337,7 @@ class KycService
             : null;
 
         if ($status === 'verified' && filled($providerFullName)) {
-            $this->assertBankIdentityMatches(
-                $user,
+            $this->assertBankAccountHolderNameMatches(
                 (string) $data['account_holder_name'],
                 $providerFullName,
             );
@@ -391,26 +390,14 @@ class KycService
     }
 
     /**
-     * Match Surepass bank full_name against account holder name and user profile name.
+     * Match Surepass bank full_name against the submitted account_holder_name only.
      */
-    protected function assertBankIdentityMatches(User $user, string $accountHolderName, string $providerFullName): void
+    protected function assertBankAccountHolderNameMatches(string $accountHolderName, string $providerFullName): void
     {
-        $errors = [];
-        $normalizedProvider = $this->normalizePersonName($providerFullName);
-
-        if ($this->normalizePersonName($accountHolderName) !== $normalizedProvider) {
-            $errors['account_holder_name'][] = 'Bank account holder name does not match the name registered with the bank.';
-        }
-
-        $userName = trim((string) $user->name);
-        if ($userName === '') {
-            $errors['account_holder_name'][] = 'Please update your full name in your profile before verifying bank details.';
-        } elseif ($this->normalizePersonName($userName) !== $normalizedProvider) {
-            $errors['account_holder_name'][] = 'Bank account holder name does not match your registered full name.';
-        }
-
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors);
+        if ($this->normalizePersonName($accountHolderName) !== $this->normalizePersonName($providerFullName)) {
+            throw ValidationException::withMessages([
+                'account_holder_name' => ['Account holder name does not match the name registered with the bank.'],
+            ]);
         }
     }
 
