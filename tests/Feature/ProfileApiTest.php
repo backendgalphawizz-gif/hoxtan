@@ -24,6 +24,17 @@ class ProfileApiTest extends TestCase
             'market_alerts' => true,
         ]);
 
+        $user->kycDetail()->create([
+            'full_name' => 'GOUTAM PATIDAR',
+            'pan_number' => 'HLCPP0624P',
+            'pan_verification_status' => 'verified',
+            'pan_verified_at' => now(),
+            'date_of_birth' => '2005-01-25',
+            'aadhaar_verification_status' => 'action_required',
+            'face_verification_status' => 'pending',
+            'bank_verification_status' => 'pending',
+        ]);
+
         Sanctum::actingAs($user);
 
         $response = $this->getJson('/api/v1/profile');
@@ -36,7 +47,12 @@ class ProfileApiTest extends TestCase
             ->assertJsonPath('data.user.email', 'alex@example.com')
             ->assertJsonPath('data.user.primary_residence', 'London, Mayfair')
             ->assertJsonPath('data.user.gender', 'male')
-            ->assertJsonPath('data.user.market_alerts', true);
+            ->assertJsonPath('data.user.market_alerts', true)
+            ->assertJsonPath('data.user.pan.full_name', 'GOUTAM PATIDAR')
+            ->assertJsonPath('data.user.pan.pan_number_masked', 'HLXXXXX24P')
+            ->assertJsonPath('data.user.pan.dob', '2005-01-25')
+            ->assertJsonPath('data.user.pan.verified', true)
+            ->assertJsonPath('data.user.pan.verification_status', 'verified');
     }
 
     public function test_update_profile(): void

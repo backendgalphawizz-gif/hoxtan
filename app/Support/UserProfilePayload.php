@@ -48,6 +48,7 @@ class UserProfilePayload
                 'date_of_birth' => $user->nominee_date_of_birth?->toDateString(),
                 'date_of_birth_display' => $user->nominee_date_of_birth?->format('d/m/Y'),
             ],
+            'pan' => self::pan($user),
             'bank' => [
                 'account_holder_name' => $user->kycDetail?->account_holder_name,
                 'bank_name' => $user->kycDetail?->bank_name,
@@ -55,6 +56,25 @@ class UserProfilePayload
                 'ifsc_code' => $user->kycDetail?->ifsc_code,
                 'verification_status' => $user->kycDetail?->bank_verification_status,
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected static function pan(User $user): array
+    {
+        $detail = $user->kycDetail;
+
+        return [
+            'full_name' => $detail?->full_name,
+            'pan_number' => KycPayload::maskPan($detail?->pan_number),
+            'pan_number_masked' => KycPayload::maskPan($detail?->pan_number),
+            'dob' => $detail?->date_of_birth?->toDateString(),
+            'dob_display' => $detail?->date_of_birth?->format('d/m/Y'),
+            'verification_status' => $detail?->pan_verification_status,
+            'verified' => $detail?->pan_verification_status === 'verified',
+            'verified_at' => $detail?->pan_verified_at?->toIso8601String(),
         ];
     }
 
