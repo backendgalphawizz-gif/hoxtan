@@ -20,6 +20,7 @@ class JewelleryEmiService
     public function __construct(
         protected WalletService $wallet,
         protected RazorpayService $razorpay,
+        protected ReferralService $referrals,
     ) {}
 
     /**
@@ -570,6 +571,10 @@ class JewelleryEmiService
                 'emiInstallments',
                 'user',
             ]));
+        }
+
+        if ($order?->user) {
+            $this->referrals->evaluatePendingBonusAfterCommit($order->user);
         }
 
         return $installment->fresh();

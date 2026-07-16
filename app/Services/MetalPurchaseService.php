@@ -17,6 +17,7 @@ class MetalPurchaseService
         protected MetalRateService $metalRates,
         protected GstService $gst,
         protected UserHoldingsService $holdings,
+        protected ReferralService $referrals,
     ) {}
 
     /**
@@ -246,6 +247,8 @@ class MetalPurchaseService
             ]),
             'metal_purchase',
         );
+
+        $this->referrals->evaluatePendingBonusAfterCommit($user);
 
         return $result;
     }
