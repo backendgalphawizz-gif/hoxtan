@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Driver;
 use App\Models\OldGoldBooking;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -69,6 +70,38 @@ class SellJewelleryPayload
         }
 
         return $payload;
+    }
+
+    /**
+     * Customer-facing assigned driver details (null when not assigned).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function driver(OldGoldBooking $booking): ?array
+    {
+        $booking->loadMissing('driver');
+
+        if (! $booking->driver_id || ! $booking->driver) {
+            return null;
+        }
+
+        $driver = $booking->driver;
+        $profileImageUrl = filled($driver->profile_image)
+            ? AssetUrl::publicStorage($driver->profile_image)
+            : null;
+
+        return [
+            'id' => $driver->id,
+            'name' => $driver->name,
+            'phone' => $driver->phone,
+            'phone_display' => '+91 '.$driver->phone,
+            'image_url' => $profileImageUrl,
+            'vehicle_type' => $driver->vehicle_type,
+            'vehicle_type_label' => Driver::vehicleTypeOptions()[$driver->vehicle_type] ?? $driver->vehicle_type,
+            'vehicle_number' => $driver->vehicle_number,
+            'assigned_at' => $booking->driver_assigned_at?->toIso8601String(),
+            'assigned_at_display' => $booking->driver_assigned_at?->format('d F Y, h:i A'),
+        ];
     }
 
     /**

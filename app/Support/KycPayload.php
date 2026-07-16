@@ -4,7 +4,9 @@ namespace App\Support;
 
 use App\Models\KycDetail;
 use App\Models\User;
+use App\Services\KycService;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class KycPayload
 {
@@ -124,7 +126,7 @@ class KycPayload
     }
 
     /**
-     * Surepass PAN + bank verified — eligible for automatic admin approval.
+     * Surepass PAN + Aadhaar + bank verified — eligible for automatic KYC approval.
      */
     public static function isSurepassPanBankVerified(KycDetail $detail): bool
     {
@@ -133,7 +135,52 @@ class KycPayload
         }
 
         return $detail->pan_verification_status === 'verified'
+            && $detail->aadhaar_verification_status === 'verified'
             && $detail->bank_verification_status === 'verified';
+    }
+
+    public static function canPerformTransactions(User $user, ?KycDetail $detail = null): bool
+    {
+        if ($user->kyc_status === 'approved') {
+            return true;
+        }
+
+        $detail ??= $user->kycDetail;
+
+        if (config('kyc.provider') === 'surepass' && $detail) {
+            return self::isSurepassPanBankVerified($detail);
+        }
+
+        return false;
+    }
+
+    public static function transactionBlockedMessage(): string
+    {
+        return 'Complete KYC verification (PAN, Aadhaar, and bank account) before proceeding.';
+    }
+
+    public static function assertCanPerformTransactions(User $user): void
+    {
+        $user->loadMissing('kycDetail');
+
+        if (self::canPerformTransactions($user, $user->kycDetail)) {
+            return;
+        }
+
+        if ($user->kycDetail
+            && config('kyc.provider') === 'surepass'
+            && self::isSurepassPanBankVerified($user->kycDetail)) {
+            app(KycService::class)->syncUserKycStatus($user, $user->kycDetail);
+            $user->refresh()->load('kycDetail');
+
+            if (self::canPerformTransactions($user, $user->kycDetail)) {
+                return;
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'kyc' => [self::transactionBlockedMessage()],
+        ]);
     }
 
     public static function requiresAdminKycApproval(KycDetail $detail, User $user): bool

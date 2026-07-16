@@ -292,14 +292,9 @@ class ProfileController extends Controller
     }
 
     public function downloadCertificate(
-        Request $request,
         HoldingCertificate $certificate,
         HoldingCertificateService $certificates,
     ): StreamedResponse|JsonResponse {
-        if ($certificate->user_id !== $request->user()->id) {
-            return ApiResponse::error('Unauthorized.', [], 403);
-        }
-
         $investment = $certificate->investment()->with('user')->firstOrFail();
         $certificates->writeFile($certificate, $investment, $investment->user);
         $certificate->refresh();

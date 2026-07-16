@@ -14,6 +14,7 @@ use App\Support\DeliveryOtp;
 use App\Support\JewelleryEmiPayload;
 use App\Support\JewelleryPricing;
 use App\Support\JewelleryProductPayload;
+use App\Support\KycPayload;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -108,6 +109,8 @@ class JewelleryCheckoutService
         ?string $transactionId = null,
         ?int $variantId = null,
     ): array {
+        KycPayload::assertCanPerformTransactions($user);
+
         $product = $this->resolveProduct($productId);
         $variant = $this->resolveVariant($product, $variantId, requiredForSizedProduct: true);
         $address = $this->resolveAddress($user, $addressId, required: true);

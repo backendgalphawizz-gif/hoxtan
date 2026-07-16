@@ -36,6 +36,24 @@ class AccountActivityApiTest extends TestCase
             'delivery_otp' => '5678',
         ]);
 
+        $product = \App\Models\JewelleryProduct::query()->create([
+            'name' => 'Gold Ring',
+            'metal_type' => 'gold',
+            'purity' => '22K',
+            'weight_grams' => 5,
+            'price' => 10000,
+            'stock_status' => 'in_stock',
+            'is_active' => true,
+        ]);
+
+        \App\Models\JewelleryOrderItem::query()->create([
+            'jewellery_order_id' => $order->id,
+            'jewellery_product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 10000,
+            'line_total' => 10000,
+        ]);
+
         $this->getJson('/api/v1/orders/config')
             ->assertOk()
             ->assertJsonStructure(['data' => ['status_filters', 'statuses']]);
@@ -71,11 +89,13 @@ class AccountActivityApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.order.order_number_display', '#HOX12345')
             ->assertJsonPath('data.order.delivery_otp', '5678')
+            ->assertJsonPath('data.order.driver', null)
             ->assertJsonStructure([
                 'data' => [
                     'order' => [
                         'items',
                         'payment',
+                        'driver',
                         'tracking' => [
                             ['key', 'label', 'completed', 'current', 'completed_at'],
                         ],
@@ -92,6 +112,29 @@ class AccountActivityApiTest extends TestCase
             ])
             ->assertJsonPath('data.order.tracking.0.key', 'placed')
             ->assertJsonPath('data.order.tracking.1.current', true);
+
+        $driver = \App\Models\Driver::query()->create([
+            'name' => 'Ravi Kumar',
+            'phone' => '9988776655',
+            'vehicle_type' => 'bike',
+            'vehicle_number' => 'MH12AB1234',
+            'is_active' => true,
+            'is_online' => true,
+        ]);
+
+        $order->update([
+            'driver_id' => $driver->id,
+            'driver_assigned_at' => now(),
+        ]);
+
+        $this->getJson('/api/v1/orders/'.$order->id)
+            ->assertOk()
+            ->assertJsonPath('data.order.driver_id', $driver->id)
+            ->assertJsonPath('data.order.driver.name', 'Ravi Kumar')
+            ->assertJsonPath('data.order.driver.phone', '9988776655')
+            ->assertJsonPath('data.order.driver.phone_display', '+91 9988776655')
+            ->assertJsonPath('data.order.driver.vehicle_type', 'bike')
+            ->assertJsonPath('data.order.driver.vehicle_number', 'MH12AB1234');
     }
 
     public function test_emi_order_track_payload_includes_timeline_progress_and_actions(): void

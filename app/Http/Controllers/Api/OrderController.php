@@ -38,7 +38,7 @@ class OrderController extends Controller
         $query = $request->user()
             ->jewelleryOrders()
             ->where('status', '!=', 'cart')
-            ->with(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice'])
+            ->with(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice', 'driver'])
             ->latest('id');
 
         if ($status !== 'all') {
@@ -73,7 +73,7 @@ class OrderController extends Controller
     {
         $this->ensureOwnedByUser($request, $order);
 
-        $order->load(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice']);
+        $order->load(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice', 'driver']);
 
         if (! $order->invoice) {
             $invoices->generateForJewelleryOrder($order);

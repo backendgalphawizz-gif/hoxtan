@@ -37,6 +37,7 @@ Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/app/config', [AppConfigController::class, 'index']);
+    Route::get('/config', [AppConfigController::class, 'index']);
     Route::get('/app/faqs', [AppConfigController::class, 'faqs']);
     Route::get('/app/pages/{slug}', [AppConfigController::class, 'page']);
 
@@ -51,6 +52,10 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/jewellery/emi-plans', [JewelleryController::class, 'emiPlans']);
     Route::get('/jewellery/products', [JewelleryController::class, 'products']);
     Route::get('/jewellery/products/{product}', [JewelleryController::class, 'show']);
+
+    // Public certificate download (no auth token required).
+    Route::get('/certificates/{certificate}/download', [ProfileController::class, 'downloadCertificate'])
+        ->name('api.certificates.download');
     Route::get('/products/{product}', [JewelleryController::class, 'show']);
 
     Route::get('/register/config', [RegistrationController::class, 'config']);
@@ -140,8 +145,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/invoices', [ProfileController::class, 'invoices']);
         Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
             ->name('api.invoices.download');
-        Route::get('/certificates/{certificate}/download', [ProfileController::class, 'downloadCertificate'])
-            ->name('api.certificates.download');
 
         Route::get('/orders/config', [OrderController::class, 'config']);
         Route::get('/orders', [OrderController::class, 'index']);
@@ -166,7 +169,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/kyc/bank/verify', [KycController::class, 'submitBank']);
 
         Route::post('/digilocker/initialize', [DigilockerController::class, 'initialize']);
-        Route::get('/digilocker/status/{clientId}', [DigilockerController::class, 'status'])
+        Route::match(['get', 'post'], '/digilocker/status/{clientId}', [DigilockerController::class, 'status'])
             ->where('clientId', '[A-Za-z0-9_\-]+');
 
         Route::get('/addresses', [AddressController::class, 'index']);

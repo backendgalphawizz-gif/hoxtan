@@ -123,7 +123,9 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
         $path = rtrim($this->digilockerPath('digilocker_download_aadhaar_path', '/api/v1/digilocker/download-aadhaar'), '/')
             .'/'.urlencode($clientId);
 
-        $response = $this->requestSurepass('post', $path, [], $user, 'digilocker');
+        // Surepass DigiLocker download-aadhaar accepts GET with client_id in the path.
+        // POST returns HTTP 405 "Method not allowed".
+        $response = $this->requestSurepass('get', $path, [], $user, 'digilocker');
 
         return [
             'message' => (string) ($response['message'] ?? 'Aadhaar downloaded successfully.'),
@@ -132,19 +134,76 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null
      */
     public function extractAadhaarNumber(array $data): ?string
     {
-        foreach (['aadhaar_number', 'uid', 'aadhaar_uid', 'id_number', 'masked_aadhaar'] as $key) {
-            $digits = preg_replace('/\D/', '', (string) ($data[$key] ?? '')) ?? '';
+        $candidates = [
+            $data['aadhaar_number'] ?? null,
+            $data['uid'] ?? null,
+            $data['aadhaar_uid'] ?? null,
+            $data['id_number'] ?? null,
+            $data['masked_aadhaar'] ?? null,
+            data_get($data, 'aadhaar_xml_data.aadhaar_number'),
+            data_get($data, 'aadhaar_xml_data.uid'),
+            data_get($data, 'aadhaar_xml_data.masked_aadhaar'),
+            data_get($data, 'digilocker_metadata.aadhaar_number'),
+            data_get($data, 'digilocker_metadata.uid'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $digits = preg_replace('/\D/', '', (string) $candidate) ?? '';
 
             if (strlen($digits) === 12) {
                 return $digits;
             }
         }
 
+        // Last resort: scan nested payload for a 12-digit Aadhaar.
+        $json = json_encode($data) ?: '';
+        if (preg_match('/\b(\d{12})\b/', $json, $matches) === 1) {
+            return $matches[1];
+        }
+
         return null;
+    }
+
+    /**
+     * Normalize DigiLocker download payload into identity fields used by KYC.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{name: ?string, date_of_birth: ?string, gender: ?string, address: ?array<string, mixed>}
+     */
+    public function extractDigilockerIdentity(array $data): array
+    {
+        $xml = is_array($data['aadhaar_xml_data'] ?? null) ? $data['aadhaar_xml_data'] : [];
+        $meta = is_array($data['digilocker_metadata'] ?? null) ? $data['digilocker_metadata'] : [];
+
+        $name = $xml['full_name'] ?? $meta['name'] ?? $data['name'] ?? null;
+        $dob = $xml['dob'] ?? $meta['dob'] ?? $data['date_of_birth'] ?? $data['dob'] ?? null;
+        $gender = $xml['gender'] ?? $meta['gender'] ?? $data['gender'] ?? null;
+
+        $address = is_array($data['address'] ?? null) ? $data['address'] : null;
+        if ($address === null && $xml !== []) {
+            $address = array_filter([
+                'care_of' => $xml['care_of'] ?? null,
+                'house' => $xml['house'] ?? null,
+                'street' => $xml['street'] ?? null,
+                'landmark' => $xml['landmark'] ?? null,
+                'locality' => $xml['locality'] ?? null,
+                'vtc' => $xml['vtc'] ?? null,
+                'district' => $xml['district'] ?? null,
+                'state' => $xml['state'] ?? null,
+                'pincode' => $xml['zip'] ?? $xml['pincode'] ?? null,
+            ], fn ($value) => filled($value));
+        }
+
+        return [
+            'name' => is_string($name) ? $name : null,
+            'date_of_birth' => is_string($dob) ? $dob : null,
+            'gender' => is_string($gender) ? $gender : null,
+            'address' => $address !== [] ? $address : null,
+        ];
     }
 
     /**
@@ -219,9 +278,11 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
         Log::info('Surepass response.', [
             'user_id' => $user->id,
             'context' => $context,
+            'method' => strtoupper($method),
             'path' => $path,
             'http_status' => $response->status(),
             'success' => $payload['success'] ?? null,
+            'message' => $payload['message'] ?? null,
         ]);
 
         if (! $response->successful() || ! ($payload['success'] ?? false)) {

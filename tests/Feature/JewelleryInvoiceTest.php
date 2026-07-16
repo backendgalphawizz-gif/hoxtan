@@ -21,7 +21,7 @@ class JewelleryInvoiceTest extends TestCase
 
     public function test_full_payment_buy_now_generates_invoice_and_lists_in_api(): void
     {
-        $user = User::factory()->create(['phone' => '9876500001', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876500001', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         $address = UserAddress::query()->create([
@@ -81,20 +81,29 @@ class JewelleryInvoiceTest extends TestCase
             ->assertJsonPath('data.invoices.0.source_type', 'jewellery')
             ->assertJsonPath('data.invoices.0.order_number', $response->json('data.order.order_number'));
 
+        $this->getJson('/api/v1/orders/'.$orderId)
+            ->assertOk()
+            ->assertJsonPath('data.order.invoice.invoice_number', $invoiceNumber)
+            ->assertJsonPath('data.order.invoice.source_type', 'jewellery')
+            ->assertJsonPath('data.order.invoice.download_url', route('api.invoices.download', Invoice::query()->where('invoice_number', $invoiceNumber)->first()));
+
         $this->getJson('/api/v1/transactions?filter=jewellery')
             ->assertOk()
             ->assertJsonFragment([
                 'invoice_number' => $invoiceNumber,
             ]);
 
-        $this->getJson('/api/v1/orders/'.$orderId)
-            ->assertOk()
-            ->assertJsonPath('data.order.invoice.invoice_number', $invoiceNumber);
+        $txnList = $this->getJson('/api/v1/transactions?filter=jewellery')->assertOk();
+        $this->assertTrue(
+            collect($txnList->json('data'))->contains(
+                fn (array $txn): bool => ($txn['invoice']['invoice_number'] ?? null) === $invoiceNumber
+            )
+        );
     }
 
     public function test_emi_buy_now_does_not_generate_invoice_until_fully_paid(): void
     {
-        $user = User::factory()->create(['phone' => '9876500002', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876500002', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         $address = UserAddress::query()->create([

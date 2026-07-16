@@ -42,6 +42,11 @@ class AppConfigPayload
             'driver' => self::driverLegal($settings),
             'delete_account' => self::deleteAccount($settings),
             'metal_rates_realtime' => MetalRateRealtimeConfig::make(),
+            'surepass_token' => (string) config('kyc.surepass.token', ''),
+            'surepass' => [
+                'token' => (string) config('kyc.surepass.token', ''),
+                'base_url' => (string) config('kyc.surepass.base_url', ''),
+            ],
         ];
     }
 

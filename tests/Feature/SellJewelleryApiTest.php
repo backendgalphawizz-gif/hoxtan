@@ -18,7 +18,7 @@ class SellJewelleryApiTest extends TestCase
     {
         Storage::fake('public');
 
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'phone' => '9876543211',
             'mpin' => '1234',
         ]);
@@ -118,11 +118,60 @@ class SellJewelleryApiTest extends TestCase
             ->assertJsonPath('data.request.documents.1.uploaded', true);
     }
 
+    public function test_sell_request_show_includes_assigned_driver_details(): void
+    {
+        $user = $this->userWithTransactionKyc([
+            'phone' => '9876543213',
+            'mpin' => '1234',
+        ]);
+        Sanctum::actingAs($user);
+
+        $booking = OldGoldBooking::query()->create([
+            'booking_number' => 'SELLDRIVER1',
+            'user_id' => $user->id,
+            'metal_type' => 'gold',
+            'purity' => '22K',
+            'estimated_weight_grams' => 10,
+            'quoted_amount' => 50000,
+            'status' => 'pending',
+            'pickup_address' => '12 MG Road, Mumbai',
+            'pickup_name' => 'Test User',
+            'pickup_phone' => '9876543213',
+        ]);
+
+        $this->getJson("/api/v1/sell-jewellery/requests/{$booking->id}")
+            ->assertOk()
+            ->assertJsonPath('data.request.driver', null);
+
+        $driver = \App\Models\Driver::query()->create([
+            'name' => 'Suresh Pickup',
+            'phone' => '9911223344',
+            'vehicle_type' => 'van',
+            'vehicle_number' => 'MH14CD5678',
+            'is_active' => true,
+            'is_online' => true,
+        ]);
+
+        $booking->update([
+            'driver_id' => $driver->id,
+            'driver_assigned_at' => now(),
+        ]);
+
+        $this->getJson("/api/v1/sell-jewellery/requests/{$booking->id}")
+            ->assertOk()
+            ->assertJsonPath('data.request.driver_id', $driver->id)
+            ->assertJsonPath('data.request.driver.name', 'Suresh Pickup')
+            ->assertJsonPath('data.request.driver.phone', '9911223344')
+            ->assertJsonPath('data.request.driver.phone_display', '+91 9911223344')
+            ->assertJsonPath('data.request.driver.vehicle_type', 'van')
+            ->assertJsonPath('data.request.driver.vehicle_number', 'MH14CD5678');
+    }
+
     public function test_id_proof_required_only_when_jewellery_is_in_someone_elses_name(): void
     {
         Storage::fake('public');
 
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'phone' => '9876543212',
             'mpin' => '1234',
         ]);

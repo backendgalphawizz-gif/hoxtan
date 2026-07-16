@@ -21,7 +21,7 @@ class HoldingsLotApiTest extends TestCase
             'currency' => 'INR',
         ]);
 
-        $user = User::factory()->create(['phone' => '9876501001', 'mpin' => '1234']);
+        $user = $this->userWithTransactionKyc(['phone' => '9876501001', 'mpin' => '1234']);
         Sanctum::actingAs($user);
 
         $this->postJson('/api/v1/holdings/purchase', [
@@ -155,7 +155,7 @@ class HoldingsLotApiTest extends TestCase
             'currency' => 'INR',
         ]);
 
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'phone' => '9876501003',
             'mpin' => '1234',
             'gold_holdings' => 50,
@@ -163,8 +163,7 @@ class HoldingsLotApiTest extends TestCase
         ]);
         Sanctum::actingAs($user);
 
-        \App\Models\KycDetail::query()->create([
-            'user_id' => $user->id,
+        \App\Models\KycDetail::query()->where('user_id', $user->id)->update([
             'full_name' => 'Seller User',
             'bank_name' => 'HDFC Bank',
             'account_holder_name' => 'Seller User',
