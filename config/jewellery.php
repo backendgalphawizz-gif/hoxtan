@@ -15,9 +15,6 @@ return [
         'gold' => [
             ['value' => '24K', 'label' => '24K'],
             ['value' => '22K', 'label' => '22K'],
-            ['value' => '20K', 'label' => '20K'],
-            ['value' => '18K', 'label' => '18K'],
-            ['value' => '16K', 'label' => '16K'],
         ],
         'silver' => [
             ['value' => '999', 'label' => '999 Fine Silver'],
@@ -26,8 +23,9 @@ return [
         // Fallback when metal_type is unknown (union of common gold options).
         'default' => [
             ['value' => '22K', 'label' => '22K'],
-            ['value' => '18K', 'label' => '18K'],
-            ['value' => '16K', 'label' => '16K'],
+            ['value' => '999', 'label' => '999 Fine Silver'],
+            ['value' => '925', 'label' => '925 Sterling Silver'],
+            
         ],
     ],
 
