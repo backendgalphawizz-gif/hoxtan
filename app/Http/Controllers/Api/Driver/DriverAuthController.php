@@ -83,8 +83,8 @@ class DriverAuthController extends Controller
                 $device = $fcm->registerToken(
                     $driver,
                     $fcmToken,
-                    $data['platform'] ?? null,
-                    $data['device_name'] ?? null,
+                    FcmTokenRequest::platform($request),
+                    FcmTokenRequest::deviceName($request),
                 );
                 $fcmRegistered = true;
                 $deviceTokenId = $device->id;
@@ -100,9 +100,70 @@ class DriverAuthController extends Controller
             'token' => $token,
             'token_type' => 'Bearer',
             'fcm_token_registered' => $fcmRegistered,
+            'fcm_token_skipped_reason' => $fcmToken === null ? 'empty_or_missing' : ($fcmRegistered ? null : 'save_failed'),
             'device_token_id' => $deviceTokenId,
             'driver' => DriverPayload::make($driver->fresh()),
         ], 'Login successful.');
+    }
+
+    public function registerDevice(Request $request, FirebaseCloudMessagingService $fcm): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['nullable', 'string', 'max:4096'],
+            'fcm_token' => ['nullable', 'string', 'max:4096'],
+            'platform' => ['nullable', 'string', 'in:android,ios,web'],
+            'device_name' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $fcmToken = FcmTokenRequest::from($request) ?? (filled($data['token'] ?? null) ? trim((string) $data['token']) : null);
+
+        if ($fcmToken === null) {
+            return ApiResponse::error('FCM token is required.', [
+                'errors' => ['fcm_token' => ['Please provide fcm_token or token.']],
+            ], 422);
+        }
+
+        /** @var Driver $driver */
+        $driver = $request->user();
+
+        $device = $fcm->registerToken(
+            $driver,
+            $fcmToken,
+            FcmTokenRequest::platform($request) ?? ($data['platform'] ?? null),
+            FcmTokenRequest::deviceName($request) ?? ($data['device_name'] ?? null),
+        );
+
+        return ApiResponse::success([
+            'device_token' => [
+                'id' => $device->id,
+                'platform' => $device->platform,
+                'device_name' => $device->device_name,
+                'updated_at' => optional($device->updated_at)?->toIso8601String(),
+            ],
+            'fcm_token_registered' => true,
+            'device_token_id' => $device->id,
+        ], 'Device token registered.');
+    }
+
+    public function removeDevice(Request $request, FirebaseCloudMessagingService $fcm): JsonResponse
+    {
+        $request->validate([
+            'token' => ['nullable', 'string', 'max:4096'],
+            'fcm_token' => ['nullable', 'string', 'max:4096'],
+        ]);
+
+        $fcmToken = FcmTokenRequest::from($request);
+        if ($fcmToken === null) {
+            return ApiResponse::error('FCM token is required.', [
+                'errors' => ['fcm_token' => ['Please provide fcm_token or token.']],
+            ], 422);
+        }
+
+        /** @var Driver $driver */
+        $driver = $request->user();
+        $fcm->removeToken($driver, $fcmToken);
+
+        return ApiResponse::success([], 'Device token removed.');
     }
 
     public function logout(Request $request, FirebaseCloudMessagingService $fcm): JsonResponse
