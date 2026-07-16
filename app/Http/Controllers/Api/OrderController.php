@@ -125,49 +125,13 @@ class OrderController extends Controller
         $this->ensureOwnedByUser($request, $order);
 
         $data = $request->validate([
-            'payment_method' => ['nullable', 'string', Rule::in(['razorpay', 'wallet'])],
+            'payment_method' => ['nullable', 'string', Rule::in(['direct', 'wallet'])],
         ]);
 
         $result = $emi->payAllRemaining(
             $order,
             $request->user(),
-            $data['payment_method'] ?? 'razorpay',
-        );
-
-        $message = ($result['requires_verification'] ?? false)
-            ? 'Razorpay order created. Complete payment and call verify.'
-            : 'All remaining EMIs paid successfully.';
-
-        return ApiResponse::success([
-            'amount_paid' => $result['amount_paid'],
-            'amount_paid_display' => $result['amount_paid_display'],
-            'installments_paid' => $result['installments_paid'],
-            'payment_method' => $result['payment_method'],
-            'requires_verification' => (bool) ($result['requires_verification'] ?? false),
-            'wallet_balance' => $result['wallet_balance'],
-            'fully_paid' => $result['fully_paid'],
-            'delivery_unlocked' => $result['delivery_unlocked'],
-            'razorpay' => $result['razorpay'] ?? null,
-            'order' => OrderPayload::make($result['order'], detailed: true),
-        ], $message);
-    }
-
-    public function verifyPayAllEmi(Request $request, JewelleryOrder $order, JewelleryEmiService $emi): JsonResponse
-    {
-        $this->ensureOwnedByUser($request, $order);
-
-        $data = $request->validate([
-            'razorpay_order_id' => ['required', 'string'],
-            'razorpay_payment_id' => ['required', 'string'],
-            'razorpay_signature' => ['required', 'string'],
-        ]);
-
-        $result = $emi->verifyRazorpayPayAll(
-            $order,
-            $request->user(),
-            $data['razorpay_order_id'],
-            $data['razorpay_payment_id'],
-            $data['razorpay_signature'],
+            $data['payment_method'] ?? 'direct',
         );
 
         return ApiResponse::success([
@@ -175,14 +139,11 @@ class OrderController extends Controller
             'amount_paid_display' => $result['amount_paid_display'],
             'installments_paid' => $result['installments_paid'],
             'payment_method' => $result['payment_method'],
-            'already_completed' => (bool) ($result['already_completed'] ?? false),
             'wallet_balance' => $result['wallet_balance'],
             'fully_paid' => $result['fully_paid'],
             'delivery_unlocked' => $result['delivery_unlocked'],
             'order' => OrderPayload::make($result['order'], detailed: true),
-        ], ($result['already_completed'] ?? false)
-            ? 'EMI pay-all already completed.'
-            : 'All remaining EMIs paid successfully.');
+        ], 'All remaining EMIs paid successfully.');
     }
 
     protected function ensureOwnedByUser(Request $request, JewelleryOrder $order): void

@@ -156,7 +156,6 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/orders/{order}/emi-cancel', [OrderController::class, 'cancelEmi']);
         Route::get('/orders/{order}/emi/pay-all-preview', [OrderController::class, 'payAllEmiPreview']);
         Route::post('/orders/{order}/emi/pay-all', [OrderController::class, 'payAllEmi']);
-        Route::post('/orders/{order}/emi/pay-all/verify', [OrderController::class, 'verifyPayAllEmi']);
 
         Route::get('/transactions/config', [TransactionController::class, 'config']);
         Route::get('/transactions', [TransactionController::class, 'index']);
