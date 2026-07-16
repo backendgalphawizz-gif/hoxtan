@@ -36,6 +36,7 @@ class KycController extends Controller
             'provider' => $provider,
             'third_party_enabled' => $provider !== 'stub',
             'pan_otp_required' => $provider !== 'surepass',
+            'bank_verify_via_provider' => $provider === 'surepass',
             'user_kyc_statuses' => config('kyc.user_kyc_statuses', []),
         ]);
     }
@@ -167,6 +168,9 @@ class KycController extends Controller
 
         $result = $kyc->submitBank($request->user(), $data);
 
-        return ApiResponse::success($result, $result['message']);
+        return ApiResponse::success(
+            $result,
+            (string) ($result['message'] ?? 'Bank details submitted successfully.'),
+        );
     }
 }

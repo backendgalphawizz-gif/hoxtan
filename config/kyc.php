@@ -8,6 +8,10 @@ return [
         'token' => env('SUREPASS_TOKEN', ''),
         'pan_path' => env('SUREPASS_PAN_PATH', '/api/v1/pan/pan-comprehensive'),
         'pan_id_field' => env('SUREPASS_PAN_ID_FIELD', 'id_number'),
+        'bank_path' => env('SUREPASS_BANK_PATH', '/api/v1/bank-verification/'),
+        'bank_account_field' => env('SUREPASS_BANK_ACCOUNT_FIELD', 'id_number'),
+        'bank_ifsc_field' => env('SUREPASS_BANK_IFSC_FIELD', 'ifsc'),
+        'bank_ifsc_details' => filter_var(env('SUREPASS_BANK_IFSC_DETAILS', true), FILTER_VALIDATE_BOOL),
         'timeout' => (int) env('SUREPASS_TIMEOUT', 30),
     ],
 

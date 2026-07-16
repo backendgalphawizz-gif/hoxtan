@@ -162,6 +162,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/kyc/aadhaar/verify-otp', [KycController::class, 'verifyAadhaarOtp']);
         Route::post('/kyc/face', [KycController::class, 'submitFace']);
         Route::post('/kyc/bank', [KycController::class, 'submitBank']);
+        Route::post('/kyc/bank/verify', [KycController::class, 'submitBank']);
 
         Route::get('/addresses', [AddressController::class, 'index']);
         Route::post('/addresses', [AddressController::class, 'store']);
