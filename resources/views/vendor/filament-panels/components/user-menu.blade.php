@@ -44,8 +44,11 @@
 
     <x-filament::dropdown.header>
         <div class="gs-user-menu-header">
-            <span class="gs-user-menu-header__name">{{ filament()->getUserName($user) }}</span>
-            <span class="gs-user-menu-header__email">{{ $user->email }}</span>
+            <x-filament-panels::avatar.user :user="$user" class="gs-user-menu-header__avatar" />
+            <div class="gs-user-menu-header__text">
+                <span class="gs-user-menu-header__name">{{ filament()->getUserName($user) }}</span>
+                <span class="gs-user-menu-header__email">{{ $user->email }}</span>
+            </div>
         </div>
     </x-filament::dropdown.header>
 

@@ -30,26 +30,36 @@ return new class extends Migration
             });
         }
 
+        $tokenColumn = Schema::hasColumn('device_tokens', 'fcm_token')
+            ? 'fcm_token'
+            : (Schema::hasColumn('device_tokens', 'token') ? 'token' : null);
+
         $driver = Schema::getConnection()->getDriverName();
-        if ($driver === 'mysql') {
-            foreach (['device_tokens_token_unique', 'token'] as $index) {
+        if ($driver === 'mysql' && $tokenColumn !== null) {
+            foreach (['device_tokens_token_unique', 'device_tokens_fcm_token_unique', 'token', 'fcm_token'] as $index) {
                 try {
                     DB::statement("ALTER TABLE device_tokens DROP INDEX `{$index}`");
                 } catch (\Throwable) {
                 }
             }
-            DB::statement('ALTER TABLE device_tokens MODIFY token TEXT NOT NULL');
+            DB::statement("ALTER TABLE device_tokens MODIFY `{$tokenColumn}` TEXT NOT NULL");
         }
 
-        $rows = DB::table('device_tokens')->whereNull('token_hash')->orWhere('token_hash', '')->get(['id', 'fcm_token', 'token']);
-        foreach ($rows as $row) {
-            $value = $row->fcm_token ?? $row->token ?? null;
-            if ($value === null) {
-                continue;
+        if ($tokenColumn !== null) {
+            $rows = DB::table('device_tokens')
+                ->whereNull('token_hash')
+                ->orWhere('token_hash', '')
+                ->get(['id', $tokenColumn]);
+
+            foreach ($rows as $row) {
+                $value = $row->{$tokenColumn} ?? null;
+                if ($value === null || $value === '') {
+                    continue;
+                }
+                DB::table('device_tokens')->where('id', $row->id)->update([
+                    'token_hash' => hash('sha256', (string) $value),
+                ]);
             }
-            DB::table('device_tokens')->where('id', $row->id)->update([
-                'token_hash' => hash('sha256', (string) $value),
-            ]);
         }
 
         // Unique index on token_hash
