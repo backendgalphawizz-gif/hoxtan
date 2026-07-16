@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\JewelleryOrder;
+use App\Services\InvoiceService;
 use App\Services\JewelleryEmiCancellationService;
 use App\Support\ApiResponse;
 use App\Support\OrderPayload;
@@ -68,11 +69,16 @@ class OrderController extends Controller
         ]);
     }
 
-    public function show(Request $request, JewelleryOrder $order): JsonResponse
+    public function show(Request $request, JewelleryOrder $order, InvoiceService $invoices): JsonResponse
     {
         $this->ensureOwnedByUser($request, $order);
 
         $order->load(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice']);
+
+        if (! $order->invoice) {
+            $invoices->generateForJewelleryOrder($order);
+            $order->load('invoice');
+        }
 
         return ApiResponse::success([
             'order' => OrderPayload::make($order, detailed: true),

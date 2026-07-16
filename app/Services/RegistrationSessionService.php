@@ -12,7 +12,7 @@ class RegistrationSessionService
         protected OtpService $otp,
     ) {}
 
-    public function create(string $phone): array
+    public function create(string $phone, array $extra = []): array
     {
         $phone = preg_replace('/\D/', '', $phone) ?? $phone;
 
@@ -25,12 +25,16 @@ class RegistrationSessionService
         $ttl = config('otp.registration_session_ttl', 1800);
         $token = Str::random(64);
 
-        Cache::put($this->sessionCacheKey($token), [
+        Cache::put($this->sessionCacheKey($token), array_merge([
             'phone' => $phone,
             'name' => null,
             'referral_code' => null,
             'created_at' => now()->timestamp,
-        ], $ttl);
+        ], array_filter([
+            'fcm_token' => $extra['fcm_token'] ?? null,
+            'platform' => $extra['platform'] ?? null,
+            'device_name' => $extra['device_name'] ?? null,
+        ], fn ($value) => filled($value))), $ttl);
 
         return [
             'token' => $token,

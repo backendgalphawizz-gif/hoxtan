@@ -92,9 +92,11 @@ class FirebaseCloudMessagingService
             'last_used_at' => now(),
         ];
 
+        // Keep both columns in sync when legacy `token` still exists (e.g. SQLite rename path).
         if ($this->hasFcmTokenColumn()) {
             $payload['fcm_token'] = $token;
-        } else {
+        }
+        if (Schema::hasColumn('device_tokens', 'token')) {
             $payload['token'] = $token;
         }
 

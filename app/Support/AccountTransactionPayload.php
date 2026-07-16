@@ -147,6 +147,18 @@ class AccountTransactionPayload
 
     public static function fromOldGoldBooking(OldGoldBooking $booking): array
     {
+        $booking->loadMissing(['invoice']);
+
+        $meta = [
+            'booking_id' => $booking->id,
+            'booking_number_display' => '#'.$booking->booking_number,
+        ];
+
+        if ($booking->invoice) {
+            $meta['invoice_number'] = $booking->invoice->invoice_number;
+            $meta['invoice_download_url'] = route('api.invoices.download', $booking->invoice);
+        }
+
         return self::base(
             id: 'old_gold:'.$booking->id,
             sourceType: 'old_gold',
@@ -161,10 +173,7 @@ class AccountTransactionPayload
             occurredAt: $booking->created_at,
             metalType: $booking->metal_type,
             quantityGrams: $booking->estimated_weight_grams !== null ? (float) $booking->estimated_weight_grams : null,
-            meta: [
-                'booking_id' => $booking->id,
-                'booking_number_display' => '#'.$booking->booking_number,
-            ],
+            meta: $meta,
         );
     }
 

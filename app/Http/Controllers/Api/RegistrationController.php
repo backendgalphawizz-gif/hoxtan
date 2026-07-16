@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\User;
+use App\Services\FirebaseCloudMessagingService;
 use App\Services\OtpService;
 use App\Services\ReferralService;
 use App\Services\RegistrationSessionService;
 use App\Services\UserRegistrationService;
 use App\Support\ApiResponse;
+use App\Support\FcmTokenRequest;
 use App\Support\MpinRules;
 use App\Support\PhoneRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class RegistrationController extends AuthController
@@ -49,20 +52,22 @@ class RegistrationController extends AuthController
         Request $request,
         OtpService $otp,
         RegistrationSessionService $sessions,
+        FirebaseCloudMessagingService $fcm,
     ): JsonResponse {
         $otpLength = (int) config('otp.length', 4);
         $mpinLength = MpinRules::length();
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'phone' => PhoneRules::rules(),
             'otp' => ['required', 'string', "digits:{$otpLength}", 'regex:/^\d+$/'],
             'mpin' => ['nullable', 'string', "digits:{$mpinLength}", 'regex:/^\d+$/'],
-        ], array_merge(PhoneRules::messages(), MpinRules::validationMessages(), [
+        ], FcmTokenRequest::validationRules()), array_merge(PhoneRules::messages(), MpinRules::validationMessages(), [
             'otp.digits' => "OTP must be exactly {$otpLength} digits.",
             'otp.regex' => 'OTP must contain only numbers.',
         ]));
 
         $phone = PhoneRules::normalize($data['phone']);
+        $fcmToken = FcmTokenRequest::from($request);
 
         $otp->verifyRegistrationOtp($phone, $data['otp']);
 
@@ -80,6 +85,7 @@ class RegistrationController extends AuthController
 
                 if (filled($readableMpin)) {
                     $token = $existingUser->createToken('mobile-app')->plainTextToken;
+                    $fcmResult = $this->registerFcmToken($existingUser, $request, $fcm, $fcmToken);
 
                     return ApiResponse::success([
                         'already_registered' => true,
@@ -90,9 +96,13 @@ class RegistrationController extends AuthController
                         'has_mpin' => true,
                         'mpin_legacy_hashed' => false,
                         'token' => $token,
+                        'fcm_token_registered' => $fcmResult['registered'],
+                        'device_token_id' => $fcmResult['device_token_id'],
                         'user' => $this->userPayload($existingUser),
                     ], 'Login successful.');
                 }
+
+                $fcmResult = $this->registerFcmToken($existingUser, $request, $fcm, $fcmToken);
 
                 return ApiResponse::success([
                     'already_registered' => true,
@@ -103,6 +113,8 @@ class RegistrationController extends AuthController
                     'has_mpin' => filled($existingUser->getRawOriginal('mpin')),
                     'mpin_legacy_hashed' => $existingUser->usesLegacyHashedMpin(),
                     'next_api' => '/api/v1/register/login-mpin',
+                    'fcm_token_registered' => $fcmResult['registered'],
+                    'device_token_id' => $fcmResult['device_token_id'],
                     'user' => $this->userPayload($existingUser),
                 ], $existingUser->usesLegacyHashedMpin()
                     ? 'OTP verified. Please reset your M-PIN once using Forgot M-PIN or admin.'
@@ -116,6 +128,7 @@ class RegistrationController extends AuthController
             }
 
             $token = $existingUser->createToken('mobile-app')->plainTextToken;
+            $fcmResult = $this->registerFcmToken($existingUser, $request, $fcm, $fcmToken);
 
             return ApiResponse::success([
                 'already_registered' => true,
@@ -123,11 +136,17 @@ class RegistrationController extends AuthController
                 'mpin' => $existingUser->readableMpin() ?? $data['mpin'],
                 'mpin_length' => $mpinLength,
                 'token' => $token,
+                'fcm_token_registered' => $fcmResult['registered'],
+                'device_token_id' => $fcmResult['device_token_id'],
                 'user' => $this->userPayload($existingUser),
             ], 'Login successful.');
         }
 
-        $session = $sessions->create($phone);
+        $session = $sessions->create($phone, [
+            'fcm_token' => $fcmToken,
+            'platform' => $request->input('platform'),
+            'device_name' => $request->input('device_name'),
+        ]);
 
         return ApiResponse::success([
             'already_registered' => false,
@@ -136,17 +155,18 @@ class RegistrationController extends AuthController
             'expires_in_seconds' => $session['expires_in'],
             'phone' => $phone,
             'mpin_length' => $mpinLength,
+            'fcm_token_received' => $fcmToken !== null,
         ], 'Mobile number verified successfully.');
     }
 
-    public function loginMpin(Request $request, OtpService $otp): JsonResponse
+    public function loginMpin(Request $request, OtpService $otp, FirebaseCloudMessagingService $fcm): JsonResponse
     {
         $mpinLength = MpinRules::length();
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'phone' => PhoneRules::rules(),
             'mpin' => ['required', 'string', "digits:{$mpinLength}", 'regex:/^\d+$/'],
-        ], array_merge(PhoneRules::messages(), MpinRules::validationMessages()));
+        ], FcmTokenRequest::validationRules()), array_merge(PhoneRules::messages(), MpinRules::validationMessages()));
 
         $phone = PhoneRules::normalize($data['phone']);
 
@@ -164,7 +184,7 @@ class RegistrationController extends AuthController
             ]);
         }
 
-        return $this->loginWithMpin($user, $phone, $data['mpin'], $otp);
+        return $this->loginWithMpin($user, $phone, $data['mpin'], $otp, $request, $fcm);
     }
 
     public function details(Request $request, RegistrationSessionService $sessions, ReferralService $referrals): JsonResponse
@@ -225,13 +245,14 @@ class RegistrationController extends AuthController
         Request $request,
         RegistrationSessionService $sessions,
         UserRegistrationService $registration,
+        FirebaseCloudMessagingService $fcm,
     ): JsonResponse {
         $length = MpinRules::length();
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'registration_token' => ['required', 'string', 'size:64'],
             'mpin' => ['required', 'string', "digits:{$length}", 'regex:/^\d+$/'],
-        ], MpinRules::validationMessages());
+        ], FcmTokenRequest::validationRules()), MpinRules::validationMessages());
 
         $session = $sessions->get($data['registration_token']);
 
@@ -248,6 +269,31 @@ class RegistrationController extends AuthController
             $session['referral_code'] ?? null,
         );
 
+        $fcmToken = FcmTokenRequest::from($request) ?? (filled($session['fcm_token'] ?? null) ? (string) $session['fcm_token'] : null);
+        $platform = $request->input('platform') ?? ($session['platform'] ?? null);
+        $deviceName = $request->input('device_name') ?? ($session['device_name'] ?? null);
+
+        $fcmResult = ['registered' => false, 'device_token_id' => null];
+        if ($fcmToken !== null) {
+            try {
+                $device = $fcm->registerToken(
+                    $user,
+                    $fcmToken,
+                    is_string($platform) ? $platform : null,
+                    is_string($deviceName) ? $deviceName : null,
+                );
+                $fcmResult = [
+                    'registered' => true,
+                    'device_token_id' => $device->id,
+                ];
+            } catch (\Throwable $e) {
+                Log::error('User FCM token save failed during registration', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $sessions->forget($data['registration_token'], $session['phone']);
 
         $token = $user->createToken('mobile-app')->plainTextToken;
@@ -256,7 +302,44 @@ class RegistrationController extends AuthController
             'mpin' => $data['mpin'],
             'mpin_length' => $length,
             'token' => $token,
+            'fcm_token_registered' => $fcmResult['registered'],
+            'device_token_id' => $fcmResult['device_token_id'],
             'user' => $this->userPayload($user),
         ], 'M-PIN created successfully.', 201);
+    }
+
+    /**
+     * @return array{registered: bool, device_token_id: int|null}
+     */
+    protected function registerFcmToken(
+        User $user,
+        Request $request,
+        FirebaseCloudMessagingService $fcm,
+        ?string $fcmToken,
+    ): array {
+        if ($fcmToken === null) {
+            return ['registered' => false, 'device_token_id' => null];
+        }
+
+        try {
+            $device = $fcm->registerToken(
+                $user,
+                $fcmToken,
+                $request->input('platform'),
+                $request->input('device_name'),
+            );
+
+            return [
+                'registered' => true,
+                'device_token_id' => $device->id,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('User FCM token save failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['registered' => false, 'device_token_id' => null];
+        }
     }
 }

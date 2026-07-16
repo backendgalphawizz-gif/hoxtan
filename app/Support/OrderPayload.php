@@ -59,6 +59,9 @@ class OrderPayload
                 ->map(fn (JewelleryOrderItem $item) => self::item($item))
                 ->values()
                 ->all(),
+            'invoice_url' => $order->invoice
+                ? route('api.invoices.download', $order->invoice)
+                : null,
             'invoice' => $order->invoice ? [
                 'invoice_number' => $order->invoice->invoice_number,
                 'total_amount' => (float) $order->invoice->total_amount,
