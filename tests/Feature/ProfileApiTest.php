@@ -48,6 +48,10 @@ class ProfileApiTest extends TestCase
             ->assertJsonPath('data.user.primary_residence', 'London, Mayfair')
             ->assertJsonPath('data.user.gender', 'male')
             ->assertJsonPath('data.user.market_alerts', true)
+            ->assertJsonPath('data.user.wallet_balance', 0)
+            ->assertJsonPath('data.user.gold_holdings', 0)
+            ->assertJsonPath('data.user.silver_holdings', 0)
+            ->assertJsonPath('data.user.mpin_length', 4)
             ->assertJsonPath('data.user.pan.full_name', 'GOUTAM PATIDAR')
             ->assertJsonPath('data.user.pan.pan_number_masked', 'HLXXXXX24P')
             ->assertJsonPath('data.user.pan.dob', '2005-01-25')
@@ -55,6 +59,13 @@ class ProfileApiTest extends TestCase
             ->assertJsonPath('data.user.pan.verification_status', 'verified')
             ->assertJsonPath('data.user.aadhaar.verified', false)
             ->assertJsonPath('data.user.aadhaar.verification_status', 'action_required');
+
+        $userPayload = $response->json('data.user');
+        foreach (['id', 'mpin_length', 'wallet_balance', 'gold_holdings', 'silver_holdings'] as $numericKey) {
+            $this->assertIsNumeric($userPayload[$numericKey] ?? null, "Expected numeric {$numericKey}");
+            $this->assertNotNull($userPayload[$numericKey], "Expected non-null {$numericKey}");
+        }
+        $this->assertIsString($userPayload['mpin']);
     }
 
     public function test_update_profile(): void
@@ -88,11 +99,37 @@ class ProfileApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.user.name', 'Alexander Vance')
+            ->assertJsonPath('data.user.date_of_birth', '1990-04-12')
+            ->assertJsonPath('data.user.date_of_birth_display', '12/04/1990')
             ->assertJsonPath('data.user.nominee.name', 'Jane Vance')
             ->assertJsonPath('data.user.bank.account_holder_name', 'Alexander Vance')
             ->assertJsonPath('data.user.bank.bank_name', 'HDFC Bank')
             ->assertJsonPath('data.user.bank.account_number', '123456789012')
             ->assertJsonPath('data.user.bank.ifsc_code', 'HDFC0001234');
+    }
+
+    public function test_update_profile_date_of_birth_only(): void
+    {
+        $user = User::factory()->create([
+            'phone' => '9876543210',
+            'mpin' => '1234',
+            'date_of_birth' => null,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/v1/profile', [
+            'date_of_birth' => '1998-03-21',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.user.date_of_birth', '1998-03-21')
+            ->assertJsonPath('data.user.date_of_birth_display', '21/03/1998');
+
+        $this->putJson('/api/v1/profile', [
+            'dob' => '1997-11-05',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.user.date_of_birth', '1997-11-05');
     }
 
     public function test_update_profile_photo_only(): void

@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\User;
-use App\Support\AssetUrl;
 
 class UserProfilePayload
 {
@@ -12,30 +11,34 @@ class UserProfilePayload
         $user->loadMissing(['referredBy:id,name,phone', 'kycDetail']);
 
         $photoUrl = self::profilePhotoUrl($user->profile_photo);
+        $dateOfBirth = $user->date_of_birth?->toDateString();
 
         return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'phone' => $user->phone,
+            'id' => (int) $user->id,
+            'name' => (string) ($user->name ?? ''),
+            'phone' => (string) ($user->phone ?? ''),
             'phone_verified' => (bool) $user->is_verified,
-            'mpin' => $user->readableMpin(),
-            'mpin_length' => MpinRules::length(),
+            // Never null — Flutter models often cast this as non-nullable String/num.
+            'mpin' => $user->readableMpin() ?? '',
+            'mpin_length' => (int) MpinRules::length(),
             'has_mpin' => filled($user->getRawOriginal('mpin')),
             'mpin_legacy_hashed' => $user->usesLegacyHashedMpin(),
             'email' => self::displayEmail($user->email),
             'primary_residence' => $user->primary_residence,
             'gender' => $user->gender,
-            'date_of_birth' => $user->date_of_birth?->toDateString(),
+            'date_of_birth' => $dateOfBirth,
+            'dob' => $dateOfBirth,
             'date_of_birth_display' => $user->date_of_birth?->format('d/m/Y'),
             'image' => $photoUrl,
             'image_url' => $photoUrl,
             'profile_photo_url' => $photoUrl,
             'market_alerts' => (bool) $user->market_alerts,
             'referral_code' => $user->referral_code,
-            'wallet_balance' => (float) $user->wallet_balance,
-            'gold_holdings' => (float) $user->gold_holdings,
-            'silver_holdings' => (float) $user->silver_holdings,
-            'kyc_status' => $user->kyc_status,
+            // Always JSON numbers (never null) for Flutter `as num` casts.
+            'wallet_balance' => self::money($user->wallet_balance),
+            'gold_holdings' => self::grams($user->gold_holdings),
+            'silver_holdings' => self::grams($user->silver_holdings),
+            'kyc_status' => $user->kyc_status ?? 'pending',
             'kyc_completed_at' => $user->kycDetail?->reviewed_at?->toDateString(),
             'referred_by' => $user->referredBy ? [
                 'name' => $user->referredBy->name,
@@ -67,7 +70,7 @@ class UserProfilePayload
             'pan_number_masked' => KycPayload::maskPan($detail?->pan_number),
             'dob' => $detail?->date_of_birth?->toDateString(),
             'dob_display' => $detail?->date_of_birth?->format('d/m/Y'),
-            'verification_status' => $detail?->pan_verification_status,
+            'verification_status' => $detail?->pan_verification_status ?: 'action_required',
             'verified' => $detail?->pan_verification_status === 'verified',
             'verified_at' => $detail?->pan_verified_at?->toIso8601String(),
         ];
@@ -107,10 +110,20 @@ class UserProfilePayload
             'account_number_masked' => KycPayload::maskAccount($detail?->account_number),
             'ifsc_code' => $detail?->ifsc_code,
             'upi_id' => $detail?->upi_id,
-            'verification_status' => $detail?->bank_verification_status,
+            'verification_status' => $detail?->bank_verification_status ?: 'action_required',
             'verified' => in_array($detail?->bank_verification_status, ['verified', 'approved'], true),
             'submitted_at' => $detail?->bank_submitted_at?->toIso8601String(),
         ];
+    }
+
+    protected static function money(mixed $value): float
+    {
+        return round((float) ($value ?? 0), 2);
+    }
+
+    protected static function grams(mixed $value): float
+    {
+        return round((float) ($value ?? 0), 4);
     }
 
     protected static function displayEmail(?string $email): ?string
