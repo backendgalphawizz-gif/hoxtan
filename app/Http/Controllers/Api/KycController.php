@@ -25,6 +25,13 @@ class KycController extends Controller
                     $step['otp_required'] = false;
                 }
 
+                if (($step['key'] ?? null) === 'aadhaar') {
+                    $step['description'] = 'Verify your Aadhaar via Surepass DigiLocker.';
+                    $step['provider_label'] = 'Surepass DigiLocker';
+                    $step['otp_required'] = false;
+                    $step['digilocker_required'] = true;
+                }
+
                 return $step;
             }, $steps);
         }
@@ -36,7 +43,13 @@ class KycController extends Controller
             'provider' => $provider,
             'third_party_enabled' => $provider !== 'stub',
             'pan_otp_required' => $provider !== 'surepass',
+            'aadhaar_otp_required' => $provider !== 'surepass',
+            'aadhaar_digilocker_required' => $provider === 'surepass',
             'bank_verify_via_provider' => $provider === 'surepass',
+            'digilocker' => $provider === 'surepass' ? [
+                'initialize_endpoint' => '/api/v1/digilocker/initialize',
+                'status_endpoint' => '/api/v1/digilocker/status/{client_id}',
+            ] : null,
             'user_kyc_statuses' => config('kyc.user_kyc_statuses', []),
         ]);
     }

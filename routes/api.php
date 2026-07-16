@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DigilockerController;
 use App\Http\Controllers\Api\ForgotMpinController;
 use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\HoldingsController;
@@ -163,6 +164,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/kyc/face', [KycController::class, 'submitFace']);
         Route::post('/kyc/bank', [KycController::class, 'submitBank']);
         Route::post('/kyc/bank/verify', [KycController::class, 'submitBank']);
+
+        Route::post('/digilocker/initialize', [DigilockerController::class, 'initialize']);
+        Route::get('/digilocker/status/{clientId}', [DigilockerController::class, 'status'])
+            ->where('clientId', '[A-Za-z0-9_\-]+');
 
         Route::get('/addresses', [AddressController::class, 'index']);
         Route::post('/addresses', [AddressController::class, 'store']);

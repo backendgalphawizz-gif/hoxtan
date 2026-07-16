@@ -12,6 +12,18 @@ return [
         'bank_account_field' => env('SUREPASS_BANK_ACCOUNT_FIELD', 'id_number'),
         'bank_ifsc_field' => env('SUREPASS_BANK_IFSC_FIELD', 'ifsc'),
         'bank_ifsc_details' => filter_var(env('SUREPASS_BANK_IFSC_DETAILS', true), FILTER_VALIDATE_BOOL),
+        'digilocker_initialize_path' => env('SUREPASS_DIGILOCKER_INITIALIZE_PATH', '/api/v1/digilocker/initialize'),
+        'digilocker_status_path' => env('SUREPASS_DIGILOCKER_STATUS_PATH', '/api/v1/digilocker/status'),
+        'digilocker_download_aadhaar_path' => env('SUREPASS_DIGILOCKER_DOWNLOAD_AADHAAR_PATH', '/api/v1/digilocker/download-aadhaar'),
+        'digilocker' => [
+            'signup_flow' => filter_var(env('SUREPASS_DIGILOCKER_SIGNUP_FLOW', true), FILTER_VALIDATE_BOOL),
+            'auth_type' => env('SUREPASS_DIGILOCKER_AUTH_TYPE', 'app'),
+            'logo_url' => env('SUREPASS_DIGILOCKER_LOGO_URL'),
+            'voice_assistant_lang' => env('SUREPASS_DIGILOCKER_VOICE_LANG', 'hi'),
+            'voice_assistant' => filter_var(env('SUREPASS_DIGILOCKER_VOICE_ASSISTANT', true), FILTER_VALIDATE_BOOL),
+            'retry_count' => (int) env('SUREPASS_DIGILOCKER_RETRY_COUNT', 3),
+            'skip_main_screen' => filter_var(env('SUREPASS_DIGILOCKER_SKIP_MAIN_SCREEN', false), FILTER_VALIDATE_BOOL),
+        ],
         'timeout' => (int) env('SUREPASS_TIMEOUT', 30),
     ],
 

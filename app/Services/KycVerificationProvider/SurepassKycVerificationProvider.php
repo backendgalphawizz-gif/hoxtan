@@ -11,8 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Surepass KYC provider — PAN + bank verification.
- * Aadhaar / face remain local stubs until those Surepass APIs are wired.
+ * Surepass KYC provider — PAN, bank, and DigiLocker Aadhaar verification.
  */
 class SurepassKycVerificationProvider implements KycVerificationProvider
 {
@@ -38,10 +37,11 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
     public function sendAadhaarOtp(string $aadhaarNumber, User $user): array
     {
         return [
-            'provider_reference' => 'SUREPASS-AAD-PENDING-'.Str::upper(Str::random(8)),
-            'message' => 'Aadhaar OTP is not yet connected to Surepass. Using local OTP flow.',
+            'provider_reference' => 'SUREPASS-AAD-DIGILOCKER',
+            'message' => 'Use DigiLocker flow via /api/v1/digilocker/initialize for Aadhaar verification.',
             'verified' => false,
-            'otp_required' => true,
+            'otp_required' => false,
+            'digilocker_required' => true,
         ];
     }
 
@@ -70,6 +70,169 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
             'verified' => true,
             'data' => $result['data'] ?? [],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return array{client_id: ?string, message: string, data: array<string, mixed>}
+     */
+    public function initializeDigilocker(User $user, array $options = []): array
+    {
+        $payload = [
+            'data' => array_merge($this->digilockerDefaults(), $options),
+        ];
+
+        $response = $this->requestSurepass(
+            'post',
+            $this->digilockerPath('digilocker_initialize_path', '/api/v1/digilocker/initialize'),
+            $payload,
+            $user,
+            'digilocker',
+        );
+
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+
+        return [
+            'client_id' => isset($data['client_id']) ? (string) $data['client_id'] : null,
+            'message' => (string) ($response['message'] ?? 'DigiLocker initialized successfully.'),
+            'data' => $data,
+        ];
+    }
+
+    /**
+     * @return array{message: string, data: array<string, mixed>}
+     */
+    public function getDigilockerStatus(string $clientId, User $user): array
+    {
+        $path = rtrim($this->digilockerPath('digilocker_status_path', '/api/v1/digilocker/status'), '/')
+            .'/'.urlencode($clientId);
+
+        $response = $this->requestSurepass('get', $path, [], $user, 'digilocker');
+
+        return [
+            'message' => (string) ($response['message'] ?? 'DigiLocker status fetched.'),
+            'data' => is_array($response['data'] ?? null) ? $response['data'] : [],
+        ];
+    }
+
+    /**
+     * @return array{message: string, data: array<string, mixed>}
+     */
+    public function downloadDigilockerAadhaar(string $clientId, User $user): array
+    {
+        $path = rtrim($this->digilockerPath('digilocker_download_aadhaar_path', '/api/v1/digilocker/download-aadhaar'), '/')
+            .'/'.urlencode($clientId);
+
+        $response = $this->requestSurepass('post', $path, [], $user, 'digilocker');
+
+        return [
+            'message' => (string) ($response['message'] ?? 'Aadhaar downloaded successfully.'),
+            'data' => is_array($response['data'] ?? null) ? $response['data'] : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function extractAadhaarNumber(array $data): ?string
+    {
+        foreach (['aadhaar_number', 'uid', 'aadhaar_uid', 'id_number', 'masked_aadhaar'] as $key) {
+            $digits = preg_replace('/\D/', '', (string) ($data[$key] ?? '')) ?? '';
+
+            if (strlen($digits) === 12) {
+                return $digits;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function digilockerDefaults(): array
+    {
+        $defaults = (array) config('kyc.surepass.digilocker', []);
+
+        return array_filter([
+            'signup_flow' => $defaults['signup_flow'] ?? true,
+            'auth_type' => $defaults['auth_type'] ?? 'app',
+            'logo_url' => $defaults['logo_url'] ?? null,
+            'voice_assistant_lang' => $defaults['voice_assistant_lang'] ?? 'hi',
+            'voice_assistant' => $defaults['voice_assistant'] ?? true,
+            'retry_count' => $defaults['retry_count'] ?? 3,
+            'skip_main_screen' => $defaults['skip_main_screen'] ?? false,
+        ], fn ($value) => $value !== null);
+    }
+
+    protected function digilockerPath(string $configKey, string $fallback): string
+    {
+        $path = (string) config('kyc.surepass.'.$configKey, $fallback);
+
+        return '/'.ltrim($path, '/');
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    protected function requestSurepass(string $method, string $path, array $body, User $user, string $context): array
+    {
+        $baseUrl = rtrim((string) config('kyc.surepass.base_url'), '/');
+        $token = (string) config('kyc.surepass.token');
+        $timeout = (int) config('kyc.surepass.timeout', 30);
+
+        if ($baseUrl === '' || $token === '') {
+            throw ValidationException::withMessages([
+                $context === 'digilocker' ? 'digilocker' : 'kyc' => ['Surepass KYC is not configured. Please contact support.'],
+            ]);
+        }
+
+        try {
+            $request = Http::baseUrl($baseUrl)
+                ->withToken($token)
+                ->acceptJson()
+                ->timeout($timeout);
+
+            $response = match (strtolower($method)) {
+                'get' => $request->get($path),
+                default => $request->asJson()->post($path, $body),
+            };
+        } catch (\Throwable $e) {
+            Log::error('Surepass request failed.', [
+                'user_id' => $user->id,
+                'context' => $context,
+                'path' => $path,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw ValidationException::withMessages([
+                $context === 'digilocker' ? 'digilocker' : 'kyc' => ['Unable to reach verification service. Please try again.'],
+            ]);
+        }
+
+        $payload = $response->json();
+        if (! is_array($payload)) {
+            $payload = [];
+        }
+
+        Log::info('Surepass response.', [
+            'user_id' => $user->id,
+            'context' => $context,
+            'path' => $path,
+            'http_status' => $response->status(),
+            'success' => $payload['success'] ?? null,
+        ]);
+
+        if (! $response->successful() || ! ($payload['success'] ?? false)) {
+            $field = $context === 'digilocker' ? 'digilocker' : ($context === 'bank' ? 'account_number' : 'pan_number');
+
+            throw ValidationException::withMessages([
+                $field => [$this->extractErrorMessage($payload, $response->status(), $context)],
+            ]);
+        }
+
+        return $payload;
     }
 
     /**
@@ -254,7 +417,11 @@ class SurepassKycVerificationProvider implements KycVerificationProvider
             }
         }
 
-        $label = $context === 'bank' ? 'bank account' : 'PAN';
+        $label = match ($context) {
+            'bank' => 'bank account',
+            'digilocker', 'aadhaar' => 'Aadhaar DigiLocker',
+            default => 'PAN',
+        };
 
         return match (true) {
             $httpStatus === 401, $httpStatus === 403 => ucfirst($label).' verification authorization failed. Please contact support.',

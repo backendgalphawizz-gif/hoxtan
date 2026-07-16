@@ -27,6 +27,7 @@ class KycDetail extends Model
         'bank_verification_status',
         'pan_verified_at',
         'aadhaar_verified_at',
+        'digilocker_client_id',
         'bank_submitted_at',
         'face_submitted_at',
         'pan_document',

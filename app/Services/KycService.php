@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\KycVerificationProvider;
 use App\Models\KycDetail;
 use App\Models\User;
+use App\Services\KycVerificationProvider\SurepassKycVerificationProvider;
 use App\Support\FilamentFormFields;
 use App\Support\KycPayload;
 use Illuminate\Http\UploadedFile;
@@ -226,6 +227,201 @@ class KycService
         $normalized = preg_replace('/\s+/u', ' ', strtoupper(trim($name)));
 
         return is_string($normalized) ? $normalized : '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
+    public function initializeDigilocker(User $user, array $options = []): array
+    {
+        $this->assertKycEditable($user);
+
+        $provider = $this->surepassProvider();
+        $result = $provider->initializeDigilocker($user, $options);
+        $data = is_array($result['data'] ?? null) ? $result['data'] : [];
+        $clientId = (string) ($data['client_id'] ?? $result['client_id'] ?? '');
+
+        if ($clientId === '') {
+            throw ValidationException::withMessages([
+                'digilocker' => ['DigiLocker client_id was not returned by Surepass.'],
+            ]);
+        }
+
+        $detail = $this->getOrCreateDetail($user);
+        $detail->update([
+            'digilocker_client_id' => $clientId,
+            'aadhaar_verification_status' => 'submitted',
+        ]);
+
+        return [
+            'client_id' => $clientId,
+            'token' => $data['token'] ?? null,
+            'url' => $data['url'] ?? null,
+            'expiry_seconds' => $data['expiry_seconds'] ?? null,
+            'digilocker' => $data,
+            'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function checkDigilockerStatus(User $user, string $clientId): array
+    {
+        $this->assertKycEditable($user);
+        $clientId = trim($clientId);
+
+        $detail = $this->getOrCreateDetail($user);
+
+        if (filled($detail->digilocker_client_id) && $detail->digilocker_client_id !== $clientId) {
+            throw ValidationException::withMessages([
+                'client_id' => ['This DigiLocker session does not belong to your account.'],
+            ]);
+        }
+
+        if ($detail->aadhaar_verification_status === 'verified'
+            && $detail->digilocker_client_id === $clientId) {
+            return [
+                'verified' => true,
+                'completed' => true,
+                'failed' => false,
+                'client_id' => $clientId,
+                'aadhaar_number_masked' => KycPayload::maskAadhaar($detail->aadhaar_number),
+                'message' => 'Aadhaar already verified.',
+                'kyc' => KycPayload::overview($user, $detail),
+            ];
+        }
+
+        $provider = $this->surepassProvider();
+        $statusResult = $provider->getDigilockerStatus($clientId, $user);
+        $statusData = is_array($statusResult['data'] ?? null) ? $statusResult['data'] : [];
+        $completed = ($statusData['completed'] ?? false) === true;
+        $failed = ($statusData['failed'] ?? false) === true;
+
+        if ($failed) {
+            $detail->update([
+                'digilocker_client_id' => $clientId,
+                'aadhaar_verification_status' => 'rejected',
+            ]);
+
+            throw ValidationException::withMessages([
+                'digilocker' => [
+                    (string) ($statusData['error_description'] ?? 'DigiLocker verification failed. Please try again.'),
+                ],
+            ]);
+        }
+
+        if (! $completed) {
+            if (blank($detail->digilocker_client_id)) {
+                $detail->update(['digilocker_client_id' => $clientId]);
+            }
+
+            return [
+                'verified' => false,
+                'completed' => false,
+                'failed' => false,
+                'client_id' => $clientId,
+                'status' => $statusData['status'] ?? null,
+                'aadhaar_linked' => $statusData['aadhaar_linked'] ?? null,
+                'error_count' => $statusData['error_count'] ?? 0,
+                'message' => (string) ($statusResult['message'] ?? 'DigiLocker verification in progress.'),
+                'digilocker' => $statusData,
+                'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
+            ];
+        }
+
+        return $this->markAadhaarVerifiedFromDigilocker($user, $clientId, $provider);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function markAadhaarVerifiedFromDigilocker(
+        User $user,
+        string $clientId,
+        SurepassKycVerificationProvider $provider,
+    ): array {
+        $download = $provider->downloadDigilockerAadhaar($clientId, $user);
+        $downloadData = is_array($download['data'] ?? null) ? $download['data'] : [];
+        $aadhaarNumber = $provider->extractAadhaarNumber($downloadData);
+
+        if (blank($aadhaarNumber)) {
+            throw ValidationException::withMessages([
+                'digilocker' => ['Aadhaar number could not be retrieved from DigiLocker. Please try again.'],
+            ]);
+        }
+
+        $this->assertAadhaarFormat($aadhaarNumber);
+
+        $detail = $this->getOrCreateDetail($user);
+        $updates = [
+            'digilocker_client_id' => $clientId,
+            'aadhaar_number' => $aadhaarNumber,
+            'aadhaar_verification_status' => 'verified',
+            'aadhaar_verified_at' => now(),
+        ];
+
+        if (filled($downloadData['name'] ?? null) && is_string($downloadData['name'])) {
+            $updates['full_name'] = $downloadData['name'];
+        }
+
+        if (filled($downloadData['date_of_birth'] ?? null) && is_string($downloadData['date_of_birth'])) {
+            try {
+                $updates['date_of_birth'] = \Illuminate\Support\Carbon::parse($downloadData['date_of_birth'])->toDateString();
+            } catch (\Throwable) {
+                // Ignore unparseable DOB from provider.
+            }
+        }
+
+        if (is_array($downloadData['address'] ?? null)) {
+            $address = collect($downloadData['address'])
+                ->filter(fn ($value) => filled($value))
+                ->implode(', ');
+            if (filled($address)) {
+                $updates['address'] = $address;
+            }
+            if (filled($downloadData['address']['pincode'] ?? null)) {
+                $updates['pincode'] = (string) $downloadData['address']['pincode'];
+            }
+            if (filled($downloadData['address']['state'] ?? null)) {
+                $updates['state'] = (string) $downloadData['address']['state'];
+            }
+            if (filled($downloadData['address']['district'] ?? null)) {
+                $updates['city'] = (string) $downloadData['address']['district'];
+            }
+        }
+
+        $detail->update($updates);
+        $this->syncUserKycStatus($user->fresh(), $detail->fresh());
+
+        return [
+            'verified' => true,
+            'completed' => true,
+            'failed' => false,
+            'client_id' => $clientId,
+            'aadhaar_number_masked' => KycPayload::maskAadhaar($aadhaarNumber),
+            'message' => 'Aadhaar verified successfully via DigiLocker.',
+            'aadhaar' => [
+                'full_name' => $downloadData['name'] ?? null,
+                'dob' => $downloadData['date_of_birth'] ?? null,
+                'gender' => $downloadData['gender'] ?? null,
+                'address' => $downloadData['address'] ?? null,
+            ],
+            'digilocker' => $downloadData,
+            'kyc' => KycPayload::overview($user->fresh(), $detail->fresh()),
+        ];
+    }
+
+    protected function surepassProvider(): SurepassKycVerificationProvider
+    {
+        if (! $this->provider instanceof SurepassKycVerificationProvider) {
+            throw ValidationException::withMessages([
+                'digilocker' => ['DigiLocker Aadhaar verification requires Surepass provider.'],
+            ]);
+        }
+
+        return $this->provider;
     }
 
     /**

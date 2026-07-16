@@ -45,6 +45,7 @@ class KycPayload
             'face_photo_url' => AssetUrl::publicStorage($detail->selfie_photo),
             'pan_verification_status' => $detail->pan_verification_status,
             'aadhaar_verification_status' => $detail->aadhaar_verification_status,
+            'digilocker_client_id' => $detail->digilocker_client_id,
             'face_verification_status' => $detail->face_verification_status,
             'bank_verification_status' => $detail->bank_verification_status,
         ];
