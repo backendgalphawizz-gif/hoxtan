@@ -293,11 +293,9 @@ class ProfileController extends Controller
             return ApiResponse::error('Unauthorized.', [], 403);
         }
 
-        if (! $certificate->file_path || ! Storage::disk('local')->exists($certificate->file_path)) {
-            $investment = $certificate->investment()->firstOrFail();
-            $certificates->generateForInvestment($investment);
-            $certificate->refresh();
-        }
+        $investment = $certificate->investment()->with('user')->firstOrFail();
+        $certificates->writeFile($certificate, $investment, $investment->user);
+        $certificate->refresh();
 
         if (! $certificate->file_path || ! Storage::disk('local')->exists($certificate->file_path)) {
             return ApiResponse::error('Certificate file not found.', [], 404);

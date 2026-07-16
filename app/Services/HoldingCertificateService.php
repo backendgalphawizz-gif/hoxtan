@@ -59,19 +59,27 @@ class HoldingCertificateService
         $metalType = $certificate->metal_type;
         $metalConfig = config('holding_certificate.'.$metalType, config('holding_certificate.gold'));
         $providerLabel = $metalConfig['provider_label'] ?? 'digital '.$metalType;
+        $brand = config('holding_certificate.brand', []);
+        $trustee = config('holding_certificate.trustee', []);
+        $custodian = config('holding_certificate.custodian', []);
 
         $html = View::make('certificates.holding', [
             'certificate' => $certificate,
             'investment' => $investment,
             'user' => $user,
-            'appName' => $this->settings->get('app_name', config('app_content.app_name', 'HOXTAN')),
+            'appName' => $brand['name'] ?? $this->settings->get('app_name', config('app_content.app_name', 'HOXTAN')),
+            'brandTagline' => $brand['tagline'] ?? 'Digital Gold Provider',
+            'brandLogo' => $this->embedPublicImage($brand['logo'] ?? 'images/hoxtan-logo.png'),
             'providerLabel' => $providerLabel,
+            'holdingLabel' => $metalConfig['holding_label'] ?? (ucfirst($metalType).' Holding'),
             'metalLabel' => ucfirst($metalType),
             'vaultAuditFrequency' => config('holding_certificate.vault_audit_frequency', 'Annual'),
-            'digitalProvider' => config('holding_certificate.digital_provider', 'Custodian Vault'),
             'custodyNote' => config('holding_certificate.custody_note'),
-            'trustee' => config('holding_certificate.trustee', []),
-            'custodian' => config('holding_certificate.custodian', []),
+            'trusteeNote' => config('holding_certificate.trustee_note'),
+            'trustee' => $trustee,
+            'custodian' => $custodian,
+            'trusteeLogo' => $this->embedPublicImage($trustee['logo'] ?? null),
+            'custodianLogo' => $this->embedPublicImage($custodian['logo'] ?? null),
             'holdingDisplay' => $this->formatGrams((float) $certificate->holding_grams),
             'issuedAtDisplay' => $certificate->issued_at?->format('d M Y'),
         ])->render();
@@ -133,5 +141,22 @@ class HoldingCertificateService
         $formatted = rtrim(rtrim(number_format($grams, 4, '.', ''), '0'), '.');
 
         return ($formatted === '' ? '0' : $formatted).'g';
+    }
+
+    protected function embedPublicImage(?string $relativePath): ?string
+    {
+        if (blank($relativePath)) {
+            return null;
+        }
+
+        $fullPath = public_path(ltrim($relativePath, '/'));
+
+        if (! is_file($fullPath)) {
+            return null;
+        }
+
+        $mime = mime_content_type($fullPath) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($fullPath));
     }
 }
