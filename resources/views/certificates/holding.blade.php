@@ -5,17 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Certificate {{ $certificate->certificate_number }}</title>
     <style>
-        :root {
-            --cert-frame: #d8a0ad;
-            --cert-frame-dark: #8f1932;
-            --cert-gold: #c5a059;
-            --cert-gold-light: #e8d4a8;
-            --cert-text: #111111;
-            --cert-muted: #777777;
-            --cert-border: #cccccc;
-            --cert-table-head: #f0f0f0;
-        }
-
         @page {
             margin: 0;
             size: A4 portrait;
@@ -28,8 +17,8 @@
         body {
             margin: 0;
             padding: 18px;
-            font-family: Arial, Helvetica, sans-serif;
-            color: var(--cert-text);
+            font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
+            color: #111111;
             background: #ffffff;
             font-size: 11.5px;
             line-height: 1.42;
@@ -37,8 +26,8 @@
 
         .certificate-frame {
             position: relative;
-            min-height: calc(100vh - 36px);
-            border: 3px double var(--cert-frame);
+            min-height: 980px;
+            border: 3px double #d8a0ad;
             background: #ffffff;
             padding: 34px 42px 28px;
         }
@@ -49,7 +38,7 @@
             right: 0;
             bottom: 0;
             height: 14px;
-            background: var(--cert-frame-dark);
+            background: #8f1932;
         }
 
         .certificate-content {
@@ -70,8 +59,8 @@
         .certificate-watermark span {
             position: absolute;
             display: block;
-            border: 1.5px solid var(--cert-gold-light);
-            background: rgba(197, 160, 89, 0.06);
+            border: 1.5px solid #e8d4a8;
+            background: #f8f1e4;
         }
 
         .certificate-watermark span:nth-child(1) {
@@ -109,7 +98,7 @@
         .certificate-title {
             margin: 0 0 22px;
             text-align: center;
-            font-family: "Times New Roman", Times, serif;
+            font-family: DejaVu Serif, "Times New Roman", Times, serif;
             font-size: 24px;
             font-weight: 700;
             letter-spacing: 0.01em;
@@ -144,14 +133,14 @@
 
         table.particulars th,
         table.particulars td {
-            border: 1px solid var(--cert-border);
+            border: 1px solid #cccccc;
             padding: 7px 10px;
             text-align: left;
             vertical-align: top;
         }
 
         table.particulars thead th {
-            background: var(--cert-table-head);
+            background: #f0f0f0;
             font-weight: 700;
         }
 
@@ -184,7 +173,7 @@
         .certificate-partners__label {
             font-size: 11px;
             font-weight: 700;
-            color: var(--cert-text);
+            color: #111111;
         }
 
         .certificate-narrative {
@@ -233,22 +222,9 @@
         .certificate-footer-note {
             margin-top: 22px;
             font-size: 10.5px;
-            color: var(--cert-muted);
+            color: #777777;
             font-style: italic;
             text-align: center;
-        }
-
-        @media print {
-            body {
-                padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            .certificate-frame {
-                min-height: 100vh;
-                border-width: 2px;
-            }
         }
     </style>
 </head>
