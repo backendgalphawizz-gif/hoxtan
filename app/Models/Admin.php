@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AssetUrl;
 use App\Support\AdminPermissions;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
@@ -22,6 +23,7 @@ class Admin extends Authenticatable implements FilamentUser, HasAvatar, HasName
         'admin_role_id',
         'name',
         'email',
+        'avatar',
         'password',
         'is_active',
     ];
@@ -97,6 +99,12 @@ class Admin extends Authenticatable implements FilamentUser, HasAvatar, HasName
 
     public function getFilamentAvatarUrl(): ?string
     {
+        $uploaded = AssetUrl::publicStorage($this->avatar);
+
+        if (filled($uploaded)) {
+            return $uploaded;
+        }
+
         $initial = strtoupper(substr($this->name, 0, 1));
 
         return 'https://ui-avatars.com/api/?name='.urlencode($initial).'&color=d4a017&background=1e293b&size=128&bold=true';

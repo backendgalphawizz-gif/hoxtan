@@ -53,7 +53,6 @@ class PushNotificationResource extends Resource
                         Forms\Components\Select::make('target')
                             ->options([
                                 'all' => 'All Users',
-                                'investors' => 'Investors Only',
                                 'specific' => 'Specific Users',
                             ])
                             ->required()
@@ -143,7 +142,6 @@ class PushNotificationResource extends Resource
                 Tables\Filters\SelectFilter::make('target')
                     ->options([
                         'all' => 'All Users',
-                        'investors' => 'Investors Only',
                         'specific' => 'Specific Users',
                     ]),
                 FilamentDateFilters::tableFilter('scheduled_date', 'scheduled_at', 'Scheduled Date', allowFuture: true),

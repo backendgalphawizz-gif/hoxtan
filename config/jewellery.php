@@ -13,7 +13,6 @@ return [
     */
     'purities' => [
         'gold' => [
-            ['value' => '24K', 'label' => '24K'],
             ['value' => '22K', 'label' => '22K'],
         ],
         'silver' => [
