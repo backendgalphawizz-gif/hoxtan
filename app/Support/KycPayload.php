@@ -122,6 +122,28 @@ class KycPayload
             && self::stepCompleted($detail, 'bank');
     }
 
+    /**
+     * Surepass PAN + bank verified — eligible for automatic admin approval.
+     */
+    public static function isSurepassPanBankVerified(KycDetail $detail): bool
+    {
+        if (config('kyc.provider') !== 'surepass') {
+            return false;
+        }
+
+        return $detail->pan_verification_status === 'verified'
+            && $detail->bank_verification_status === 'verified';
+    }
+
+    public static function requiresAdminKycApproval(KycDetail $detail, User $user): bool
+    {
+        if ($user->kyc_status === 'approved') {
+            return false;
+        }
+
+        return ! self::isSurepassPanBankVerified($detail);
+    }
+
     public static function stepStatusLabel(?string $status): string
     {
         $normalized = match ($status) {

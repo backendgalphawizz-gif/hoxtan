@@ -33,6 +33,11 @@ class NavigationBadgeCounts
     {
         return Cache::remember('nav.pending_kyc_verifications', self::TTL_SECONDS, fn (): int => KycDetail::query()
             ->where('face_verification_status', 'pending')
+            ->whereHas('user', fn ($query) => $query->where('kyc_status', '!=', 'approved'))
+            ->where(function ($query): void {
+                $query->where('pan_verification_status', '!=', 'verified')
+                    ->orWhere('bank_verification_status', '!=', 'verified');
+            })
             ->count());
     }
 

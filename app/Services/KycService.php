@@ -428,6 +428,10 @@ class KycService
             return;
         }
 
+        if ($this->autoApproveSurepassKycIfEligible($user, $detail)) {
+            return;
+        }
+
         if (KycPayload::canSubmit($detail, $user)) {
             $user->update([
                 'kyc_status' => 'submitted',
@@ -445,6 +449,34 @@ class KycService
         }
 
         $user->update(['kyc_status' => 'pending']);
+    }
+
+    /**
+     * When Surepass has verified PAN + bank, mark KYC approved without admin action.
+     */
+    public function autoApproveSurepassKycIfEligible(User $user, KycDetail $detail): bool
+    {
+        if (! KycPayload::isSurepassPanBankVerified($detail)) {
+            return false;
+        }
+
+        $detailUpdates = [
+            'reviewed_at' => now(),
+            'face_verification_notes' => 'Auto-approved: PAN and bank verified via Surepass.',
+        ];
+
+        if (blank($detail->submitted_at)) {
+            $detailUpdates['submitted_at'] = now();
+        }
+
+        if (filled($detail->selfie_photo) && $detail->face_verification_status !== 'approved') {
+            $detailUpdates['face_verification_status'] = 'approved';
+        }
+
+        $detail->update($detailUpdates);
+        $user->update(['kyc_status' => 'approved']);
+
+        return true;
     }
 
     protected function assertKycEditable(User $user): void

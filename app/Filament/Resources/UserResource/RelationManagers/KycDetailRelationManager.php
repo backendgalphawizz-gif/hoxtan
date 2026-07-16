@@ -5,6 +5,7 @@ namespace App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\KycDetail;
 use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
+use App\Support\KycPayload;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -96,12 +97,32 @@ class KycDetailRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('full_name'),
                 Tables\Columns\TextColumn::make('pan_number'),
+                Tables\Columns\BadgeColumn::make('pan_verification_status')
+                    ->label('PAN')
+                    ->formatStateUsing(fn (?string $state): string => filled($state)
+                        ? str($state)->replace('_', ' ')->title()
+                        : '—')
+                    ->colors([
+                        'warning' => fn (?string $state): bool => in_array($state, ['action_required', 'pending', 'otp_sent'], true),
+                        'success' => 'verified',
+                        'danger' => 'rejected',
+                    ]),
                 Tables\Columns\TextColumn::make('bank_name')
                     ->label('Bank')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('account_number')
                     ->label('A/C No')
                     ->toggleable(),
+                Tables\Columns\BadgeColumn::make('bank_verification_status')
+                    ->label('Bank Status')
+                    ->formatStateUsing(fn (?string $state): string => filled($state)
+                        ? str($state)->replace('_', ' ')->title()
+                        : '—')
+                    ->colors([
+                        'success' => fn (?string $state): bool => in_array($state, ['verified', 'approved'], true),
+                        'warning' => 'pending',
+                        'danger' => 'rejected',
+                    ]),
                 Tables\Columns\BadgeColumn::make('face_verification_status')
                     ->colors([
                         'warning' => 'pending',
@@ -128,6 +149,10 @@ class KycDetailRelationManager extends RelationManager
                     ->color('success')
                     ->tooltip('Approve KYC')
                     ->requiresConfirmation()
+                    ->visible(fn (KycDetail $record): bool => KycPayload::requiresAdminKycApproval(
+                        $record,
+                        $record->user,
+                    ))
                     ->action(function (KycDetail $record) {
                         $record->update([
                             'face_verification_status' => 'approved',

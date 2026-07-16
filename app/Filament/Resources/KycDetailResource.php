@@ -11,6 +11,7 @@ use App\Support\FilamentDateFilters;
 use App\Support\FilamentExportActions;
 use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
+use App\Support\KycPayload;
 use App\Support\NavigationBadgeCounts;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -198,7 +199,10 @@ class KycDetailResource extends Resource
                     ->icon('heroicon-o-check')
                     ->color('success')
                     ->tooltip('Approve')
-                    ->visible(fn (KycDetail $r) => $r->face_verification_status !== 'approved')
+                    ->visible(fn (KycDetail $record): bool => KycPayload::requiresAdminKycApproval(
+                        $record,
+                        $record->user,
+                    ) && $record->face_verification_status !== 'approved')
                     ->requiresConfirmation()
                     ->action(function (KycDetail $record) {
                         $record->update([

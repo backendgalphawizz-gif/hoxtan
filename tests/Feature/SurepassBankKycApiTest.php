@@ -194,4 +194,49 @@ class SurepassBankKycApiTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('data.errors.account_number.0', 'Invalid Account');
     }
+
+    public function test_bank_verify_auto_approves_kyc_when_pan_already_verified(): void
+    {
+        Http::fake([
+            'kyc-api.surepass.app/*' => Http::response([
+                'success' => true,
+                'status_code' => 200,
+                'data' => [
+                    'client_id' => 'bank_auto_approve',
+                    'account_exists' => true,
+                    'full_name' => 'RAHUL JOSHI',
+                    'remarks' => 'Transaction Successful',
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create([
+            'name' => 'Rahul joshi',
+            'kyc_status' => 'pending',
+        ]);
+        $user->kycDetail()->create([
+            'full_name' => 'RAHUL JOSHI',
+            'pan_number' => 'ABCDE1234F',
+            'pan_verification_status' => 'verified',
+            'pan_verified_at' => now(),
+            'aadhaar_verification_status' => 'action_required',
+            'face_verification_status' => 'pending',
+            'bank_verification_status' => 'pending',
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/kyc/bank/verify', [
+            'account_holder_name' => 'Rahul joshi',
+            'bank_name' => 'Bank of Baroda',
+            'account_number' => '05050100009895',
+            'ifsc_code' => 'BARB0UJJAIN',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.verified', true);
+
+        $user->refresh();
+        $this->assertSame('approved', $user->kyc_status);
+        $this->assertSame('verified', $user->kycDetail->bank_verification_status);
+        $this->assertNotNull($user->kycDetail->reviewed_at);
+    }
 }
