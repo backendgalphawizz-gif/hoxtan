@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 42" role="img" aria-label="Brinks">
+    <g fill="#005daa">
+        <rect x="0" y="6" width="5" height="30" rx="0.5"/>
+        <rect x="8" y="6" width="5" height="30" rx="0.5"/>
+        <rect x="16" y="6" width="5" height="30" rx="0.5"/>
+        <rect x="24" y="6" width="5" height="30" rx="0.5"/>
+    </g>
+    <text x="38" y="31" fill="#005daa" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" font-style="italic" letter-spacing="1">BRINKS</text>
+</svg>

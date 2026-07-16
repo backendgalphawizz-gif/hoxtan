@@ -62,24 +62,39 @@ class HoldingCertificateService
         $brand = config('holding_certificate.brand', []);
         $trustee = config('holding_certificate.trustee', []);
         $custodian = config('holding_certificate.custodian', []);
+        $brandName = $brand['name'] ?? $this->settings->get('app_name', config('app_content.app_name', 'HOXTAN'));
 
         $html = View::make('certificates.holding', [
             'certificate' => $certificate,
             'investment' => $investment,
             'user' => $user,
-            'appName' => $brand['name'] ?? $this->settings->get('app_name', config('app_content.app_name', 'HOXTAN')),
-            'brandTagline' => $brand['tagline'] ?? 'Digital Gold Provider',
-            'brandLogo' => $this->embedPublicImage($brand['logo'] ?? 'images/hoxtan-logo.png'),
+            'appName' => $brandName,
+            'brandTagline' => $metalType === 'silver'
+                ? 'Digital Silver Provider'
+                : ($brand['tagline'] ?? 'Digital Gold Provider'),
+            'brandLogo' => $this->embedPublicImage($brand['logo'] ?? 'images/certificates/hoxtan-brand.svg'),
             'providerLabel' => $providerLabel,
             'holdingLabel' => $metalConfig['holding_label'] ?? (ucfirst($metalType).' Holding'),
             'metalLabel' => ucfirst($metalType),
             'vaultAuditFrequency' => config('holding_certificate.vault_audit_frequency', 'Annual'),
-            'custodyNote' => config('holding_certificate.custody_note'),
-            'trusteeNote' => config('holding_certificate.trustee_note'),
+            'custodyNote' => $this->interpolateCertificateText(
+                config('holding_certificate.custody_note'),
+                $brandName,
+                $trustee,
+                $custodian,
+                $metalType,
+            ),
+            'trusteeNote' => $this->interpolateCertificateText(
+                config('holding_certificate.trustee_note'),
+                $brandName,
+                $trustee,
+                $custodian,
+                $metalType,
+            ),
             'trustee' => $trustee,
             'custodian' => $custodian,
-            'trusteeLogo' => $this->embedPublicImage($trustee['logo'] ?? null),
-            'custodianLogo' => $this->embedPublicImage($custodian['logo'] ?? null),
+            'trusteeLogo' => $this->embedPublicImage($trustee['logo'] ?? 'images/certificates/vistra-logo.svg'),
+            'custodianLogo' => $this->embedPublicImage($custodian['logo'] ?? 'images/certificates/brinks-logo.svg'),
             'holdingDisplay' => $this->formatGrams((float) $certificate->holding_grams),
             'issuedAtDisplay' => $certificate->issued_at?->format('d M Y'),
         ])->render();
@@ -158,5 +173,23 @@ class HoldingCertificateService
         $mime = mime_content_type($fullPath) ?: 'image/png';
 
         return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($fullPath));
+    }
+
+    /**
+     * @param  array<string, mixed>  $trustee
+     * @param  array<string, mixed>  $custodian
+     */
+    protected function interpolateCertificateText(
+        ?string $template,
+        string $brandName,
+        array $trustee,
+        array $custodian,
+        string $metalType = 'gold',
+    ): string {
+        return str_replace(
+            ['{brand}', '{trustee_name}', '{custodian_name}', '{metal}'],
+            [$brandName, (string) ($trustee['name'] ?? ''), (string) ($custodian['name'] ?? ''), $metalType],
+            (string) $template,
+        );
     }
 }
