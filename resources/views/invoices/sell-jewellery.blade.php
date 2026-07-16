@@ -4,32 +4,35 @@
     <meta charset="UTF-8">
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
-        body { font-family: Arial, sans-serif; color: #111827; margin: 0; padding: 2rem; }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #ea580c; padding-bottom: 1rem; margin-bottom: 1.5rem; }
-        .brand { font-size: 1.5rem; font-weight: bold; color: #ea580c; }
-        .meta { text-align: right; font-size: 0.875rem; color: #6b7280; }
-        h1 { font-size: 1.25rem; margin: 0 0 1rem; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        th, td { border: 1px solid #e5e7eb; padding: 0.75rem; text-align: left; }
-        th { background: #f9fafb; font-size: 0.75rem; text-transform: uppercase; }
-        .totals { margin-top: 1rem; width: 100%; max-width: 320px; margin-left: auto; }
-        .totals td { border: none; padding: 0.35rem 0; }
-        .totals .grand { font-weight: bold; font-size: 1.1rem; border-top: 1px solid #e5e7eb; padding-top: 0.5rem; }
-        .footer { margin-top: 2rem; font-size: 0.8rem; color: #6b7280; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; color: #111827; margin: 0; padding: 24px; }
+        .header { width: 100%; border-collapse: collapse; border-bottom: 2px solid #ea580c; margin-bottom: 18px; }
+        .header td { border: none; padding: 0 0 12px; vertical-align: top; }
+        .brand { font-size: 22px; font-weight: bold; color: #ea580c; }
+        .meta { text-align: right; font-size: 12px; color: #6b7280; }
+        h1 { font-size: 18px; margin: 0 0 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; }
+        th { background: #f9fafb; font-size: 11px; text-transform: uppercase; }
+        .totals { margin-top: 12px; width: 280px; margin-left: auto; }
+        .totals td { border: none; padding: 4px 0; }
+        .totals .grand { font-weight: bold; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+        .footer { margin-top: 24px; font-size: 11px; color: #6b7280; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div>
-            <div class="brand">{{ $appName }}</div>
-            <div>Sell Jewellery Settlement Invoice</div>
-        </div>
-        <div class="meta">
-            <div><strong>Invoice:</strong> {{ $invoice->invoice_number }}</div>
-            <div><strong>Date:</strong> {{ $invoice->issued_at->format('d M Y') }}</div>
-            <div><strong>Request:</strong> {{ $booking->booking_number }}</div>
-        </div>
-    </div>
+    <table class="header">
+        <tr>
+            <td>
+                <div class="brand">{{ $appName }}</div>
+                <div>Sell Jewellery Settlement Invoice</div>
+            </td>
+            <td class="meta">
+                <div><strong>Invoice:</strong> {{ $invoice->invoice_number }}</div>
+                <div><strong>Date:</strong> {{ $invoice->issued_at->format('d M Y') }}</div>
+                <div><strong>Request:</strong> {{ $booking->booking_number }}</div>
+            </td>
+        </tr>
+    </table>
 
     <h1>Customer</h1>
     <p>
