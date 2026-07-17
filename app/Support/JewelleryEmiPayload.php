@@ -265,7 +265,7 @@ class JewelleryEmiPayload
             'gst_amount' => (float) ($preview['gst_amount'] ?? 0),
             'you_will_receive' => $refund,
             'you_will_receive_display' => self::inr($refund),
-            'credit_note' => 'Amount will be credited to your bank account within 3-5 business days.',
+            'credit_note' => 'The amount will be credited to your registered bank account instantly.',
             'withdraw_to' => $autoDebit,
             'confirm_label' => 'Confirm Withdrawal',
             'preview_endpoint' => '/api/v1/orders/{order}/emi-cancel-preview',
