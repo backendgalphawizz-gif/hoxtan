@@ -38,6 +38,7 @@ class JewelleryOrder extends Model
         'shipping_address_type',
         'expected_delivery_date',
         'delivery_otp',
+        'delivery_requested_at',
         'tracking_number',
         'courier_name',
         'dispatched_at',
@@ -64,6 +65,7 @@ class JewelleryOrder extends Model
             'picked_up_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'delivery_requested_at' => 'datetime',
         ];
     }
 
@@ -184,7 +186,8 @@ class JewelleryOrder extends Model
     }
 
     /**
-     * EMI jewellery is held until every monthly installment is paid.
+     * EMI jewellery can be delivered only after every installment is paid
+     * and the customer has requested delivery.
      */
     public function isDeliveryEligible(): bool
     {
@@ -193,6 +196,32 @@ class JewelleryOrder extends Model
         }
 
         return $this->emiInstallmentsFullyPaid();
+    }
+
+    public function hasRequestedDelivery(): bool
+    {
+        return filled($this->delivery_requested_at);
+    }
+
+    public function canRequestDelivery(): bool
+    {
+        if (! $this->isEmi()) {
+            return false;
+        }
+
+        if (! $this->emiInstallmentsFullyPaid()) {
+            return false;
+        }
+
+        if ($this->hasRequestedDelivery()) {
+            return false;
+        }
+
+        if (in_array($this->status, ['cancelled', 'failed', 'completed', 'cart'], true)) {
+            return false;
+        }
+
+        return blank($this->delivered_at);
     }
 
     public function emiProgressLabel(): string

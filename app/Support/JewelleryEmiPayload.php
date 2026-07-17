@@ -97,9 +97,7 @@ class JewelleryEmiPayload
         }
 
         $canCancelOrWithdraw = (bool) ($preview['can_cancel'] ?? false);
-        $canDeliver = $fullyPaid
-            && ! in_array($order->status, ['cancelled', 'failed', 'completed'], true)
-            && blank($order->delivered_at);
+        $canDeliver = $order->canRequestDelivery();
 
         $autoDebit = self::autoDebitAccount($order);
 
@@ -144,11 +142,13 @@ class JewelleryEmiPayload
             'can_cancel' => $canCancelOrWithdraw && ! $fullyPaid,
             'can_withdraw' => $canCancelOrWithdraw,
             'can_deliver' => $canDeliver,
+            'delivery_requested' => $order->hasRequestedDelivery(),
+            'delivery_requested_at' => $order->delivery_requested_at?->toIso8601String(),
             'delivery_eligible' => $order->isDeliveryEligible(),
             'delivery_hold_message' => $order->isDeliveryEligible()
                 ? null
                 : 'Jewellery will be delivered after all EMI installments are paid.',
-            'actions' => self::actions($canCancelOrWithdraw, $fullyPaid, $canDeliver),
+            'actions' => self::actions($canCancelOrWithdraw, $fullyPaid, $canDeliver, $order),
             'cancel_popup' => self::cancelPopup($preview),
             'withdrawal' => self::withdrawalPreview($order, $preview, $autoDebit),
             'installments' => $installments->map(fn (JewelleryOrderEmiInstallment $row) => [
@@ -169,8 +169,12 @@ class JewelleryEmiPayload
     /**
      * @return list<array{key: string, label: string, enabled: bool, endpoint: ?string, method: ?string}>
      */
-    protected static function actions(bool $canCancelOrWithdraw, bool $fullyPaid, bool $canDeliver): array
-    {
+    protected static function actions(
+        bool $canCancelOrWithdraw,
+        bool $fullyPaid,
+        bool $canDeliver,
+        JewelleryOrder $order,
+    ): array {
         $actions = [];
 
         if ($fullyPaid) {
@@ -178,11 +182,13 @@ class JewelleryEmiPayload
                 'key' => 'deliver_jewellery',
                 'label' => 'Deliver My Jewellery',
                 'enabled' => $canDeliver,
-                'endpoint' => null,
-                'method' => null,
+                'endpoint' => '/api/v1/orders/'.$order->id.'/emi/deliver',
+                'method' => 'POST',
                 'note' => $canDeliver
                     ? 'Request delivery once EMI is fully paid. Our team will assign a delivery slot.'
-                    : 'Delivery is not available for this order right now.',
+                    : ($order->hasRequestedDelivery()
+                        ? 'Delivery already requested. Our team will assign a delivery slot.'
+                        : 'Delivery is not available for this order right now.'),
             ];
             $actions[] = [
                 'key' => 'withdraw_emi_value',

@@ -364,8 +364,6 @@ class JewelleryEmiService
         $order = $installment->order()->with(['emiInstallments', 'payment', 'items.product', 'user'])->first();
 
         if ($order && $order->emiInstallmentsFullyPaid()) {
-            $this->releaseEmiDelivery($order);
-
             if ($order->payment && $order->payment->status !== 'completed') {
                 $order->payment->update([
                     'status' => 'completed',
@@ -374,6 +372,7 @@ class JewelleryEmiService
                 ]);
             }
 
+            // Do not auto-move to Ready for Delivery — customer must call deliver API.
             app(InvoiceService::class)->generateForJewelleryOrder($order->fresh([
                 'items.product',
                 'payment',
@@ -403,9 +402,62 @@ class JewelleryEmiService
         return $installment->fresh();
     }
 
+    /**
+     * Customer requests jewellery delivery after all EMIs are paid.
+     * Moves tracking to Ready for Delivery (does not auto-run when EMI completes).
+     *
+     * @return array{order: JewelleryOrder}
+     */
+    public function requestDelivery(JewelleryOrder $order, User $user): array
+    {
+        $this->assertPayableEmiOrder($order, $user);
+
+        if (! $order->emiInstallmentsFullyPaid()) {
+            throw ValidationException::withMessages([
+                'emi' => ['All EMI installments must be paid before requesting delivery.'],
+            ]);
+        }
+
+        if ($order->hasRequestedDelivery()) {
+            throw ValidationException::withMessages([
+                'delivery' => ['Delivery has already been requested for this order.'],
+            ]);
+        }
+
+        if (in_array($order->status, ['cancelled', 'failed', 'completed'], true) || filled($order->delivered_at)) {
+            throw ValidationException::withMessages([
+                'order' => ['Delivery cannot be requested for this order.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($order): array {
+            $order->update([
+                'delivery_requested_at' => now(),
+            ]);
+
+            $this->releaseEmiDelivery($order->fresh());
+
+            return [
+                'order' => $order->fresh([
+                    'items.product',
+                    'items.variant',
+                    'payment',
+                    'emiInstallments',
+                    'invoice',
+                    'driver',
+                    'user',
+                ]),
+            ];
+        });
+    }
+
     public function releaseEmiDelivery(JewelleryOrder $order): void
     {
         if (! $order->isEmi() || ! $order->emiInstallmentsFullyPaid()) {
+            return;
+        }
+
+        if (! $order->hasRequestedDelivery()) {
             return;
         }
 
