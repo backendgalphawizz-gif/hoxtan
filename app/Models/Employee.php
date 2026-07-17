@@ -17,8 +17,13 @@ class Employee extends Authenticatable implements FilamentUser, HasAvatar, HasNa
 {
     use HasFactory, Notifiable;
 
+    public const ROLE_STAFF = 'staff';
+
+    public const ROLE_EMPLOYEE = 'employee';
+
     protected $fillable = [
         'department_id',
+        'role',
         'name',
         'email',
         'phone',
@@ -74,6 +79,34 @@ class Employee extends Authenticatable implements FilamentUser, HasAvatar, HasNa
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * @param  Builder<Employee>  $query
+     * @return Builder<Employee>
+     */
+    public function scopeStaff(Builder $query): Builder
+    {
+        return $query->where('role', self::ROLE_STAFF);
+    }
+
+    /**
+     * @param  Builder<Employee>  $query
+     * @return Builder<Employee>
+     */
+    public function scopeTeamEmployees(Builder $query): Builder
+    {
+        return $query->where('role', self::ROLE_EMPLOYEE);
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->role === self::ROLE_STAFF;
+    }
+
+    public function isTeamEmployee(): bool
+    {
+        return $this->role === self::ROLE_EMPLOYEE;
     }
 
     public function canAccessPanel(Panel $panel): bool

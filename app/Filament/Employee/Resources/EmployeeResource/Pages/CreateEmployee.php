@@ -18,6 +18,7 @@ class CreateEmployee extends CreateRecord
 
         $data['created_by_employee_id'] = $creator->id;
         $data['department_id'] = $creator->department_id;
+        $data['role'] = Employee::ROLE_EMPLOYEE;
 
         return $data;
     }

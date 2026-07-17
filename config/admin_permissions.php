@@ -202,7 +202,7 @@ return [
             'group' => 'System',
         ],
         'employees' => [
-            'label' => 'Employees',
+            'label' => 'Staff',
             'group' => 'User Management',
         ],
         'settings' => [

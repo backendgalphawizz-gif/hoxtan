@@ -31,6 +31,19 @@ class UserResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Users';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    public static function canAccess(): bool
+    {
+        /** @var Employee|null $actor */
+        $actor = Auth::guard('employee')->user();
+
+        return $actor?->isTeamEmployee() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -91,16 +104,14 @@ class UserResource extends Resource
                         Forms\Components\Hidden::make('role')
                             ->default('user')
                             ->dehydrated(),
-                        Forms\Components\Select::make('kyc_status')
-                            ->options([
-                                'pending' => 'Pending',
-                                'submitted' => 'Submitted',
-                                'under_review' => 'Under Review',
-                                'approved' => 'Approved',
-                                'rejected' => 'Rejected',
-                            ])
-                            ->required()
-                            ->default('pending'),
+                        Forms\Components\Hidden::make('kyc_status')
+                            ->default('pending')
+                            ->dehydrated(fn (string $operation): bool => $operation === 'create'),
+                        Forms\Components\Placeholder::make('kyc_status_display')
+                            ->label('KYC Status')
+                            ->content(fn (?User $record): string => ($record?->kyc_status === 'approved')
+                                ? 'Approved'
+                                : 'Pending'),
                     ])->columns(2),
             ]);
     }

@@ -28,7 +28,7 @@ class EmployeePanelProvider extends PanelProvider
             ->id('employee')
             ->path('employee')
             ->login(Login::class)
-            ->brandName('hoxtan Employee')
+            ->brandName('hoxtan Staff / Employee')
             ->brandLogo(fn () => view('admin.layouts.logo'))
             ->brandLogoHeight('3.5rem')
             ->favicon(asset('images/hoxtan-icon.png'))
@@ -58,6 +58,7 @@ class EmployeePanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Employee/Widgets'), for: 'App\\Filament\\Employee\\Widgets')
             ->widgets([])
             ->navigationGroups([
+                NavigationGroup::make('Team')->collapsed(false),
                 NavigationGroup::make('Users')->collapsed(false),
             ])
             ->middleware([

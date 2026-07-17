@@ -33,7 +33,15 @@ class EmployeeResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return static::canAccess();
+    }
+
+    public static function canAccess(): bool
+    {
+        /** @var Employee|null $actor */
+        $actor = Auth::guard('employee')->user();
+
+        return $actor?->isStaff() ?? false;
     }
 
     public static function form(Form $form): Form
@@ -54,8 +62,8 @@ class EmployeeResource extends Resource
                             ->label('Employee Code')
                             ->maxLength(32)
                             ->unique(ignoreRecord: true)
-                            ->helperText('Optional staff code.'),
-                        Forms\Components\TextInput::make('role')
+                            ->helperText('Optional employee code.'),
+                        Forms\Components\TextInput::make('role_display')
                             ->label('Role')
                             ->default('Employee')
                             ->disabled()
@@ -94,6 +102,9 @@ class EmployeeResource extends Resource
                     ->label('Code')
                     ->badge()
                     ->placeholder('—'),
+                Tables\Columns\TextColumn::make('created_users_count')
+                    ->label('Users')
+                    ->counts('createdUsers'),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean(),
@@ -119,11 +130,12 @@ class EmployeeResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        /** @var Employee|null $employee */
-        $employee = Auth::guard('employee')->user();
+        /** @var Employee|null $staff */
+        $staff = Auth::guard('employee')->user();
 
         return parent::getEloquentQuery()
-            ->where('created_by_employee_id', $employee?->id)
+            ->where('created_by_employee_id', $staff?->id)
+            ->where('role', Employee::ROLE_EMPLOYEE)
             ->with(['department']);
     }
 
