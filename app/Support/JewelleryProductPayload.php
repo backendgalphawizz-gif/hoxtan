@@ -25,6 +25,7 @@ class JewelleryProductPayload
             $product->making_charge_percent,
             $product->discount_type,
             $product->discount_value,
+            $product->purity,
         );
 
         // Always price from the current gold/silver rate (not the stored DB price).
@@ -118,6 +119,7 @@ class JewelleryProductPayload
             $product->making_charge_percent,
             $product->discount_type,
             $product->discount_value,
+            $product->purity,
         );
 
         $price = $pricing['total'] > 0 ? $pricing['total'] : (float) $variant->price;

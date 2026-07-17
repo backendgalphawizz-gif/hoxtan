@@ -70,6 +70,7 @@ class JewelleryProduct extends Model
                 $product->making_charge_percent,
                 $product->discount_type,
                 $product->discount_value,
+                $product->purity,
             );
 
             $product->price = $pricing['total'];

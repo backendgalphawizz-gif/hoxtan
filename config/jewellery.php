@@ -17,6 +17,9 @@ return [
             ['value' => '22K', 'label' => '22K'],
             ['value' => '20K', 'label' => '20K'],
             ['value' => '18K', 'label' => '18K'],
+            ['value' => '16K', 'label' => '16K'],
+            ['value' => '14K', 'label' => '14K'],
+
         ],
         'silver' => [
             ['value' => '999', 'label' => '999 Fine Silver'],
@@ -28,11 +31,19 @@ return [
             ['value' => '22K', 'label' => '22K'],
             ['value' => '20K', 'label' => '20K'],
             ['value' => '18K', 'label' => '18K'],
+            ['value' => '16K', 'label' => '16K'],
+            ['value' => '14K', 'label' => '14K'],
+           
             ['value' => '999', 'label' => '999 Fine Silver'],
             ['value' => '925', 'label' => '925 Sterling Silver'],
-            
         ],
     ],
+
+    /*
+    | Gold purities priced from admin-defined ₹/g rates (not metal API).
+    | 24K / 22K continue to use live metal rates.
+    */
+    'karat_rate_purities' => ['20K', '18K', '16K', '14K'],
 
     'weight' => [
         'min' => 1.0,

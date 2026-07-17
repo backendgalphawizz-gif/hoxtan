@@ -43,6 +43,7 @@ class JewelleryProductVariant extends Model
                 $product->making_charge_percent,
                 $product->discount_type,
                 $product->discount_value,
+                $product->purity,
             );
 
             $variant->price = $pricing['total'];

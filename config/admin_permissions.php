@@ -122,6 +122,10 @@ return [
             'label' => 'Jewellery Products',
             'group' => 'Jewellery Management',
         ],
+        'jewellery_karat_rates' => [
+            'label' => 'Gold Karat Rates',
+            'group' => 'Jewellery Management',
+        ],
         'jewellery_emi_plans' => [
             'label' => 'EMI Plans',
             'group' => 'Jewellery Management',

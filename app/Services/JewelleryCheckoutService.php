@@ -290,6 +290,7 @@ class JewelleryCheckoutService
             $product->making_charge_percent,
             $product->discount_type,
             $product->discount_value,
+            $product->purity,
         );
 
         $unitPrice = $pricing['total'] > 0 ? $pricing['total'] : (float) $storedUnitPrice;

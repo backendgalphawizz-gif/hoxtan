@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Services\JewelleryKaratRateService;
 use App\Services\MetalRateService;
 
 class JewelleryPricing
@@ -17,6 +18,7 @@ class JewelleryPricing
      *     discount_value: float,
      *     discount_amount: float,
      *     total: float,
+     *     rate_source: ?string,
      * }
      */
     public static function calculate(
@@ -25,6 +27,7 @@ class JewelleryPricing
         mixed $makingChargePercent = null,
         ?string $discountType = null,
         mixed $discountValue = null,
+        ?string $purity = null,
     ): array {
         $weight = max(0, (float) ($weightGrams ?? 0));
         $makingPercent = max(0, (float) ($makingChargePercent ?? 0));
@@ -33,7 +36,12 @@ class JewelleryPricing
             return self::emptyResult($makingPercent, $discountType, $discountValue);
         }
 
-        $rate = app(MetalRateService::class)->getCurrentRatePerGram($metalType);
+        [$rate, $rateSource] = self::resolveRatePerGram($metalType, $purity);
+
+        if ($rate === null || $rate <= 0) {
+            return self::emptyResult($makingPercent, $discountType, $discountValue);
+        }
+
         $metalValue = round($weight * $rate, 2);
         $makingAmount = $makingPercent > 0
             ? round($metalValue * ($makingPercent / 100), 2)
@@ -54,7 +62,30 @@ class JewelleryPricing
             'discount_value' => max(0, (float) ($discountValue ?? 0)),
             'discount_amount' => $discountAmount,
             'total' => $total,
+            'rate_source' => $rateSource,
         ];
+    }
+
+    /**
+     * @return array{0: ?float, 1: ?string}
+     */
+    public static function resolveRatePerGram(?string $metalType, ?string $purity): array
+    {
+        $karatRates = app(JewelleryKaratRateService::class);
+
+        if ($karatRates->usesAdminRate($metalType, $purity)) {
+            $rate = $karatRates->getRatePerGram((string) $purity);
+
+            return [$rate, $rate !== null ? 'karat_admin' : null];
+        }
+
+        if (! in_array($metalType, ['gold', 'silver'], true)) {
+            return [null, null];
+        }
+
+        $rate = app(MetalRateService::class)->getCurrentRatePerGram($metalType);
+
+        return [$rate > 0 ? $rate : null, 'metal_api'];
     }
 
     /**
@@ -92,6 +123,7 @@ class JewelleryPricing
      *     discount_value: float,
      *     discount_amount: float,
      *     total: float,
+     *     rate_source: ?string,
      * }
      */
     protected static function emptyResult(float $makingPercent, ?string $discountType, mixed $discountValue): array
@@ -106,6 +138,7 @@ class JewelleryPricing
             'discount_value' => max(0, (float) ($discountValue ?? 0)),
             'discount_amount' => 0.0,
             'total' => 0.0,
+            'rate_source' => null,
         ];
     }
 }

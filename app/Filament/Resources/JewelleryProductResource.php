@@ -144,7 +144,12 @@ class JewelleryProductResource extends Resource
                             ->searchable()
                             ->nullable()
                             ->live()
-                            ->placeholder('Select purity'),
+                            ->placeholder('Select purity')
+                            ->helperText('20K / 18K / 16K / 14K use admin Gold Karat Rates. 24K / 22K use live metal rates.')
+                            ->afterStateUpdated(function (Set $set, Get $get): void {
+                                static::syncSellingPrice($set, $get);
+                                static::syncVariantPrices($set, $get);
+                            }),
                         Forms\Components\Toggle::make('has_size_variants')
                             ->label('Enable size variants')
                             ->helperText('When enabled, set weight (and auto price) for each size. When off, use a single size/weight as before.')
@@ -587,6 +592,7 @@ class JewelleryProductResource extends Resource
                 $get('making_charge_percent'),
                 $get('discount_type'),
                 $get('discount_value'),
+                $get('purity'),
             );
 
             $variants[$uuid]['price'] = $pricing['total'];
@@ -619,6 +625,7 @@ class JewelleryProductResource extends Resource
             static::rootFormValue($get, 'making_charge_percent'),
             static::rootFormValue($get, 'discount_type'),
             static::rootFormValue($get, 'discount_value'),
+            static::rootFormValue($get, 'purity'),
         );
 
         return (float) $pricing['total'];
@@ -645,6 +652,7 @@ class JewelleryProductResource extends Resource
             $get('making_charge_percent'),
             $get('discount_type'),
             $get('discount_value'),
+            $get('purity'),
         );
     }
 
@@ -653,13 +661,25 @@ class JewelleryProductResource extends Resource
         $pricing = static::pricingForForm($get);
 
         if ($pricing['rate_per_gram'] === null) {
-            return new HtmlString('<p class="text-sm text-gray-500">Select metal type and enter weight to calculate price.</p>');
+            $purity = (string) ($get('purity') ?? '');
+            $needsKaratRate = $get('metal_type') === 'gold'
+                && in_array($purity, config('jewellery.karat_rate_purities', []), true);
+
+            $message = $needsKaratRate
+                ? 'Set an active rate for '.$purity.' under Jewellery Management → Gold Karat Rates.'
+                : 'Select metal type and enter weight to calculate price.';
+
+            return new HtmlString('<p class="text-sm text-gray-500">'.e($message).'</p>');
         }
 
         $metalLabel = ucfirst((string) $get('metal_type'));
+        $purityLabel = filled($get('purity')) ? ' ('.$get('purity').')' : '';
+        $rateSource = ($pricing['rate_source'] ?? null) === 'karat_admin'
+            ? 'admin karat rate'
+            : 'live metal rate';
         $weight = number_format((float) $get('weight_grams'), 3);
         $lines = [
-            sprintf('%s rate: %s/g', $metalLabel, FilamentFormat::inr($pricing['rate_per_gram'])),
+            sprintf('%s%s rate (%s): %s/g', $metalLabel, $purityLabel, $rateSource, FilamentFormat::inr($pricing['rate_per_gram'])),
             sprintf(
                 'Metal value (%s g × %s): %s',
                 $weight,
