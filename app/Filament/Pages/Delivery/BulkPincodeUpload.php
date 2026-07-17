@@ -24,6 +24,9 @@ class BulkPincodeUpload extends Page implements HasForms
         return 'blocked_pincodes';
     }
 
+    // Hidden from sidebar for now.
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up-tray';
 
     protected static ?string $navigationGroup = 'Delivery Management';
