@@ -146,6 +146,17 @@ class OrderController extends Controller
         ], 'All remaining EMIs paid successfully.');
     }
 
+    public function requestEmiDelivery(Request $request, JewelleryOrder $order, JewelleryEmiService $emi): JsonResponse
+    {
+        $this->ensureOwnedByUser($request, $order);
+
+        $result = $emi->requestDelivery($order, $request->user());
+
+        return ApiResponse::success([
+            'order' => OrderPayload::make($result['order'], detailed: true),
+        ], 'Delivery requested. Your jewellery is ready for delivery.');
+    }
+
     protected function ensureOwnedByUser(Request $request, JewelleryOrder $order): void
     {
         if ($order->user_id !== $request->user()->id || $order->status === 'cart') {

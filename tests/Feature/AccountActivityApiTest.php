@@ -242,7 +242,7 @@ class AccountActivityApiTest extends TestCase
                 ],
             ]);
 
-        // Mark all paid → ready for delivery actions.
+        // Mark all paid → EMI Completed is current; Ready for Delivery waits for deliver API.
         \App\Models\JewelleryOrderEmiInstallment::query()
             ->where('jewellery_order_id', $order->id)
             ->where('status', 'pending')
@@ -251,11 +251,23 @@ class AccountActivityApiTest extends TestCase
         $this->getJson('/api/v1/orders/'.$order->id)
             ->assertOk()
             ->assertJsonPath('data.order.tracking.2.label', 'EMI Completed')
-            ->assertJsonPath('data.order.tracking.3.current', true)
+            ->assertJsonPath('data.order.tracking.2.current', true)
+            ->assertJsonPath('data.order.tracking.3.key', 'ready_for_delivery')
+            ->assertJsonPath('data.order.tracking.3.current', false)
+            ->assertJsonPath('data.order.tracking.3.completed', false)
             ->assertJsonPath('data.order.emi.is_completed', true)
             ->assertJsonPath('data.order.emi.can_deliver', true)
             ->assertJsonPath('data.order.emi.actions.0.key', 'deliver_jewellery')
+            ->assertJsonPath('data.order.emi.actions.0.endpoint', '/api/v1/orders/'.$order->id.'/emi/deliver')
             ->assertJsonPath('data.order.emi.actions.1.key', 'withdraw_emi_value');
+
+        $this->postJson('/api/v1/orders/'.$order->id.'/emi/deliver')
+            ->assertOk()
+            ->assertJsonPath('data.order.tracking.3.key', 'ready_for_delivery')
+            ->assertJsonPath('data.order.tracking.3.current', true)
+            ->assertJsonPath('data.order.tracking.3.completed', true)
+            ->assertJsonPath('data.order.emi.can_deliver', false)
+            ->assertJsonPath('data.order.emi.delivery_requested', true);
     }
 
     public function test_user_can_list_and_view_transactions(): void
