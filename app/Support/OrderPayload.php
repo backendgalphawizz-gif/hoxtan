@@ -251,8 +251,8 @@ class OrderPayload
                     $completedAt = match ($step['key']) {
                         'placed', 'reserved' => $order->created_at,
                         'emi_waiting' => $emiFullyPaid ? ($lastPaidAt ?? $order->updated_at) : null,
-                        'ready_for_delivery' => $order->dispatched_at
-                            ?? ($emiFullyPaid ? ($lastPaidAt ?? $order->updated_at) : null),
+                        'ready_for_delivery' => $order->delivery_requested_at
+                            ?? $order->dispatched_at,
                         'delivered' => $order->delivered_at
                             ?? ($order->status === 'completed' ? $order->updated_at : null),
                         default => null,
@@ -284,15 +284,16 @@ class OrderPayload
             return 4;
         }
 
-        if ($order->dispatched_at || filled($order->tracking_number) || filled($order->driver_id)) {
-            return 3;
+        if (
+            $order->dispatched_at
+            || filled($order->tracking_number)
+            || filled($order->driver_id)
+            || filled($order->delivery_requested_at)
+        ) {
+            return 3; // Ready for Delivery
         }
 
-        if ($order->emiInstallmentsFullyPaid()) {
-            return 3;
-        }
-
-        // Placed + reserved are done; waiting on EMI installments.
+        // After all EMIs are paid, stay on EMI Completed until customer requests delivery.
         return 2;
     }
 
