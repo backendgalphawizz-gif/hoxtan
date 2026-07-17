@@ -39,6 +39,7 @@ class User extends Authenticatable
         'block_reason',
         'referral_code',
         'referred_by_id',
+        'created_by_employee_id',
         'gender',
         'date_of_birth',
         'primary_residence',
@@ -136,6 +137,11 @@ class User extends Authenticatable
     public function referredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'referred_by_id');
+    }
+
+    public function createdByEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'created_by_employee_id');
     }
 
     public function referralsMade(): HasMany

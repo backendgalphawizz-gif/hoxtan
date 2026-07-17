@@ -197,6 +197,14 @@ return [
             'label' => 'Roles & Permissions',
             'group' => 'System',
         ],
+        'departments' => [
+            'label' => 'Departments',
+            'group' => 'System',
+        ],
+        'employees' => [
+            'label' => 'Employees',
+            'group' => 'User Management',
+        ],
         'settings' => [
             'label' => 'Settings',
             'group' => 'System',
