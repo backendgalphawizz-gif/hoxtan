@@ -168,6 +168,19 @@
             width: auto;
             display: inline-block;
             margin-bottom: 6px;
+            vertical-align: middle;
+        }
+
+        .certificate-partners__logos {
+            margin-bottom: 6px;
+        }
+
+        .certificate-partners__logos img {
+            margin: 0 6px 0 0;
+        }
+
+        .certificate-partners__logos img.certificate-bis {
+            height: 40px;
         }
 
         .certificate-partners__label {
@@ -203,7 +216,18 @@
         .certificate-parties img {
             height: 24px;
             width: auto;
-            display: block;
+            display: inline-block;
+            margin-bottom: 8px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .certificate-parties img.certificate-bis {
+            height: 32px;
+            margin-right: 0;
+        }
+
+        .certificate-parties__logos {
             margin-bottom: 8px;
         }
 
@@ -288,9 +312,14 @@
                         <div class="certificate-partners__label">{{ $brandTagline }}</div>
                     </td>
                     <td>
-                        @if ($custodianLogo)
-                            <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
-                        @endif
+                        <div class="certificate-partners__logos">
+                            @if ($custodianLogo)
+                                <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
+                            @endif
+                            @if (! empty($bisLogo))
+                                <img src="{{ $bisLogo }}" alt="BIS Hallmark" class="certificate-bis">
+                            @endif
+                        </div>
                         <div class="certificate-partners__label">{{ $custodian['tagline'] ?? 'Custodian Vault' }}</div>
                     </td>
                 </tr>
@@ -321,9 +350,14 @@
                         @endif
                     </td>
                     <td>
-                        @if ($custodianLogo)
-                            <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
-                        @endif
+                        <div class="certificate-parties__logos">
+                            @if ($custodianLogo)
+                                <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
+                            @endif
+                            @if (! empty($bisLogo))
+                                <img src="{{ $bisLogo }}" alt="BIS Hallmark" class="certificate-bis">
+                            @endif
+                        </div>
                         <h3>{{ $custodian['title'] ?? 'Custodian Details' }}:</h3>
                         <div class="name">{{ $custodian['name'] ?? '' }}</div>
                         <div>Registered Office:</div>

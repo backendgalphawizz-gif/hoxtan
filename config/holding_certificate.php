@@ -48,6 +48,7 @@ return [
         'name' => env('HOLDING_CERT_CUSTODIAN_NAME', 'Brink\'s Arya Gold And Silver Refinery Private Limited'),
         'tagline' => 'Custodian Vault',
         'logo' => 'images/certificates/brinks-logo.svg',
+        'bis_logo' => 'images/certificates/bis-logo.png',
         'registered_office_lines' => [
             env('HOLDING_CERT_CUSTODIAN_ADDRESS_1', '2nd Floor, Arya Gold Annex, Arya Gold Refinery Premises'),
             env('HOLDING_CERT_CUSTODIAN_ADDRESS_2', 'MIDC, Tarapur Industrial Area, Boisar, Maharashtra, India 421302'),

@@ -24,10 +24,15 @@ class AccountActivityService
         int $page = 1,
         int $perPage = 20,
         ?string $metalType = null,
+        ?string $category = null,
     ): array {
-        $categoryFilter = in_array($filter, ['gold', 'silver'], true) ? 'all' : $filter;
         $metalFilter = $metalType
             ?? (in_array($filter, ['gold', 'silver'], true) ? $filter : null);
+
+        // Explicit category wins; otherwise use filter when it is not a metal type.
+        $categoryFilter = filled($category) && $category !== 'all'
+            ? $category
+            : (in_array($filter, ['gold', 'silver'], true) ? 'all' : $filter);
 
         // Metal filters skip pure wallet rows (no metal_type).
         if ($metalFilter !== null && $categoryFilter === 'all') {
@@ -53,6 +58,9 @@ class AccountActivityService
         return [
             'transactions' => $slice->all(),
             'filter' => $filter,
+            'category' => filled($category) && $category !== 'all' ? $category : (
+                in_array($filter, ['gold', 'silver'], true) ? null : $categoryFilter
+            ),
             'metal_type' => $metalFilter,
             'pagination' => [
                 'current_page' => $page,

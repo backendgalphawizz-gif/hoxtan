@@ -20,7 +20,10 @@
                 @endforeach
             @endif
         </ul>
-        <a href="{{ ($isHome ?? false) ? '#download' : route('home').'#download' }}" class="btn btn--gold" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;">Get the App</a>
+        <div class="nav__actions">
+            <a href="{{ ($isHome ?? false) ? '#download' : route('home').'#download' }}" class="btn btn--gold" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;">Get the App</a>
+            <img src="{{ asset('images/bis-logo.png') }}" alt="BIS Hallmark" class="nav__bis" width="48" height="48">
+        </div>
         <button class="nav__toggle" aria-label="Menu">☰</button>
     </div>
 </nav>

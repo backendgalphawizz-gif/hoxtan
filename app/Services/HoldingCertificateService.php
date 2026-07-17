@@ -96,6 +96,7 @@ class HoldingCertificateService
             'custodian' => $custodian,
             'trusteeLogo' => $this->embedPublicImage($trustee['logo'] ?? 'images/certificates/vistra-logo.svg'),
             'custodianLogo' => $this->embedPublicImage($custodian['logo'] ?? 'images/certificates/brinks-logo.svg'),
+            'bisLogo' => $this->embedPublicImage($custodian['bis_logo'] ?? 'images/certificates/bis-logo.png'),
             'holdingDisplay' => $this->formatGrams((float) $certificate->holding_grams),
             'issuedAtDisplay' => $certificate->issued_at?->format('d M Y'),
         ])->render();
