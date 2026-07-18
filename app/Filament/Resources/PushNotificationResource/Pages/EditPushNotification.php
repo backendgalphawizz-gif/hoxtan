@@ -2,10 +2,11 @@
 
 namespace App\Filament\Resources\PushNotificationResource\Pages;
 
+use App\Filament\Resources\Pages\BaseEditRecord;
 use App\Filament\Resources\PushNotificationResource;
+use App\Services\PushNotificationDispatchService;
 use Filament\Actions;
 use Filament\Notifications\Notification;
-use App\Filament\Resources\Pages\BaseEditRecord;
 
 class EditPushNotification extends BaseEditRecord
 {
@@ -23,26 +24,48 @@ class EditPushNotification extends BaseEditRecord
                 ->color('success')
                 ->visible(fn () => in_array($this->record->status, ['draft', 'scheduled']))
                 ->requiresConfirmation()
-                ->action(function () {
-                    $this->record->update([
-                        'status' => 'sent',
-                        'sent_at' => now(),
-                    ]);
+                ->action(function (PushNotificationDispatchService $dispatch): void {
+                    $count = $dispatch->dispatch($this->record);
 
                     Notification::make()
                         ->title('Push notification sent')
+                        ->body('Delivered to '.$count.' recipient(s).')
                         ->success()
                         ->send();
+
+                    $this->refreshFormData(['status', 'sent_at', 'recipients_count']);
                 }),
         ];
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        if (($data['target'] ?? null) !== 'specific') {
+        if (! in_array($data['target'] ?? null, ['specific', 'specific_drivers'], true)) {
             $data['target_user_ids'] = null;
         }
 
+        if (($data['status'] ?? null) === 'sent' && $this->record->status !== 'sent') {
+            $data['status'] = $this->record->status;
+            $this->shouldDispatchAfterSave = true;
+        }
+
         return $data;
+    }
+
+    protected bool $shouldDispatchAfterSave = false;
+
+    protected function afterSave(): void
+    {
+        if (! $this->shouldDispatchAfterSave) {
+            return;
+        }
+
+        $count = app(PushNotificationDispatchService::class)->dispatch($this->record->fresh());
+
+        Notification::make()
+            ->title('Push notification sent')
+            ->body('Delivered to '.$count.' recipient(s).')
+            ->success()
+            ->send();
     }
 }

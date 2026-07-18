@@ -312,15 +312,11 @@
                         <div class="certificate-partners__label">{{ $brandTagline }}</div>
                     </td>
                     <td>
-                        <div class="certificate-partners__logos">
-                            @if ($custodianLogo)
-                                <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
-                            @endif
-                            @if (! empty($bisLogo))
+                        @if (! empty($bisLogo))
+                            <div class="certificate-partners__logos">
                                 <img src="{{ $bisLogo }}" alt="BIS Hallmark" class="certificate-bis">
-                            @endif
-                        </div>
-                        <div class="certificate-partners__label">{{ $custodian['tagline'] ?? 'Custodian Vault' }}</div>
+                            </div>
+                        @endif
                     </td>
                 </tr>
             </table>
@@ -330,7 +326,7 @@
 
             <table class="certificate-parties">
                 <tr>
-                    <td>
+                    <td colspan="2" style="width: 100%; padding-right: 0; padding-left: 0;">
                         @if ($trusteeLogo)
                             <img src="{{ $trusteeLogo }}" alt="{{ $trustee['name'] ?? 'Trustee' }}">
                         @endif
@@ -347,30 +343,6 @@
                         @endif
                         @if (! empty($trustee['cin']))
                             <div>CIN: {{ $trustee['cin'] }}</div>
-                        @endif
-                    </td>
-                    <td>
-                        <div class="certificate-parties__logos">
-                            @if ($custodianLogo)
-                                <img src="{{ $custodianLogo }}" alt="{{ $custodian['name'] ?? 'Custodian' }}">
-                            @endif
-                            @if (! empty($bisLogo))
-                                <img src="{{ $bisLogo }}" alt="BIS Hallmark" class="certificate-bis">
-                            @endif
-                        </div>
-                        <h3>{{ $custodian['title'] ?? 'Custodian Details' }}:</h3>
-                        <div class="name">{{ $custodian['name'] ?? '' }}</div>
-                        <div>Registered Office:</div>
-                        @foreach (($custodian['registered_office_lines'] ?? []) as $line)
-                            @if (filled($line))
-                                <div>{{ $line }}</div>
-                            @endif
-                        @endforeach
-                        @if (! empty($custodian['phone']))
-                            <div>Phone : {{ $custodian['phone'] }}</div>
-                        @endif
-                        @if (! empty($custodian['cin']))
-                            <div>CIN: {{ $custodian['cin'] }}</div>
                         @endif
                     </td>
                 </tr>

@@ -62,7 +62,6 @@ class HoldingCertificateService
         $providerLabel = $metalConfig['provider_label'] ?? 'digital '.$metalType;
         $brand = config('holding_certificate.brand', []);
         $trustee = config('holding_certificate.trustee', []);
-        $custodian = config('holding_certificate.custodian', []);
         $brandName = $brand['name'] ?? $this->settings->get('app_name', config('app_content.app_name', 'HOXTAN'));
 
         $html = View::make('certificates.holding', [
@@ -82,21 +81,17 @@ class HoldingCertificateService
                 config('holding_certificate.custody_note'),
                 $brandName,
                 $trustee,
-                $custodian,
                 $metalType,
             ),
             'trusteeNote' => $this->interpolateCertificateText(
                 config('holding_certificate.trustee_note'),
                 $brandName,
                 $trustee,
-                $custodian,
                 $metalType,
             ),
             'trustee' => $trustee,
-            'custodian' => $custodian,
             'trusteeLogo' => $this->embedPublicImage($trustee['logo'] ?? 'images/certificates/vistra-logo.svg'),
-            'custodianLogo' => $this->embedPublicImage($custodian['logo'] ?? 'images/certificates/brinks-logo.svg'),
-            'bisLogo' => $this->embedPublicImage($custodian['bis_logo'] ?? 'images/certificates/bis-logo.png'),
+            'bisLogo' => $this->embedPublicImage(config('holding_certificate.bis_logo', 'images/certificates/bis-logo.png')),
             'holdingDisplay' => $this->formatGrams((float) $certificate->holding_grams),
             'issuedAtDisplay' => $certificate->issued_at?->format('d M Y'),
         ])->render();
@@ -187,18 +182,16 @@ class HoldingCertificateService
 
     /**
      * @param  array<string, mixed>  $trustee
-     * @param  array<string, mixed>  $custodian
      */
     protected function interpolateCertificateText(
         ?string $template,
         string $brandName,
         array $trustee,
-        array $custodian,
         string $metalType = 'gold',
     ): string {
         return str_replace(
-            ['{brand}', '{trustee_name}', '{custodian_name}', '{metal}'],
-            [$brandName, (string) ($trustee['name'] ?? ''), (string) ($custodian['name'] ?? ''), $metalType],
+            ['{brand}', '{trustee_name}', '{metal}'],
+            [$brandName, (string) ($trustee['name'] ?? ''), $metalType],
             (string) $template,
         );
     }

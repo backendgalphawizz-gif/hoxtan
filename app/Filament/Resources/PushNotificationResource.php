@@ -82,15 +82,24 @@ class PushNotificationResource extends Resource
                             ->visible(fn (Forms\Get $get) => in_array($get('target'), ['specific', 'specific_drivers'], true))
                             ->required(fn (Forms\Get $get) => in_array($get('target'), ['specific', 'specific_drivers'], true)),
                         Forms\Components\Select::make('status')
-                            ->options([
-                                'draft' => 'Draft',
-                                'scheduled' => 'Scheduled',
-                                'sent' => 'Sent',
-                                'failed' => 'Failed',
-                            ])
+                            ->options(function (?PushNotification $record): array {
+                                if ($record?->status === 'sent') {
+                                    return ['sent' => 'Sent'];
+                                }
+
+                                return [
+                                    'draft' => 'Draft',
+                                    'scheduled' => 'Scheduled',
+                                    'sent' => 'Send now',
+                                ];
+                            })
                             ->required()
                             ->default('draft')
-                            ->disabled(fn (?PushNotification $record) => $record?->status === 'sent'),
+                            ->helperText(fn (?PushNotification $record): ?string => $record?->status === 'sent'
+                                ? null
+                                : '“Send now” dispatches immediately. Draft/Scheduled can be sent later with Send Now.')
+                            ->disabled(fn (?PushNotification $record) => $record?->status === 'sent')
+                            ->dehydrated(),
                         Forms\Components\DateTimePicker::make('scheduled_at')
                             ->native(false)
                             ->visible(fn (Forms\Get $get) => $get('status') === 'scheduled')

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PushNotificationResource\Pages;
 
 use App\Filament\Resources\PushNotificationResource;
+use App\Services\PushNotificationDispatchService;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -22,16 +23,16 @@ class ViewPushNotification extends ViewRecord
                 ->color('success')
                 ->visible(fn () => in_array($this->record->status, ['draft', 'scheduled']))
                 ->requiresConfirmation()
-                ->action(function () {
-                    $this->record->update([
-                        'status' => 'sent',
-                        'sent_at' => now(),
-                    ]);
+                ->action(function (PushNotificationDispatchService $dispatch): void {
+                    $count = $dispatch->dispatch($this->record);
 
                     Notification::make()
                         ->title('Push notification sent')
+                        ->body('Delivered to '.$count.' recipient(s).')
                         ->success()
                         ->send();
+
+                    $this->refreshFormData(['status', 'sent_at', 'recipients_count']);
                 }),
         ];
     }
