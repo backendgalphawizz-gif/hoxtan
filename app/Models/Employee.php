@@ -29,6 +29,7 @@ class Employee extends Authenticatable implements FilamentUser, HasAvatar, HasNa
         'phone',
         'employee_code',
         'password',
+        'password_plain',
         'is_active',
         'created_by_admin_id',
         'created_by_employee_id',
@@ -36,6 +37,7 @@ class Employee extends Authenticatable implements FilamentUser, HasAvatar, HasNa
 
     protected $hidden = [
         'password',
+        'password_plain',
         'remember_token',
     ];
 
@@ -45,6 +47,28 @@ class Employee extends Authenticatable implements FilamentUser, HasAvatar, HasNa
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Persist login password (hashed for auth) and encrypted copy for admin/staff view.
+     */
+    public function setLoginPassword(string $plain): void
+    {
+        $this->password = $plain;
+        $this->password_plain = encrypt($plain);
+    }
+
+    public function readablePassword(): ?string
+    {
+        if (blank($this->password_plain)) {
+            return null;
+        }
+
+        try {
+            return decrypt($this->password_plain);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function department(): BelongsTo

@@ -21,6 +21,10 @@ class CreateEmployee extends BaseCreateRecord
         $data['created_by_admin_id'] = Auth::guard('admin')->id();
         $data['role'] = Employee::ROLE_STAFF;
 
+        if (filled($data['password'] ?? null)) {
+            $data['password_plain'] = encrypt((string) $data['password']);
+        }
+
         return $data;
     }
 }

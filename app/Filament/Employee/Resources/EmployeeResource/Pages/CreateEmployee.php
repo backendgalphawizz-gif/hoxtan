@@ -20,6 +20,10 @@ class CreateEmployee extends CreateRecord
         $data['department_id'] = $creator->department_id;
         $data['role'] = Employee::ROLE_EMPLOYEE;
 
+        if (filled($data['password'] ?? null)) {
+            $data['password_plain'] = encrypt((string) $data['password']);
+        }
+
         return $data;
     }
 }

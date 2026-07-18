@@ -16,7 +16,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Hash;
 
 class EmployeeResource extends Resource
 {
@@ -81,12 +80,14 @@ class EmployeeResource extends Resource
                         Forms\Components\TextInput::make('password')
                             ->password()
                             ->revealable()
-                            ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
                             ->dehydrated(fn ($state) => filled($state))
+                            ->dehydrateStateUsing(fn ($state) => $state)
                             ->required(fn (string $operation) => $operation === 'create')
                             ->minLength(8)
                             ->maxLength(255)
-                            ->helperText('Used to log in at /employee'),
+                            ->helperText(fn (string $operation): string => $operation === 'edit'
+                                ? 'Current password is shown when available. Change it here or leave as-is to keep it.'
+                                : 'Used to log in at /employee'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),

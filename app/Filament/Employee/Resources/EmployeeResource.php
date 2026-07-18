@@ -75,7 +75,7 @@ class EmployeeResource extends Resource
                             ->minLength(8)
                             ->maxLength(255)
                             ->helperText(fn (string $operation): string => $operation === 'edit'
-                                ? 'Leave blank to keep the current password.'
+                                ? 'Current password is shown when available. Change it here or leave as-is to keep it.'
                                 : 'Login password for the employee panel.'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
