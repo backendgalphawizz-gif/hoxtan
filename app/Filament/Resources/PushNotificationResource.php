@@ -197,12 +197,13 @@ class PushNotificationResource extends Resource
                     ->modalHeading('Send Push Notification')
                     ->modalDescription('This will mark the notification as sent and dispatch it to the target audience.')
                     ->action(function (PushNotification $record, PushNotificationDispatchService $dispatch) {
-                        $count = $dispatch->dispatch($record);
+                        $result = $dispatch->dispatch($record);
+                        $feedback = \App\Support\PushDispatchFeedback::fromResult($result);
 
                         Notification::make()
-                            ->title('Push notification sent')
-                            ->body('Notification "'.$record->title.'" delivered to '.$count.' recipients.')
-                            ->success()
+                            ->title($feedback['title'])
+                            ->body($feedback['body'])
+                            ->{$feedback['success'] ? 'success' : 'warning'}()
                             ->send();
                     }),
             ])

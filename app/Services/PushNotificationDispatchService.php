@@ -12,13 +12,22 @@ class PushNotificationDispatchService
         private readonly NotificationInboxService $inbox,
     ) {}
 
-    public function dispatch(PushNotification $notification): int
+    /**
+     * @return array{recipients: int, push_tokens: int, push_success: int, push_failure: int, firebase_ready: bool}
+     */
+    public function dispatch(PushNotification $notification): array
     {
         $target = (string) $notification->target;
+        $pushResult = [
+            'success' => 0,
+            'failure' => 0,
+            'tokens' => 0,
+            'firebase_ready' => false,
+        ];
 
         if (in_array($target, ['all_drivers', 'specific_drivers'], true)) {
             $drivers = $this->resolveDriverRecipients($notification);
-            $count = $this->inbox->notifyDrivers(
+            $result = $this->inbox->notifyDrivers(
                 $drivers,
                 $notification->title,
                 $notification->body,
@@ -28,9 +37,11 @@ class PushNotificationDispatchService
                 ],
                 push: true,
             );
+            $count = $result['recipients'];
+            $pushResult = $result['push'];
         } else {
             $users = $this->resolveRecipients($notification);
-            $count = $this->inbox->notifyUsers(
+            $result = $this->inbox->notifyUsers(
                 $users,
                 $notification->title,
                 $notification->body,
@@ -41,6 +52,8 @@ class PushNotificationDispatchService
                 push: true,
                 pushNotificationId: $notification->id,
             );
+            $count = $result['recipients'];
+            $pushResult = $result['push'];
         }
 
         $notification->update([
@@ -49,7 +62,13 @@ class PushNotificationDispatchService
             'recipients_count' => $count,
         ]);
 
-        return $count;
+        return [
+            'recipients' => $count,
+            'push_tokens' => (int) ($pushResult['tokens'] ?? 0),
+            'push_success' => (int) ($pushResult['success'] ?? 0),
+            'push_failure' => (int) ($pushResult['failure'] ?? 0),
+            'firebase_ready' => (bool) ($pushResult['firebase_ready'] ?? false),
+        ];
     }
 
     public function resolveRecipients(PushNotification $notification)

@@ -39,11 +39,12 @@ class CreatePushNotification extends BaseCreateRecord
         }
 
         $count = app(PushNotificationDispatchService::class)->dispatch($this->record);
+        $feedback = \App\Support\PushDispatchFeedback::fromResult($count);
 
         Notification::make()
-            ->title('Push notification sent')
-            ->body('Delivered to '.$count.' recipient(s).')
-            ->success()
+            ->title($feedback['title'])
+            ->body($feedback['body'])
+            ->{$feedback['success'] ? 'success' : 'warning'}()
             ->send();
     }
 }

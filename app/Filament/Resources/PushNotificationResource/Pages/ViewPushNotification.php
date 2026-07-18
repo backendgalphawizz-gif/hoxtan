@@ -24,12 +24,13 @@ class ViewPushNotification extends ViewRecord
                 ->visible(fn () => in_array($this->record->status, ['draft', 'scheduled']))
                 ->requiresConfirmation()
                 ->action(function (PushNotificationDispatchService $dispatch): void {
-                    $count = $dispatch->dispatch($this->record);
+                    $result = $dispatch->dispatch($this->record);
+                    $feedback = \App\Support\PushDispatchFeedback::fromResult($result);
 
                     Notification::make()
-                        ->title('Push notification sent')
-                        ->body('Delivered to '.$count.' recipient(s).')
-                        ->success()
+                        ->title($feedback['title'])
+                        ->body($feedback['body'])
+                        ->{$feedback['success'] ? 'success' : 'warning'}()
                         ->send();
 
                     $this->refreshFormData(['status', 'sent_at', 'recipients_count']);

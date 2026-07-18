@@ -60,6 +60,7 @@ class NotificationInboxService
     /**
      * @param  Collection<int, User>|iterable<User>  $users
      * @param  array<string, mixed>  $data
+     * @return array{recipients: int, push: array{success: int, failure: int, tokens: int, firebase_ready: bool}}
      */
     public function notifyUsers(
         iterable $users,
@@ -69,7 +70,7 @@ class NotificationInboxService
         array $data = [],
         bool $push = true,
         ?int $pushNotificationId = null,
-    ): int {
+    ): array {
         $users = collect($users)->unique('id')->values();
         $count = 0;
 
@@ -87,9 +88,16 @@ class NotificationInboxService
             }
         });
 
+        $pushResult = [
+            'success' => 0,
+            'failure' => 0,
+            'tokens' => 0,
+            'firebase_ready' => $this->fcm->messaging() !== null,
+        ];
+
         if ($push && $count > 0) {
             try {
-                $this->fcm->sendToOwners($users, $title, $body, $data, $type);
+                $pushResult = array_merge($pushResult, $this->fcm->sendToOwners($users, $title, $body, $data, $type));
             } catch (\Throwable $e) {
                 Log::warning('Users FCM push failed', [
                     'count' => $count,
@@ -99,12 +107,16 @@ class NotificationInboxService
             }
         }
 
-        return $count;
+        return [
+            'recipients' => $count,
+            'push' => $pushResult,
+        ];
     }
 
     /**
      * @param  Collection<int, Driver>|iterable<Driver>  $drivers
      * @param  array<string, mixed>  $data
+     * @return array{recipients: int, push: array{success: int, failure: int, tokens: int, firebase_ready: bool}}
      */
     public function notifyDrivers(
         iterable $drivers,
@@ -113,7 +125,7 @@ class NotificationInboxService
         ?string $type = null,
         array $data = [],
         bool $push = true,
-    ): int {
+    ): array {
         $drivers = collect($drivers)->unique('id')->values();
         $count = 0;
 
@@ -130,9 +142,16 @@ class NotificationInboxService
             }
         });
 
+        $pushResult = [
+            'success' => 0,
+            'failure' => 0,
+            'tokens' => 0,
+            'firebase_ready' => $this->fcm->messaging() !== null,
+        ];
+
         if ($push && $count > 0) {
             try {
-                $this->fcm->sendToOwners($drivers, $title, $body, $data, $type);
+                $pushResult = array_merge($pushResult, $this->fcm->sendToOwners($drivers, $title, $body, $data, $type));
             } catch (\Throwable $e) {
                 Log::warning('Drivers FCM push failed', [
                     'count' => $count,
@@ -142,7 +161,10 @@ class NotificationInboxService
             }
         }
 
-        return $count;
+        return [
+            'recipients' => $count,
+            'push' => $pushResult,
+        ];
     }
 
     /**

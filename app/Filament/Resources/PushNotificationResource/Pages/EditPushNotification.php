@@ -25,12 +25,13 @@ class EditPushNotification extends BaseEditRecord
                 ->visible(fn () => in_array($this->record->status, ['draft', 'scheduled']))
                 ->requiresConfirmation()
                 ->action(function (PushNotificationDispatchService $dispatch): void {
-                    $count = $dispatch->dispatch($this->record);
+                    $result = $dispatch->dispatch($this->record);
+                    $feedback = \App\Support\PushDispatchFeedback::fromResult($result);
 
                     Notification::make()
-                        ->title('Push notification sent')
-                        ->body('Delivered to '.$count.' recipient(s).')
-                        ->success()
+                        ->title($feedback['title'])
+                        ->body($feedback['body'])
+                        ->{$feedback['success'] ? 'success' : 'warning'}()
                         ->send();
 
                     $this->refreshFormData(['status', 'sent_at', 'recipients_count']);
@@ -60,12 +61,13 @@ class EditPushNotification extends BaseEditRecord
             return;
         }
 
-        $count = app(PushNotificationDispatchService::class)->dispatch($this->record->fresh());
+        $result = app(PushNotificationDispatchService::class)->dispatch($this->record->fresh());
+        $feedback = \App\Support\PushDispatchFeedback::fromResult($result);
 
         Notification::make()
-            ->title('Push notification sent')
-            ->body('Delivered to '.$count.' recipient(s).')
-            ->success()
+            ->title($feedback['title'])
+            ->body($feedback['body'])
+            ->{$feedback['success'] ? 'success' : 'warning'}()
             ->send();
     }
 }
