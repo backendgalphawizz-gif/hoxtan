@@ -51,6 +51,7 @@ class SellJewelleryApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.estimate.metal_type', 'gold')
             ->assertJsonPath('data.estimate.purity', '22K')
+            ->assertJsonPath('data.estimate.rate_source', 'metal_api')
             ->assertJsonStructure([
                 'data' => [
                     'estimate' => [
@@ -232,5 +233,38 @@ class SellJewelleryApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.recently_sold.0.booking_number', 'SELL12345')
             ->assertJsonPath('data.recently_sold.0.status', 'completed');
+    }
+
+    public function test_estimate_uses_admin_karat_rate_for_18k_gold(): void
+    {
+        \App\Models\JewelleryGoldKaratRate::query()->create([
+            'purity' => '18K',
+            'rate_per_gram' => 5500.50,
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/sell-jewellery/estimate', [
+            'metal_type' => 'gold',
+            'weight_grams' => 2,
+            'purity' => '18K',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.estimate.purity', '18K')
+            ->assertJsonPath('data.estimate.rate_source', 'karat_admin')
+            ->assertJsonPath('data.estimate.rate_per_gram', 5500.5)
+            ->assertJsonPath('data.estimate.purity_factor', 1)
+            ->assertJsonPath('data.estimate.estimated_value', 11001);
+
+        $this->postJson('/api/v1/sell-jewellery/estimate', [
+            'metal_type' => 'gold',
+            'weight_grams' => 1,
+            'purity' => '16K',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
     }
 }

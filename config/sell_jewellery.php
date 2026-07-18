@@ -9,15 +9,18 @@ return [
     ],
 
     'purities' => [
-        'gold' => ['24K', '22K', '20K', '18K'],
+        'gold' => ['24K', '22K', '20K', '18K', '16K', '14K'],
         'silver' => ['999', '925'],
     ],
 
     'purity_factors' => [
         '24K' => 1.0,
         '22K' => 0.916,
+        // 20K / 18K / 16K / 14K use admin Gold Karat Rates (₹/g), not these factors.
         '20K' => 0.833,
         '18K' => 0.75,
+        '16K' => 0.667,
+        '14K' => 0.583,
         '999' => 1.0,
         '925' => 0.925,
     ],

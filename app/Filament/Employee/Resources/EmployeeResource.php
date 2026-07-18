@@ -13,7 +13,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 
 class EmployeeResource extends Resource
 {
@@ -63,21 +62,21 @@ class EmployeeResource extends Resource
                             ->maxLength(32)
                             ->unique(ignoreRecord: true)
                             ->helperText('Optional employee code.'),
-                        Forms\Components\TextInput::make('role_display')
+                        Forms\Components\Placeholder::make('role_display')
                             ->label('Role')
-                            ->default('Employee')
-                            ->disabled()
-                            ->dehydrated(false)
+                            ->content('Employee')
                             ->helperText('Role is fixed as Employee.'),
                         Forms\Components\TextInput::make('password')
                             ->password()
                             ->revealable()
-                            ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
                             ->dehydrated(fn ($state) => filled($state))
+                            ->dehydrateStateUsing(fn ($state) => $state)
                             ->required(fn (string $operation) => $operation === 'create')
                             ->minLength(8)
                             ->maxLength(255)
-                            ->helperText('Login password for the employee panel.'),
+                            ->helperText(fn (string $operation): string => $operation === 'edit'
+                                ? 'Leave blank to keep the current password.'
+                                : 'Login password for the employee panel.'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),

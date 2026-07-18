@@ -55,7 +55,7 @@ class JewelleryKaratRates extends Page implements HasForms
 
     public function getSubheading(): ?string
     {
-        return 'Set ₹/g rates for 20K, 18K, 16K and 14K gold. Only active rates appear in the product purity dropdown and are used for pricing (not the metal API).';
+        return 'Set ₹/g rates for 20K, 18K, 16K and 14K gold. Only active rates appear in product purity and sell-jewellery estimates (not the metal API).';
     }
 
     public function form(Form $form): Form

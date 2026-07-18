@@ -16,6 +16,7 @@ class SellJewelleryService
 {
     public function __construct(
         protected MetalRateService $metalRates,
+        protected JewelleryKaratRateService $karatRates,
     ) {}
 
     /**
@@ -24,15 +25,18 @@ class SellJewelleryService
     public function getConfig(?string $metalType = null): array
     {
         $rates = $this->metalRates->getApiRates($metalType);
+        $karatRates = $this->karatRates->activeRatesByPurity();
 
         return [
             'metal_types' => config('sell_jewellery.metal_types', []),
-            'purities' => config('sell_jewellery.purities', []),
+            'purities' => $this->availablePurities(),
             'identity_owners' => config('sell_jewellery.identity_owners', []),
             'sell_locations' => config('sell_jewellery.sell_locations', []),
             'document_types' => config('sell_jewellery.document_types', []),
             'status_filters' => config('sell_jewellery.list_filters', []),
-            'rates' => $rates,
+            'rates' => array_merge($rates, [
+                'gold_karat' => $karatRates,
+            ]),
         ];
     }
 
@@ -43,6 +47,7 @@ class SellJewelleryService
      *     weight_grams: float,
      *     rate_per_gram: float,
      *     purity_factor: float,
+     *     rate_source: string,
      *     estimated_value: float,
      *     estimated_value_display: string
      * }
@@ -51,8 +56,7 @@ class SellJewelleryService
     {
         $this->assertValidPurity($metalType, $purity);
 
-        $rate = $this->metalRates->getCurrentRatePerGram($metalType);
-        $factor = $this->purityFactor($purity);
+        [$rate, $factor, $rateSource] = $this->resolveSellRate($metalType, $purity);
         $estimated = round($weightGrams * $rate * $factor, 2);
 
         return [
@@ -61,6 +65,7 @@ class SellJewelleryService
             'weight_grams' => $weightGrams,
             'rate_per_gram' => round($rate, 2),
             'purity_factor' => $factor,
+            'rate_source' => $rateSource,
             'estimated_value' => $estimated,
             'estimated_value_display' => '₹'.number_format($estimated, 2),
         ];
@@ -155,13 +160,69 @@ class SellJewelleryService
 
     public function assertValidPurity(string $metalType, string $purity): void
     {
-        $allowed = config('sell_jewellery.purities.'.$metalType, []);
+        $allowed = $this->availablePurities()[$metalType] ?? [];
 
         if (! in_array($purity, $allowed, true)) {
             throw ValidationException::withMessages([
                 'purity' => ['Invalid purity for the selected metal type.'],
             ]);
         }
+    }
+
+    /**
+     * @return array{gold: list<string>, silver: list<string>}
+     */
+    public function availablePurities(): array
+    {
+        $managed = $this->karatRates->managedPurities();
+        $active = $this->karatRates->activeManagedPurities();
+        $configured = config('sell_jewellery.purities', []);
+
+        $result = [];
+
+        foreach ($configured as $metal => $purities) {
+            $result[$metal] = collect($purities)
+                ->filter(function (string $purity) use ($metal, $managed, $active): bool {
+                    if ($metal !== 'gold' || ! in_array($purity, $managed, true)) {
+                        return true;
+                    }
+
+                    return in_array($purity, $active, true);
+                })
+                ->values()
+                ->all();
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array{0: float, 1: float, 2: string}
+     */
+    protected function resolveSellRate(string $metalType, string $purity): array
+    {
+        if ($this->karatRates->usesAdminRate($metalType, $purity)) {
+            $adminRate = $this->karatRates->getRatePerGram($purity);
+
+            if ($adminRate === null || $adminRate <= 0) {
+                throw ValidationException::withMessages([
+                    'purity' => ['Admin rate is not configured for '.$purity.' gold. Please choose another purity.'],
+                ]);
+            }
+
+            // Admin rate is already the ₹/g price for that karat — do not apply purity_factor.
+            return [$adminRate, 1.0, 'karat_admin'];
+        }
+
+        $rate = $this->metalRates->getCurrentRatePerGram($metalType);
+
+        if ($rate <= 0) {
+            throw ValidationException::withMessages([
+                'metal_type' => ['Live metal rate is unavailable. Please try again later.'],
+            ]);
+        }
+
+        return [$rate, $this->purityFactor($purity), 'metal_api'];
     }
 
     /**
