@@ -63,10 +63,30 @@ class FirebaseCloudMessagingService
             return null;
         }
 
-        $json = json_decode((string) file_get_contents($credentials), true);
+        $raw = @file_get_contents($credentials);
+        if ($raw === false || trim($raw) === '') {
+            $this->lastError = 'service-account.json is empty or unreadable ('.$credentials.'). Check file permissions (644) on the server.';
+            Log::warning('Firebase credentials unreadable', ['path' => $credentials]);
+
+            return null;
+        }
+
+        // Strip UTF-8 BOM if present (common after Windows/FTP upload).
+        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
+            $raw = substr($raw, 3);
+        }
+
+        $json = json_decode($raw, true);
         if (! is_array($json)) {
-            $this->lastError = 'service-account.json could not be parsed as JSON ('.$credentials.')';
-            Log::warning('Firebase credentials JSON parse failed', ['path' => $credentials]);
+            $this->lastError = 'service-account.json could not be parsed as JSON ('
+                .json_last_error_msg()
+                .') at '.$credentials
+                .'. Re-upload the Firebase private key file without editing it.';
+            Log::warning('Firebase credentials JSON parse failed', [
+                'path' => $credentials,
+                'json_error' => json_last_error_msg(),
+                'bytes' => strlen($raw),
+            ]);
 
             return null;
         }
