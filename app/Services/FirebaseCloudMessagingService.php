@@ -64,11 +64,27 @@ class FirebaseCloudMessagingService
         }
 
         $json = json_decode((string) file_get_contents($credentials), true);
-        if (! is_array($json) || blank($json['private_key'] ?? null) || str_contains((string) $json['private_key'], 'REPLACE_ME')) {
-            $this->lastError = 'service-account.json is invalid or still using placeholders (REPLACE_ME)';
-            Log::warning('Firebase credentials invalid / placeholder key', [
+        if (! is_array($json)) {
+            $this->lastError = 'service-account.json could not be parsed as JSON ('.$credentials.')';
+            Log::warning('Firebase credentials JSON parse failed', ['path' => $credentials]);
+
+            return null;
+        }
+
+        $privateKey = (string) ($json['private_key'] ?? '');
+        if ($privateKey === '' || str_contains($privateKey, 'REPLACE_ME') || str_contains((string) ($json['client_id'] ?? ''), 'REPLACE_ME')) {
+            $this->lastError = 'service-account.json still has placeholder values. Download a real key from Firebase Console → Project settings → Service accounts.';
+            Log::warning('Firebase credentials still contain placeholders', [
                 'path' => $credentials,
+                'realpath' => realpath($credentials) ?: $credentials,
             ]);
+
+            return null;
+        }
+
+        if (! str_contains($privateKey, 'BEGIN PRIVATE KEY')) {
+            $this->lastError = 'service-account.json private_key is missing BEGIN PRIVATE KEY block';
+            Log::warning('Firebase credentials private_key malformed', ['path' => $credentials]);
 
             return null;
         }
