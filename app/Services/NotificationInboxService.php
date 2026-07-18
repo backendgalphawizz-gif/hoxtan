@@ -93,6 +93,7 @@ class NotificationInboxService
             'failure' => 0,
             'tokens' => 0,
             'firebase_ready' => $this->fcm->messaging() !== null,
+            'error' => $this->fcm->lastError(),
         ];
 
         if ($push && $count > 0) {
@@ -104,6 +105,7 @@ class NotificationInboxService
                     'type' => $type,
                     'error' => $e->getMessage(),
                 ]);
+                $pushResult['error'] = $e->getMessage();
             }
         }
 
@@ -116,7 +118,7 @@ class NotificationInboxService
     /**
      * @param  Collection<int, Driver>|iterable<Driver>  $drivers
      * @param  array<string, mixed>  $data
-     * @return array{recipients: int, push: array{success: int, failure: int, tokens: int, firebase_ready: bool}}
+     * @return array{recipients: int, push: array{success: int, failure: int, tokens: int, firebase_ready: bool, error: ?string}}
      */
     public function notifyDrivers(
         iterable $drivers,
@@ -147,6 +149,7 @@ class NotificationInboxService
             'failure' => 0,
             'tokens' => 0,
             'firebase_ready' => $this->fcm->messaging() !== null,
+            'error' => $this->fcm->lastError(),
         ];
 
         if ($push && $count > 0) {
@@ -158,6 +161,7 @@ class NotificationInboxService
                     'type' => $type,
                     'error' => $e->getMessage(),
                 ]);
+                $pushResult['error'] = $e->getMessage();
             }
         }
 

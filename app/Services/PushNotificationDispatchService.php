@@ -13,7 +13,7 @@ class PushNotificationDispatchService
     ) {}
 
     /**
-     * @return array{recipients: int, push_tokens: int, push_success: int, push_failure: int, firebase_ready: bool}
+     * @return array{recipients: int, push_tokens: int, push_success: int, push_failure: int, firebase_ready: bool, error: ?string}
      */
     public function dispatch(PushNotification $notification): array
     {
@@ -23,6 +23,7 @@ class PushNotificationDispatchService
             'failure' => 0,
             'tokens' => 0,
             'firebase_ready' => false,
+            'error' => null,
         ];
 
         if (in_array($target, ['all_drivers', 'specific_drivers'], true)) {
@@ -68,6 +69,7 @@ class PushNotificationDispatchService
             'push_success' => (int) ($pushResult['success'] ?? 0),
             'push_failure' => (int) ($pushResult['failure'] ?? 0),
             'firebase_ready' => (bool) ($pushResult['firebase_ready'] ?? false),
+            'error' => $pushResult['error'] ?? null,
         ];
     }
 

@@ -5,7 +5,7 @@ namespace App\Support;
 class PushDispatchFeedback
 {
     /**
-     * @param  array{recipients?: int, push_tokens?: int, push_success?: int, push_failure?: int, firebase_ready?: bool}  $result
+     * @param  array{recipients?: int, push_tokens?: int, push_success?: int, push_failure?: int, firebase_ready?: bool, error?: ?string}  $result
      * @return array{title: string, body: string, success: bool}
      */
     public static function fromResult(array $result): array
@@ -14,6 +14,7 @@ class PushDispatchFeedback
         $tokens = (int) ($result['push_tokens'] ?? 0);
         $pushSuccess = (int) ($result['push_success'] ?? 0);
         $firebaseReady = (bool) ($result['firebase_ready'] ?? false);
+        $error = filled($result['error'] ?? null) ? (string) $result['error'] : null;
 
         if ($recipients === 0) {
             return [
@@ -26,7 +27,8 @@ class PushDispatchFeedback
         if (! $firebaseReady) {
             return [
                 'title' => 'In-app notification saved (push not configured)',
-                'body' => "Saved for {$recipients} recipient(s), but Firebase is not ready. Add storage/app/firebase/service-account.json and set FIREBASE_ENABLED=true.",
+                'body' => 'Saved for '.$recipients.' recipient(s), but Firebase is not ready. '
+                    .($error ?? 'Check storage/app/firebase/service-account.json and FIREBASE_ENABLED=true.'),
                 'success' => false,
             ];
         }
@@ -34,7 +36,8 @@ class PushDispatchFeedback
         if ($tokens === 0) {
             return [
                 'title' => 'In-app notification saved (no device tokens)',
-                'body' => "Saved for {$recipients} recipient(s), but no FCM device tokens are registered. Ask users/drivers to open the app and allow notifications (login/register device token).",
+                'body' => "Saved for {$recipients} recipient(s), but no FCM device tokens are registered. "
+                    .'Ask the user/driver to fully close and reopen the app (or log in again) so it registers POST /device-token.',
                 'success' => false,
             ];
         }
@@ -42,7 +45,8 @@ class PushDispatchFeedback
         if ($pushSuccess === 0) {
             return [
                 'title' => 'In-app notification saved (push failed)',
-                'body' => "Saved for {$recipients} recipient(s). Found {$tokens} device token(s), but FCM delivery failed. Check storage/logs.",
+                'body' => "Saved for {$recipients} recipient(s). Found {$tokens} device token(s), but FCM delivery failed."
+                    .($error ? ' Error: '.$error : ' Check storage/logs.'),
                 'success' => false,
             ];
         }

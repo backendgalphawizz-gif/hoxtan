@@ -25,6 +25,13 @@ class FirebaseCloudMessagingService
 
     private bool $bootAttempted = false;
 
+    private ?string $lastError = null;
+
+    public function lastError(): ?string
+    {
+        return $this->lastError;
+    }
+
     public function isEnabled(): bool
     {
         return (bool) config('firebase.enabled', true) && $this->messaging() !== null;
@@ -37,8 +44,10 @@ class FirebaseCloudMessagingService
         }
 
         $this->bootAttempted = true;
+        $this->lastError = null;
 
         if (! (bool) config('firebase.enabled', true)) {
+            $this->lastError = 'FIREBASE_ENABLED is false';
             Log::warning('Firebase push disabled (FIREBASE_ENABLED=false)');
 
             return null;
@@ -46,7 +55,18 @@ class FirebaseCloudMessagingService
 
         $credentials = (string) config('firebase.credentials');
         if ($credentials === '' || ! is_file($credentials)) {
+            $this->lastError = 'Credentials file missing: '.$credentials;
             Log::warning('Firebase credentials file missing — driver/user push will not send', [
+                'path' => $credentials,
+            ]);
+
+            return null;
+        }
+
+        $json = json_decode((string) file_get_contents($credentials), true);
+        if (! is_array($json) || blank($json['private_key'] ?? null) || str_contains((string) $json['private_key'], 'REPLACE_ME')) {
+            $this->lastError = 'service-account.json is invalid or still using placeholders (REPLACE_ME)';
+            Log::warning('Firebase credentials invalid / placeholder key', [
                 'path' => $credentials,
             ]);
 
@@ -61,6 +81,7 @@ class FirebaseCloudMessagingService
             }
             $this->messaging = $factory->createMessaging();
         } catch (Throwable $e) {
+            $this->lastError = $e->getMessage();
             Log::error('Firebase init failed', ['error' => $e->getMessage()]);
             $this->messaging = null;
         }
@@ -179,7 +200,7 @@ class FirebaseCloudMessagingService
     /**
      * @param  Collection<int, User|Admin|Driver>|array<int, User|Admin|Driver>  $recipients
      * @param  array<string, mixed>  $data
-     * @return array{success: int, failure: int, tokens: int, firebase_ready: bool}
+     * @return array{success: int, failure: int, tokens: int, firebase_ready: bool, error: ?string}
      */
     public function sendToOwners(iterable $recipients, string $title, string $body, array $data = [], ?string $type = null): array
     {
@@ -223,11 +244,13 @@ class FirebaseCloudMessagingService
             'success' => $result['success'] ?? 0,
             'failure' => $result['failure'] ?? 0,
             'firebase_ready' => $this->messaging() !== null,
+            'error' => $this->lastError,
         ]);
 
         return array_merge($result, [
             'tokens' => count($unique),
             'firebase_ready' => $this->messaging() !== null,
+            'error' => $this->lastError,
         ]);
     }
 
@@ -245,9 +268,11 @@ class FirebaseCloudMessagingService
 
         $messaging = $this->messaging();
         if ($messaging === null) {
+            $this->lastError ??= 'Firebase messaging is not ready';
             Log::warning('FCM skipped: Firebase not ready', [
                 'token_count' => count($tokens),
                 'title' => $title,
+                'error' => $this->lastError,
             ]);
 
             return ['success' => 0, 'failure' => count($tokens)];
@@ -284,6 +309,10 @@ class FirebaseCloudMessagingService
                         'aps' => [
                             'sound' => 'default',
                             'content-available' => 1,
+                            'alert' => [
+                                'title' => $title,
+                                'body' => $body,
+                            ],
                         ],
                     ],
                 ]));
@@ -300,6 +329,7 @@ class FirebaseCloudMessagingService
         $success = 0;
         $failure = 0;
         $invalid = [];
+        $errors = [];
 
         foreach (array_chunk($tokens, 500) as $chunk) {
             try {
@@ -307,7 +337,12 @@ class FirebaseCloudMessagingService
                 $success += $report->successes()->count();
                 $failure += $report->failures()->count();
                 $invalid = array_merge($invalid, $report->unknownTokens(), $report->invalidTokens());
+
+                if ($report->hasFailures()) {
+                    $errors[] = 'FCM rejected '.$report->failures()->count().' token(s)';
+                }
             } catch (MessagingException $e) {
+                $errors[] = $e->getMessage();
                 Log::error('FCM multicast failed', ['error' => $e->getMessage()]);
                 // Fallback: send one-by-one
                 foreach ($chunk as $registrationToken) {
@@ -316,18 +351,25 @@ class FirebaseCloudMessagingService
                         $success++;
                     } catch (Throwable $inner) {
                         $failure++;
+                        $errors[] = $inner->getMessage();
                         Log::warning('FCM single send failed', [
                             'error' => $inner->getMessage(),
                         ]);
                     }
                 }
             } catch (Throwable $e) {
+                $errors[] = $e->getMessage();
                 Log::error('FCM send failed', ['error' => $e->getMessage()]);
                 $failure += count($chunk);
             }
         }
 
-        if ($invalid !== []) {
+        if ($errors !== []) {
+            $this->lastError = $errors[0];
+        }
+
+        // Only prune tokens Firebase explicitly marks invalid/unknown — never on auth/config errors.
+        if ($invalid !== [] && $success + $failure > 0) {
             $invalid = array_values(array_unique($invalid));
             if ($this->hasFcmTokenColumn()) {
                 DeviceToken::query()->whereIn('fcm_token', $invalid)->delete();
