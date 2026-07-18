@@ -17,11 +17,11 @@
 /public/hot
 /public/storage
 /storage/*.key
-# /storage/app/firebase/service-account.json
-# /storage/app/firebase/service-account.clean.json
-# /storage/app/firebase/service-account.min.json
-# /storage/app/firebase/service-account.json.bak.*
-# /storage/pail
+/storage/app/firebase/service-account.json
+/storage/app/firebase/service-account.clean.json
+/storage/app/firebase/service-account.min.json
+/storage/app/firebase/service-account.json.bak.*
+/storage/pail
 /vendor
 Homestead.json
 Homestead.yaml

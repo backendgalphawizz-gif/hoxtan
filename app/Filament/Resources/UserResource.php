@@ -421,6 +421,22 @@ class UserResource extends Resource
                         ]);
                         Notification::make()->title('Account blocked')->danger()->send();
                     }),
+                FilamentTableActions::make('unblock')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->tooltip('Unblock')
+                    ->visible(fn (User $record) => $record->is_blocked)
+                    ->requiresConfirmation()
+                    ->modalHeading('Unblock account')
+                    ->modalDescription('This user will be able to log in and use the app again.')
+                    ->action(function (User $record) {
+                        $record->update([
+                            'is_blocked' => false,
+                            'blocked_at' => null,
+                            'block_reason' => null,
+                        ]);
+                        Notification::make()->title('Account unblocked')->success()->send();
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

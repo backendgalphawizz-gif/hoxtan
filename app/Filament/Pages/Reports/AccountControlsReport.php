@@ -44,6 +44,39 @@ class AccountControlsReport extends BaseReportPage
                 TextColumn::make('restriction.support_notes')->limit(30)->placeholder('—'),
             ])
             ->actions([
+                Action::make('block')
+                    ->label('Block')
+                    ->icon('heroicon-o-no-symbol')
+                    ->color('danger')
+                    ->visible(fn (User $record): bool => static::canEditReport() && ! $record->is_blocked)
+                    ->form([
+                        Forms\Components\Textarea::make('block_reason')
+                            ->label('Block reason')
+                            ->required()
+                            ->maxLength(500),
+                    ])
+                    ->action(function (User $record, array $data): void {
+                        $record->update([
+                            'is_blocked' => true,
+                            'blocked_at' => now(),
+                            'block_reason' => $data['block_reason'],
+                        ]);
+                        Notification::make()->title('Account blocked')->danger()->send();
+                    }),
+                Action::make('unblock')
+                    ->label('Unblock')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->visible(fn (User $record): bool => static::canEditReport() && $record->is_blocked)
+                    ->requiresConfirmation()
+                    ->action(function (User $record): void {
+                        $record->update([
+                            'is_blocked' => false,
+                            'blocked_at' => null,
+                            'block_reason' => null,
+                        ]);
+                        Notification::make()->title('Account unblocked')->success()->send();
+                    }),
                 Action::make('restrictions')
                     ->label('Restrictions')
                     ->icon('heroicon-o-shield-exclamation')
