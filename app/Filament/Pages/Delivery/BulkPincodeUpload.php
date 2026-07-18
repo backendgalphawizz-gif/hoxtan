@@ -25,7 +25,7 @@ class BulkPincodeUpload extends Page implements HasForms
     }
 
     // Hidden from sidebar for now.
-    protected static bool $shouldRegisterNavigation = false;
+   
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up-tray';
 

@@ -25,7 +25,6 @@ class BlockedPincodeResource extends Resource
     protected static ?string $model = BlockedPincode::class;
 
     // Hidden from sidebar for now.
-    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-no-symbol';
 

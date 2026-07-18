@@ -297,7 +297,51 @@ class ProfileApiTest extends TestCase
             'mpin' => '9999',
         ])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['mpin']);
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('data.errors.mpin.0', 'Invalid M-PIN. Account could not be closed.');
+
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'deleted_at' => null]);
+    }
+
+    public function test_close_account_rejects_when_active_emi_exists(): void
+    {
+        $user = User::factory()->create([
+            'phone' => '9876543213',
+            'mpin' => '1234',
+        ]);
+
+        $order = \App\Models\JewelleryOrder::query()->create([
+            'order_number' => 'EMI-CLOSE-001',
+            'user_id' => $user->id,
+            'subtotal' => 10000,
+            'total_amount' => 10000,
+            'payment_mode' => 'emi',
+            'emi_tenure' => 3,
+            'total_emi_cost' => 10500,
+            'monthly_emi_amount' => 3500,
+            'status' => 'pending',
+            'shipping_address' => 'Test address',
+        ]);
+
+        \App\Models\JewelleryOrderEmiInstallment::query()->create([
+            'jewellery_order_id' => $order->id,
+            'installment_number' => 1,
+            'amount' => 3500,
+            'due_date' => now()->toDateString(),
+            'status' => 'pending',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/profile/close-account', [
+            'mpin' => '1234',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath(
+                'data.errors.account.0',
+                'Your account cannot be closed while you have an active jewellery EMI. Please complete or cancel the EMI plan first.'
+            );
 
         $this->assertDatabaseHas('users', ['id' => $user->id, 'deleted_at' => null]);
     }

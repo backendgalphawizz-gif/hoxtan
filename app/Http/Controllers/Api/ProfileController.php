@@ -235,6 +235,12 @@ class ProfileController extends Controller
             ]);
         }
 
+        if ($user->hasActiveJewelleryEmi()) {
+            throw ValidationException::withMessages([
+                'account' => ['Your account cannot be closed while you have an active jewellery EMI. Please complete or cancel the EMI plan first.'],
+            ]);
+        }
+
         $user->tokens()->delete();
 
         if (filled($user->profile_photo)) {

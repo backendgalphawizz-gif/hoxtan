@@ -189,6 +189,18 @@ class User extends Authenticatable
         return $this->hasMany(OldGoldBooking::class);
     }
 
+    /**
+     * True when the user has a jewellery EMI order with at least one unpaid installment.
+     */
+    public function hasActiveJewelleryEmi(): bool
+    {
+        return $this->jewelleryOrders()
+            ->where('payment_mode', 'emi')
+            ->whereNotIn('status', ['cancelled', 'failed', 'cart'])
+            ->whereHas('emiInstallments', fn ($query) => $query->where('status', 'pending'))
+            ->exists();
+    }
+
     public function isInvestor(): bool
     {
         return $this->role === 'investor' || $this->gold_holdings > 0 || $this->silver_holdings > 0;

@@ -21,7 +21,7 @@ class BannerResource extends Resource
     {
         return 'banners';
     }
-
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $model = Banner::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-photo';
