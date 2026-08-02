@@ -498,6 +498,8 @@ class JewelleryProductResource extends Resource
             ])
             ->actionsColumnLabel('Actions')
             ->defaultSort('id', 'desc')
+            ->defaultPaginationPageOption(10)
+            ->paginationPageOptions([10, 25, 50, 100])
             ->reorderable('sort_order');
     }
 
