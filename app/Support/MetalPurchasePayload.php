@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Investment;
 use App\Models\User;
 use App\Services\AppSettingService;
+use App\Services\HoldingCertificateService;
 use App\Services\MetalRateService;
 
 class MetalPurchasePayload
@@ -107,6 +108,8 @@ class MetalPurchasePayload
                     .number_format((float) $investment->quantity_grams, 4).'g credited to your '
                     .ucfirst($investment->metal_type).' holdings.',
             ],
+            'certificate' => app(HoldingCertificateService::class)
+                ->payload($investment->loadMissing('holdingCertificate')->holdingCertificate),
         ];
     }
 

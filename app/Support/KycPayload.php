@@ -4,7 +4,9 @@ namespace App\Support;
 
 use App\Models\KycDetail;
 use App\Models\User;
+use App\Services\KycService;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class KycPayload
 {
@@ -45,6 +47,7 @@ class KycPayload
             'face_photo_url' => AssetUrl::publicStorage($detail->selfie_photo),
             'pan_verification_status' => $detail->pan_verification_status,
             'aadhaar_verification_status' => $detail->aadhaar_verification_status,
+            'digilocker_client_id' => $detail->digilocker_client_id,
             'face_verification_status' => $detail->face_verification_status,
             'bank_verification_status' => $detail->bank_verification_status,
         ];
@@ -122,14 +125,80 @@ class KycPayload
             && self::stepCompleted($detail, 'bank');
     }
 
+    /**
+     * Surepass PAN + Aadhaar + bank verified — eligible for automatic KYC approval.
+     */
+    public static function isSurepassPanBankVerified(KycDetail $detail): bool
+    {
+        if (config('kyc.provider') !== 'surepass') {
+            return false;
+        }
+
+        return $detail->pan_verification_status === 'verified'
+            && $detail->aadhaar_verification_status === 'verified'
+            && $detail->bank_verification_status === 'verified';
+    }
+
+    public static function canPerformTransactions(User $user, ?KycDetail $detail = null): bool
+    {
+        if ($user->kyc_status === 'approved') {
+            return true;
+        }
+
+        $detail ??= $user->kycDetail;
+
+        if (config('kyc.provider') === 'surepass' && $detail) {
+            return self::isSurepassPanBankVerified($detail);
+        }
+
+        return false;
+    }
+
+    public static function transactionBlockedMessage(): string
+    {
+        return 'Complete KYC verification (PAN, Aadhaar, and bank account) before proceeding.';
+    }
+
+    public static function assertCanPerformTransactions(User $user): void
+    {
+        $user->loadMissing('kycDetail');
+
+        if (self::canPerformTransactions($user, $user->kycDetail)) {
+            return;
+        }
+
+        if ($user->kycDetail
+            && config('kyc.provider') === 'surepass'
+            && self::isSurepassPanBankVerified($user->kycDetail)) {
+            app(KycService::class)->syncUserKycStatus($user, $user->kycDetail);
+            $user->refresh()->load('kycDetail');
+
+            if (self::canPerformTransactions($user, $user->kycDetail)) {
+                return;
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'kyc' => [self::transactionBlockedMessage()],
+        ]);
+    }
+
+    public static function requiresAdminKycApproval(KycDetail $detail, User $user): bool
+    {
+        if ($user->kyc_status === 'approved') {
+            return false;
+        }
+
+        return ! self::isSurepassPanBankVerified($detail);
+    }
+
     public static function stepStatusLabel(?string $status): string
     {
-        $normalized = match ($status) {
-            'otp_sent', 'submitted' => 'pending',
-            default => $status,
-        };
-
-        return config('kyc.step_statuses.'.$normalized, Str::headline(str_replace('_', ' ', (string) $status)));
+        // Keep submitted/otp_sent as their own labels (not remapped to Pending).
+        return config(
+            'kyc.step_statuses.'.$status,
+            Str::headline(str_replace('_', ' ', (string) $status))
+        );
     }
 
     public static function userKycStatusLabel(?string $status): string
@@ -148,11 +217,18 @@ class KycPayload
 
     public static function maskAadhaar(?string $aadhaar): ?string
     {
-        if (blank($aadhaar) || strlen($aadhaar) < 12) {
+        if (blank($aadhaar)) {
+            return null;
+        }
+
+        $compact = strtoupper((string) preg_replace('/[\s\-]+/', '', $aadhaar));
+        $lastFour = substr($compact, -4);
+
+        if ($lastFour === '' || ! ctype_digit($lastFour)) {
             return $aadhaar;
         }
 
-        return 'XXXX XXXX '.substr($aadhaar, -4);
+        return 'XXXX XXXX '.$lastFour;
     }
 
     public static function maskAccount(?string $account): ?string

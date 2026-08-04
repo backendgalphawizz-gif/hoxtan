@@ -313,7 +313,7 @@ class MetalRateService
         }
 
         try {
-            MetalRatesUpdated::dispatch($this->getApiRates());
+            MetalRatesUpdated::dispatchSafe($this->getApiRates());
         } catch (\Throwable $exception) {
             Log::warning('Metal rate broadcast skipped.', [
                 'message' => $exception->getMessage(),

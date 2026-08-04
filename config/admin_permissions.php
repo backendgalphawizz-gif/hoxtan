@@ -78,6 +78,10 @@ return [
             'label' => 'Purchase Invoices',
             'group' => 'Investment Management',
         ],
+        'holding_certificates' => [
+            'label' => 'Holding Certificates',
+            'group' => 'Investment Management',
+        ],
         'redemption_requests' => [
             'label' => 'Redemption Requests',
             'group' => 'Redemption Management',
@@ -116,6 +120,10 @@ return [
         ],
         'jewellery_products' => [
             'label' => 'Jewellery Products',
+            'group' => 'Jewellery Management',
+        ],
+        'jewellery_karat_rates' => [
+            'label' => 'Gold Karat Rates',
             'group' => 'Jewellery Management',
         ],
         'jewellery_emi_plans' => [
@@ -192,6 +200,14 @@ return [
         'admin_roles' => [
             'label' => 'Roles & Permissions',
             'group' => 'System',
+        ],
+        'departments' => [
+            'label' => 'Departments',
+            'group' => 'System',
+        ],
+        'employees' => [
+            'label' => 'Staff',
+            'group' => 'User Management',
         ],
         'settings' => [
             'label' => 'Settings',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\UserAssetsUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\SigInstallment;
 use App\Models\SigPlan;
@@ -10,6 +11,7 @@ use App\Services\MetalRateService;
 use App\Services\SigPlanService;
 use App\Support\ApiResponse;
 use App\Support\SigPayload;
+use App\Support\WalletHoldingsSnapshot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,8 +28,8 @@ class SigController extends Controller
             'preset_amounts' => config('sig.preset_amounts', []),
             'min_amount' => config('sig.min_amount', 100),
             'gst_percent' => $settings->gstRatePercent(),
-            'gst_included' => true,
-            'gst_note' => 'GST included '.$settings->gstRatePercent().'%',
+            'gst_included' => false,
+            'gst_note' => 'GST '.$settings->gstRatePercent().'% added on metal value',
             'rates' => $metalRates,
             'gold_rate' => $metalRates['gold'] ?? null,
             'silver_rate' => $metalRates['silver'] ?? null,
@@ -37,12 +39,13 @@ class SigController extends Controller
 
     public function show(Request $request): JsonResponse
     {
-        $plan = $this->activePlanQuery($request)->with('installments')->first();
+        $activePlan = $this->activePlanQuery($request)->with('installments')->first();
+        $plan = $activePlan ?? $this->latestPlanQuery($request)->with('installments')->first();
 
         return ApiResponse::success([
             'sig' => $plan ? SigPayload::plan($plan) : null,
-            'has_active_plan' => $plan !== null,
-            'can_activate' => $plan === null,
+            'has_active_plan' => $activePlan !== null,
+            'can_activate' => $activePlan === null,
         ]);
     }
 
@@ -73,7 +76,8 @@ class SigController extends Controller
         ]);
 
         $limit = (int) ($data['limit'] ?? 20);
-        $plan = $this->activePlanQuery($request)->first();
+        $activePlan = $this->activePlanQuery($request)->first();
+        $plan = $activePlan ?? $this->latestPlanQuery($request)->first();
 
         $query = SigInstallment::query()
             ->where('user_id', $request->user()->id)
@@ -88,9 +92,8 @@ class SigController extends Controller
 
         $transactions = $query->limit($limit)->get();
 
-        return ApiResponse::success([
-            'transactions' => SigPayload::installmentCollection($transactions),
-        ]);
+        // List goes directly under data (not data.transactions).
+        return ApiResponse::successList(SigPayload::installmentCollection($transactions));
     }
 
     public function activate(Request $request, SigPlanService $service): JsonResponse
@@ -99,6 +102,7 @@ class SigController extends Controller
             'metal_type' => ['required', Rule::in(['gold', 'silver'])],
             'frequency' => ['required', Rule::in(['daily', 'weekly', 'monthly'])],
             'amount' => ['required', 'numeric', 'min:'.config('sig.min_amount', 100)],
+            'weight_grams' => ['nullable', 'numeric', 'min:0.000001', 'max:10000'],
             'linked_bank_name' => ['nullable', 'string', 'max:100'],
             'linked_bank_last4' => ['nullable', 'string', 'size:4'],
         ]);
@@ -121,12 +125,32 @@ class SigController extends Controller
             'metal_type' => $data['metal_type'],
             'frequency' => $data['frequency'],
             'amount' => $data['amount'],
+            'weight_grams' => $data['weight_grams'] ?? null,
             'linked_bank_name' => $data['linked_bank_name'] ?? null,
             'linked_bank_last4' => $data['linked_bank_last4'] ?? null,
         ]);
 
         $plan->load('installments');
-        $estimate = $service->estimate((float) $data['amount'], $data['metal_type']);
+        $estimate = $service->estimate(
+            (float) $data['amount'],
+            $data['metal_type'],
+            isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
+        );
+
+        // Refresh gold/silver/SIG wallet for rates/push + withdraw/assets + private WS.
+        $wallet = WalletHoldingsSnapshot::make($request->user()->fresh());
+        UserAssetsUpdated::dispatchSafe(
+            (int) $request->user()->id,
+            array_merge($wallet['assets'], [
+                'withdraw_assets' => $wallet['withdraw_assets'],
+                'gold_holdings' => $wallet['gold_holdings'],
+                'silver_holdings' => $wallet['silver_holdings'],
+                'sig_holdings' => $wallet['sig_holdings'],
+                'sig_metal_type' => $wallet['sig_metal_type'],
+                'sig_value' => $wallet['sig_value'],
+            ]),
+            'sig_activate',
+        );
 
         return ApiResponse::success([
             'sig' => SigPayload::plan($plan),
@@ -137,6 +161,18 @@ class SigController extends Controller
                 'amount_display' => SigPayload::amountWithFrequency($plan),
                 'message' => 'Your '.strtolower($plan->frequency).' SIG plan is now active.',
             ],
+            'sig_holdings' => $wallet['sig_holdings'],
+            'sig_value' => $wallet['sig_value'],
+            'sig_value_display' => $wallet['sig_value_display'],
+            'sig_metal_type' => $wallet['sig_metal_type'],
+            'gold_holdings' => $wallet['gold_holdings'],
+            'silver_holdings' => $wallet['silver_holdings'],
+            'total_assets_balance' => $wallet['total_assets_balance'],
+            'total_assets_balance_display' => $wallet['total_assets_balance_display'],
+            'assets' => $wallet['assets'],
+            'withdraw_assets' => $wallet['withdraw_assets'],
+            'user_channel' => 'private-user.'.$request->user()->id,
+            'user_event' => 'assets.updated',
         ], 'SIG activated successfully.', 201);
     }
 
@@ -176,11 +212,25 @@ class SigController extends Controller
         $plan = $this->requireManageablePlan($request);
 
         $plan = $service->stop($plan);
+        $canWithdraw = round((float) $plan->metal_accumulated_grams, 6) > 0;
 
         return ApiResponse::success([
-            'sig' => SigPayload::plan($plan, includeManageActions: false),
+            'sig' => SigPayload::plan($plan, includeManageActions: true),
             'modal' => collect(config('sig.manage_actions', []))
                 ->firstWhere('key', 'stop')['modal'] ?? null,
+            'withdrawal' => [
+                'available' => $canWithdraw,
+                'asset_source' => 'sig',
+                'endpoint' => '/api/v1/withdraw',
+                'method' => 'POST',
+                'payload_example' => [
+                    'amount' => 1400,
+                ],
+                'auto_approve_hours' => (int) config('withdraw.auto_approve_hours', 2),
+                'message' => $canWithdraw
+                    ? 'SIG stopped. Send only amount to withdraw from SIG. Request goes to admin and auto-approves after 2 hours to your bank.'
+                    : 'SIG stopped. There is no remaining SIG balance to withdraw.',
+            ],
         ], 'SIG stopped.');
     }
 
@@ -189,6 +239,13 @@ class SigController extends Controller
         return SigPlan::query()
             ->where('user_id', $request->user()->id)
             ->whereIn('status', ['active', 'paused'])
+            ->latest('id');
+    }
+
+    private function latestPlanQuery(Request $request)
+    {
+        return SigPlan::query()
+            ->where('user_id', $request->user()->id)
             ->latest('id');
     }
 

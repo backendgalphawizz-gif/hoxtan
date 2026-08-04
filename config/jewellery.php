@@ -6,11 +6,44 @@ return [
         ['value' => 'women', 'label' => "Women's", 'icon' => 'female'],
     ],
 
+    /*
+    | Gold / silver purity options for admin product forms and app filters.
+    | Prefer metal-specific lists (`purities.gold` / `purities.silver`).
+    | Legacy flat list kept for callers that do not pass metal_type.
+    */
     'purities' => [
-        ['value' => '22K', 'label' => '22k'],
-        ['value' => '18K', 'label' => '18k'],
-        ['value' => '16K', 'label' => '16k'],
+        'gold' => [
+            ['value' => '24K', 'label' => '24K'],
+            ['value' => '22K', 'label' => '22K'],
+            ['value' => '20K', 'label' => '20K'],
+            ['value' => '18K', 'label' => '18K'],
+            ['value' => '16K', 'label' => '16K'],
+            ['value' => '14K', 'label' => '14K'],
+
+        ],
+        'silver' => [
+            ['value' => '999', 'label' => '999 Fine Silver'],
+            ['value' => '925', 'label' => '925 Sterling Silver'],
+        ],
+        // Fallback when metal_type is unknown (union of common gold options).
+        'default' => [
+            ['value' => '24K', 'label' => '24K'],
+            ['value' => '22K', 'label' => '22K'],
+            ['value' => '20K', 'label' => '20K'],
+            ['value' => '18K', 'label' => '18K'],
+            ['value' => '16K', 'label' => '16K'],
+            ['value' => '14K', 'label' => '14K'],
+           
+            ['value' => '999', 'label' => '999 Fine Silver'],
+            ['value' => '925', 'label' => '925 Sterling Silver'],
+        ],
     ],
+
+    /*
+    | Gold purities priced from admin-defined ₹/g rates (not metal API).
+    | 24K / 22K continue to use live metal rates.
+    */
+    'karat_rate_purities' => ['20K', '18K', '16K', '14K'],
 
     'weight' => [
         'min' => 1.0,

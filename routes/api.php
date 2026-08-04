@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Driver\DriverNotificationController;
 use App\Http\Controllers\Api\Driver\DriverAppConfigController;
 use App\Http\Controllers\Api\Driver\DriverAuthController;
 use App\Http\Controllers\Api\Driver\DriverDeliveriesController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DigilockerController;
 use App\Http\Controllers\Api\ForgotMpinController;
 use App\Http\Controllers\Api\GoalController;
 use App\Http\Controllers\Api\HoldingsController;
@@ -35,21 +37,28 @@ Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/app/config', [AppConfigController::class, 'index']);
+    Route::get('/config', [AppConfigController::class, 'index']);
     Route::get('/app/faqs', [AppConfigController::class, 'faqs']);
     Route::get('/app/pages/{slug}', [AppConfigController::class, 'page']);
 
     Route::get('/rates', [MetalRateController::class, 'index']);
     Route::get('/rates/realtime-config', [MetalRateController::class, 'realtimeConfig']);
-    Route::post('/rates/push', [MetalRateController::class, 'push']);
-    Route::get('/rates/push', [MetalRateController::class, 'push']);
+    // rates/push requires auth — moved into auth:sanctum group (returns wallet after purchase)
 
     Route::get('/jewellery/categories', [JewelleryController::class, 'categories']);
     Route::get('/jewellery/sub-categories', [JewelleryController::class, 'subCategories']);
     Route::get('/jewellery/sub-sub-categories', [JewelleryController::class, 'subSubCategories']);
+    Route::get('/jewellery/sub-sub-categories/{subSubCategory}', [JewelleryController::class, 'showSubSubCategory']);
     Route::get('/jewellery/filters', [JewelleryController::class, 'filters']);
     Route::get('/jewellery/emi-plans', [JewelleryController::class, 'emiPlans']);
     Route::get('/jewellery/products', [JewelleryController::class, 'products']);
     Route::get('/jewellery/products/{product}', [JewelleryController::class, 'show']);
+
+    // Public certificate / invoice download (no auth token required).
+    Route::get('/certificates/{certificate}/download', [ProfileController::class, 'downloadCertificate'])
+        ->name('api.certificates.download');
+    Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
+        ->name('api.invoices.download');
     Route::get('/products/{product}', [JewelleryController::class, 'show']);
 
     Route::get('/register/config', [RegistrationController::class, 'config']);
@@ -85,6 +94,8 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware(['auth:sanctum', 'driver.api'])->group(function (): void {
             Route::post('/logout', [DriverAuthController::class, 'logout']);
+            Route::post('/device-token', [DriverAuthController::class, 'registerDevice']);
+            Route::delete('/device-token', [DriverAuthController::class, 'removeDevice']);
             Route::get('/profile', [DriverProfileController::class, 'show']);
             Route::put('/profile', [DriverProfileController::class, 'update']);
             Route::post('/profile', [DriverProfileController::class, 'update']);
@@ -110,10 +121,20 @@ Route::prefix('v1')->group(function (): void {
                 ->where('booking', '[A-Za-z0-9#_-]+');
             Route::post('/tasks/pickups/{booking}/unable-to-pickup', [DriverPickupController::class, 'markUnableToPickup'])
                 ->where('booking', '[A-Za-z0-9#_-]+');
+
+            Route::get('/notifications', [DriverNotificationController::class, 'index']);
+            Route::get('/notifications/unread-count', [DriverNotificationController::class, 'unreadCount']);
+            Route::post('/notifications/read-all', [DriverNotificationController::class, 'markAllRead']);
+            Route::post('/notifications/{notification}/read', [DriverNotificationController::class, 'markRead'])
+                ->whereNumber('notification');
         });
     });
 
     Route::middleware('auth:sanctum')->group(function (): void {
+        // Wallet + live rates after purchase (Bearer token REQUIRED).
+        Route::post('/rates/push', [MetalRateController::class, 'push']);
+        Route::get('/rates/push', [MetalRateController::class, 'push']);
+
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::get('/profile/assets', [ProfileController::class, 'assets']);
@@ -127,14 +148,15 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/profile/close', [ProfileController::class, 'closeAccount']);
         Route::get('/referral-stats', [ProfileController::class, 'referralStats']);
         Route::get('/invoices', [ProfileController::class, 'invoices']);
-        Route::get('/invoices/{invoice}/download', [ProfileController::class, 'downloadInvoice'])
-            ->name('api.invoices.download');
 
         Route::get('/orders/config', [OrderController::class, 'config']);
         Route::get('/orders', [OrderController::class, 'index']);
         Route::get('/orders/{order}', [OrderController::class, 'show']);
         Route::get('/orders/{order}/emi-cancel-preview', [OrderController::class, 'cancelEmiPreview']);
         Route::post('/orders/{order}/emi-cancel', [OrderController::class, 'cancelEmi']);
+        Route::get('/orders/{order}/emi/pay-all-preview', [OrderController::class, 'payAllEmiPreview']);
+        Route::post('/orders/{order}/emi/pay-all', [OrderController::class, 'payAllEmi']);
+        Route::post('/orders/{order}/emi/deliver', [OrderController::class, 'requestEmiDelivery']);
 
         Route::get('/transactions/config', [TransactionController::class, 'config']);
         Route::get('/transactions', [TransactionController::class, 'index']);
@@ -145,10 +167,16 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/kyc', [KycController::class, 'show']);
         Route::post('/kyc/pan/request-otp', [KycController::class, 'requestPanOtp']);
         Route::post('/kyc/pan/verify-otp', [KycController::class, 'verifyPanOtp']);
+        Route::post('/kyc/pan/verify', [KycController::class, 'verifyPan']);
         Route::post('/kyc/aadhaar/request-otp', [KycController::class, 'requestAadhaarOtp']);
         Route::post('/kyc/aadhaar/verify-otp', [KycController::class, 'verifyAadhaarOtp']);
         Route::post('/kyc/face', [KycController::class, 'submitFace']);
         Route::post('/kyc/bank', [KycController::class, 'submitBank']);
+        Route::post('/kyc/bank/verify', [KycController::class, 'submitBank']);
+
+        Route::post('/digilocker/initialize', [DigilockerController::class, 'initialize']);
+        Route::match(['get', 'post'], '/digilocker/status/{clientId}', [DigilockerController::class, 'status'])
+            ->where('clientId', '[A-Za-z0-9_\-]+');
 
         Route::get('/addresses', [AddressController::class, 'index']);
         Route::post('/addresses', [AddressController::class, 'store']);
@@ -187,7 +215,12 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/buy-metal/purchase', [MetalPurchaseController::class, 'purchase']);
 
         Route::get('/holdings/config', [HoldingsController::class, 'config']);
+        Route::get('/holdings', [HoldingsController::class, 'index']);
         Route::get('/holdings/performance', [HoldingsController::class, 'performance']);
+        Route::get('/holdings/transactions', [HoldingsController::class, 'transactions']);
+        Route::post('/holdings/purchase', [HoldingsController::class, 'purchase']);
+        Route::post('/holdings/sell', [HoldingsController::class, 'sell']);
+        Route::post('/holdings/claim-bonus', [HoldingsController::class, 'claimBonus']);
 
         Route::get('/withdraw/assets', [MetalWithdrawalController::class, 'assets']);
         Route::get('/withdraw/{asset}/screen', [MetalWithdrawalController::class, 'screen']);

@@ -54,14 +54,20 @@ class MetalWithdrawalController extends Controller
 
         $result = $service->create($user, $data);
 
+        $isSig = ($data['asset_source'] ?? '') === 'sig';
+        $hours = (int) config('withdraw.auto_approve_hours', 2);
+        $message = $isSig
+            ? 'Withdrawal request sent to Admin successfully. If not actioned within '.$hours.' hours it will auto-approve and credit your registered bank account.'
+            : 'Your withdrawal request has been submitted. Funds will be transferred to your registered bank account after approval.';
+
         return ApiResponse::success([
             'withdrawal' => $service->withdrawalPayload($result['withdrawal']),
             'estimate' => $result['estimate'],
             'success' => [
-                'title' => 'Withdrawal Requested',
-                'message' => 'Your withdrawal request has been submitted. Funds will be transferred to your registered bank account after approval.',
+                'title' => $isSig ? 'SIG Withdrawal Requested' : 'Withdrawal Requested',
+                'message' => $message,
             ],
-        ], 'Withdrawal requested successfully.', 201);
+        ], $isSig ? 'Withdrawal request sent to Admin successfully' : 'Withdrawal requested successfully.', 201);
     }
 
     public function index(Request $request, MetalWithdrawalService $service): JsonResponse
@@ -113,6 +119,28 @@ class MetalWithdrawalController extends Controller
      */
     protected function validatedCreateRequest(Request $request): array
     {
+        // SIG shortcut — body can be only { "amount": 1400 }
+        if (
+            $request->filled('amount')
+            && ! $request->filled('input_mode')
+            && ! $request->filled('weight_grams')
+            && (
+                ! $request->filled('asset_source')
+                || $request->input('asset_source') === 'sig'
+            )
+        ) {
+            $data = $request->validate([
+                'amount' => ['required', 'numeric', 'min:'.config('withdraw.min_amount', 1000)],
+                'asset_source' => ['nullable', Rule::in(['sig'])],
+            ]);
+
+            return [
+                'asset_source' => 'sig',
+                'input_mode' => 'currency',
+                'amount' => (float) $data['amount'],
+            ];
+        }
+
         return $this->validatedEstimateRequest($request);
     }
 }

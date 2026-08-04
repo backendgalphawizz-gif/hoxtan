@@ -62,6 +62,47 @@ class DriverApiTest extends TestCase
             ->assertJsonPath('data.driver.profile_image_url', null);
     }
 
+    public function test_driver_can_register_device_token(): void
+    {
+        config(['otp.expose_in_response' => true]);
+
+        $driver = Driver::query()->create([
+            'name' => 'Fcm Driver',
+            'phone' => '9876543255',
+            'vehicle_type' => 'bike',
+            'is_active' => true,
+        ]);
+
+        $send = $this->postJson('/api/v1/driver/login/send-otp', [
+            'phone' => '9876543255',
+        ])->assertOk();
+
+        $token = $this->postJson('/api/v1/driver/login/verify-otp', [
+            'phone' => '9876543255',
+            'otp' => $send->json('data.otp'),
+            'fcm_token' => 'driver-login-fcm-token',
+            'platform' => 'android',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.fcm_token_registered', true)
+            ->json('data.token');
+
+        $this->withToken($token)
+            ->postJson('/api/v1/driver/device-token', [
+                'fcm_token' => 'driver-refresh-fcm-token',
+                'platform' => 'android',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.fcm_token_registered', true);
+
+        $this->assertDatabaseHas('device_tokens', [
+            'tokenable_type' => Driver::class,
+            'tokenable_id' => $driver->id,
+            'fcm_token' => 'driver-refresh-fcm-token',
+            'platform' => 'android',
+        ]);
+    }
+
     public function test_driver_profile_returns_profile_image_url(): void
     {
         config(['otp.expose_in_response' => true]);

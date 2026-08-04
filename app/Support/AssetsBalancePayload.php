@@ -27,11 +27,18 @@ class AssetsBalancePayload
 
         $sigPlan = SigPlan::query()
             ->where('user_id', $user->id)
-            ->whereIn('status', ['active', 'paused'])
+            ->where(function ($query): void {
+                $query->whereIn('status', ['active', 'paused'])
+                    ->orWhere(function ($stopped): void {
+                        $stopped->where('status', 'stopped')
+                            ->where('metal_accumulated_grams', '>', 0);
+                    });
+            })
+            ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 ELSE 2 END")
             ->latest('id')
             ->first();
 
-        $sigGrams = round((float) ($sigPlan?->metal_accumulated_grams ?? 0), 4);
+        $sigGrams = round((float) ($sigPlan?->metal_accumulated_grams ?? 0), 6);
         $sigMetal = $sigPlan?->metal_type ?? 'gold';
         $sigRate = $sigMetal === 'silver' ? $silverRate : $goldRate;
 
@@ -70,7 +77,7 @@ class AssetsBalancePayload
                 'label' => 'SIG',
                 'metal_type' => $sigMetal,
                 'grams' => $sigGrams,
-                'grams_display' => number_format($sigGrams, 2).'g',
+                'grams_display' => rtrim(rtrim(number_format($sigGrams, 6, '.', ''), '0'), '.').'g',
                 'rate_per_gram' => $sigRate,
                 'value' => $sigValue,
                 'value_display' => '₹'.number_format($sigValue, 2),

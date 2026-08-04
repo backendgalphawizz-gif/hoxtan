@@ -27,6 +27,7 @@ class JewelleryProduct extends Model
         'gender',
         'purity',
         'size',
+        'has_size_variants',
         'stock_status',
         'sort_order',
         'is_active',
@@ -40,6 +41,7 @@ class JewelleryProduct extends Model
             'discount_value' => 'decimal:2',
             'weight_grams' => 'decimal:3',
             'is_active' => 'boolean',
+            'has_size_variants' => 'boolean',
             'image' => 'array',
         ];
     }
@@ -53,12 +55,22 @@ class JewelleryProduct extends Model
         });
 
         static::saving(function (JewelleryProduct $product): void {
+            if ($product->has_size_variants) {
+                // DB requires price; real amount comes from variants after save.
+                if ($product->price === null || $product->price === '') {
+                    $product->price = 0;
+                }
+
+                return;
+            }
+
             $pricing = JewelleryPricing::calculate(
                 $product->metal_type,
                 $product->weight_grams,
                 $product->making_charge_percent,
                 $product->discount_type,
                 $product->discount_value,
+                $product->purity,
             );
 
             $product->price = $pricing['total'];
@@ -93,6 +105,40 @@ class JewelleryProduct extends Model
     public function views(): HasMany
     {
         return $this->hasMany(JewelleryProductView::class);
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(JewelleryProductVariant::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /**
+     * Keep list/filter columns in sync with the cheapest/first active size variant.
+     */
+    public function syncVariantDerivedFields(): void
+    {
+        if (! $this->has_size_variants) {
+            return;
+        }
+
+        $variant = $this->variants()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->first();
+
+        if (! $variant) {
+            return;
+        }
+
+        // Avoid re-entering saved hook loops — update quietly.
+        static::withoutEvents(function () use ($variant): void {
+            $this->forceFill([
+                'size' => $variant->size,
+                'weight_grams' => $variant->weight_grams,
+                'price' => $variant->price,
+            ])->saveQuietly();
+        });
     }
 
     public function resolvedImagePath(): ?string

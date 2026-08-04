@@ -9,9 +9,12 @@ use App\Models\User;
 use App\Support\FilamentDateFilters;
 use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
+use App\Support\KycPayload;
 use App\Support\NavigationBadgeCounts;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -45,7 +48,147 @@ class UserResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with('referredBy');
+        return parent::getEloquentQuery()->with(['referredBy', 'kycDetail']);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('User Overview')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('name'),
+                        Infolists\Components\TextEntry::make('phone')->label('Mobile'),
+                        Infolists\Components\TextEntry::make('email')->placeholder('—'),
+                        Infolists\Components\TextEntry::make('date_of_birth')
+                            ->label('Date of Birth')
+                            ->date('d M Y')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kyc_status')
+                            ->label('KYC Status')
+                            ->badge()
+                            ->formatStateUsing(fn (string $state): string => str_replace('_', ' ', ucfirst($state)))
+                            ->color(fn (string $state): string => match ($state) {
+                                'approved' => 'success',
+                                'rejected' => 'danger',
+                                'under_review', 'submitted' => 'warning',
+                                default => 'gray',
+                            }),
+                        Infolists\Components\TextEntry::make('account_status')
+                            ->label('Account Status')
+                            ->badge()
+                            ->getStateUsing(fn (User $record): string => $record->is_blocked ? 'Blocked' : 'Active')
+                            ->color(fn (User $record): string => $record->is_blocked ? 'danger' : 'success'),
+                        Infolists\Components\TextEntry::make('created_at')
+                            ->label('Registered')
+                            ->dateTime('d M Y, h:i A'),
+                    ])->columns(3),
+
+                Infolists\Components\Section::make('KYC Details')
+                    ->description(fn (User $record): ?string => $record->kycDetail && KycPayload::isSurepassPanBankVerified($record->kycDetail)
+                        ? 'PAN, Aadhaar, and bank verified via Surepass — no manual admin approval required.'
+                        : null)
+                    ->schema([
+                        Infolists\Components\TextEntry::make('kycDetail.full_name')
+                            ->label('Full Name')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.pan_number')
+                            ->label('PAN Number')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.pan_verification_status')
+                            ->label('PAN Status')
+                            ->badge()
+                            ->formatStateUsing(fn (?string $state): string => filled($state)
+                                ? str($state)->replace('_', ' ')->title()
+                                : '—')
+                            ->color(fn (?string $state): string => match ($state) {
+                                'verified' => 'success',
+                                'rejected' => 'danger',
+                                default => 'warning',
+                            }),
+                        Infolists\Components\TextEntry::make('kycDetail.pan_verified_at')
+                            ->label('PAN Verified At')
+                            ->dateTime('d M Y, h:i A')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.date_of_birth')
+                            ->label('Date of Birth')
+                            ->date('d M Y')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.aadhaar_number')
+                            ->label('Aadhaar')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.aadhaar_verification_status')
+                            ->label('Aadhaar Status')
+                            ->badge()
+                            ->formatStateUsing(fn (?string $state): string => filled($state)
+                                ? str($state)->replace('_', ' ')->title()
+                                : '—')
+                            ->color(fn (?string $state): string => $state === 'verified' ? 'success' : 'warning'),
+                        Infolists\Components\TextEntry::make('kycDetail.account_holder_name')
+                            ->label('Account Holder')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.bank_name')
+                            ->label('Bank Name')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.account_number')
+                            ->label('Account Number')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.ifsc_code')
+                            ->label('IFSC')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.bank_verification_status')
+                            ->label('Bank Status')
+                            ->badge()
+                            ->formatStateUsing(fn (?string $state): string => filled($state)
+                                ? str($state)->replace('_', ' ')->title()
+                                : '—')
+                            ->color(fn (?string $state): string => in_array($state, ['verified', 'approved'], true) ? 'success' : 'warning'),
+                        Infolists\Components\TextEntry::make('kycDetail.bank_submitted_at')
+                            ->label('Bank Verified At')
+                            ->dateTime('d M Y, h:i A')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.face_verification_status')
+                            ->label('Face Status')
+                            ->badge()
+                            ->formatStateUsing(fn (?string $state): string => filled($state)
+                                ? str($state)->replace('_', ' ')->title()
+                                : '—')
+                            ->color(fn (?string $state): string => match ($state) {
+                                'approved' => 'success',
+                                'rejected' => 'danger',
+                                default => 'warning',
+                            }),
+                        Infolists\Components\TextEntry::make('kycDetail.submitted_at')
+                            ->label('KYC Submitted At')
+                            ->dateTime('d M Y, h:i A')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('kycDetail.reviewed_at')
+                            ->label('KYC Reviewed At')
+                            ->dateTime('d M Y, h:i A')
+                            ->placeholder('—'),
+                        Infolists\Components\TextEntry::make('surepass_auto_approved')
+                            ->label('Surepass Auto Approval')
+                            ->badge()
+                            ->getStateUsing(fn (User $record): string => $record->kycDetail && KycPayload::isSurepassPanBankVerified($record->kycDetail)
+                                ? 'Auto Approved'
+                                : 'Manual Review Required')
+                            ->color(fn (User $record): string => $record->kycDetail && KycPayload::isSurepassPanBankVerified($record->kycDetail)
+                                ? 'success'
+                                : 'warning'),
+                    ])
+                    ->columns(3)
+                    ->visible(fn (User $record): bool => $record->kycDetail !== null),
+
+                Infolists\Components\Section::make('Holdings & Wallet')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('gold_holdings')
+                            ->suffix(' g'),
+                        Infolists\Components\TextEntry::make('silver_holdings')
+                            ->suffix(' g'),
+                        Infolists\Components\TextEntry::make('wallet_balance')
+                            ->money('INR'),
+                    ])->columns(3),
+            ]);
     }
 
     public static function form(Form $form): Form
@@ -59,6 +202,13 @@ class UserResource extends Resource
                         FilamentFormFields::mobile()
                             ->required()
                             ->unique(ignoreRecord: true),
+                        Forms\Components\DatePicker::make('date_of_birth')
+                            ->label('Date of Birth')
+                            ->native(false)
+                            ->displayFormat('d/m/Y')
+                            ->maxDate(now()->subYears(18))
+                            ->minDate(now()->subYears(100))
+                            ->helperText('User must be at least 18 years old.'),
                         FilamentFormFields::mpin()
                             ->required(fn (string $operation) => $operation === 'create')
                             ->visible(fn (string $operation) => $operation === 'create'),
@@ -87,9 +237,7 @@ class UserResource extends Resource
                     ->description('Nominee information for the user profile.')
                     ->schema([
                         FilamentFormFields::fullName('nominee_name', 'Nominee Name', false),
-                        Forms\Components\TextInput::make('nominee_relation')
-                            ->label('Relation')
-                            ->maxLength(50),
+                        FilamentFormFields::relation('nominee_relation', 'Relation', false),
                         FilamentFormFields::mobile('nominee_phone', 'Nominee Mobile', false),
                         Forms\Components\DatePicker::make('nominee_date_of_birth')
                             ->label('Nominee Date of Birth')
@@ -99,13 +247,9 @@ class UserResource extends Resource
 
                 Forms\Components\Section::make('Account Status')
                     ->schema([
-                        Forms\Components\Select::make('role')
-                            ->options([
-                                'user' => 'User',
-                                'investor' => 'Investor',
-                            ])
-                            ->required()
-                            ->default('user'),
+                        Forms\Components\Hidden::make('role')
+                            ->default('user')
+                            ->dehydrated(),
                         Forms\Components\Select::make('kyc_status')
                             ->options([
                                 'pending' => 'Pending',
@@ -114,23 +258,8 @@ class UserResource extends Resource
                                 'approved' => 'Approved',
                                 'rejected' => 'Rejected',
                             ])
-                            ->required(),
-                        Forms\Components\Toggle::make('is_verified')
-                            ->label('Account Verified'),
-                        Forms\Components\Toggle::make('is_blocked')
-                            ->label('Account Blocked')
-                            ->live(),
-                        Forms\Components\Toggle::make('is_employee')
-                            ->label('Employee Account'),
-                        Forms\Components\TextInput::make('employee_code')
-                            ->label('Employee Code')
-                            ->maxLength(32)
-                            ->visible(fn (Forms\Get $get) => $get('is_employee')),
-                        Forms\Components\Textarea::make('block_reason')
-                            ->label('Block Reason')
-                            ->visible(fn (Forms\Get $get) => $get('is_blocked'))
-                            ->required(fn (Forms\Get $get) => $get('is_blocked'))
-                            ->maxLength(500),
+                            ->required()
+                            ->default('pending'),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Holdings & Wallet')
@@ -291,6 +420,22 @@ class UserResource extends Resource
                             'block_reason' => $data['block_reason'],
                         ]);
                         Notification::make()->title('Account blocked')->danger()->send();
+                    }),
+                FilamentTableActions::make('unblock')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->tooltip('Unblock')
+                    ->visible(fn (User $record) => $record->is_blocked)
+                    ->requiresConfirmation()
+                    ->modalHeading('Unblock account')
+                    ->modalDescription('This user will be able to log in and use the app again.')
+                    ->action(function (User $record) {
+                        $record->update([
+                            'is_blocked' => false,
+                            'blocked_at' => null,
+                            'block_reason' => null,
+                        ]);
+                        Notification::make()->title('Account unblocked')->success()->send();
                     }),
             ])
             ->bulkActions([

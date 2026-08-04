@@ -40,13 +40,10 @@ class DriverResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Driver Details')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->required()
-                            ->maxLength(100),
-                        FilamentFormFields::mobile('phone', 'Phone', true),
-                        Forms\Components\TextInput::make('email')
-                            ->email()
-                            ->maxLength(255),
+                        FilamentFormFields::name('name', 'Name', true),
+                        FilamentFormFields::mobile('phone', 'Phone', true)
+                            ->unique(ignoreRecord: true),
+                        FilamentFormFields::email('email', 'Email Address', false),
                         Forms\Components\FileUpload::make('profile_image')
                             ->label('Profile Image')
                             ->image()
@@ -91,10 +88,7 @@ class DriverResource extends Resource
                             ->directory('driver-documents/registration')
                             ->maxSize(4096)
                             ->required(),
-                        Forms\Components\TextInput::make('licence_no')
-                            ->label('Licence No')
-                            ->required()
-                            ->maxLength(30),
+                        FilamentFormFields::licenceNumber('licence_no', 'Licence No', true),
                         Forms\Components\FileUpload::make('licence_image')
                             ->label('Licence Image')
                             ->image()

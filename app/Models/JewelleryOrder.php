@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Services\DriverAssignmentNotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\ValidationException;
 
 class JewelleryOrder extends Model
@@ -36,6 +38,7 @@ class JewelleryOrder extends Model
         'shipping_address_type',
         'expected_delivery_date',
         'delivery_otp',
+        'delivery_requested_at',
         'tracking_number',
         'courier_name',
         'dispatched_at',
@@ -62,6 +65,7 @@ class JewelleryOrder extends Model
             'picked_up_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'delivery_requested_at' => 'datetime',
         ];
     }
 
@@ -89,6 +93,15 @@ class JewelleryOrder extends Model
             }
 
             $order->driver_assigned_at = null;
+        });
+
+        static::saved(function (JewelleryOrder $order): void {
+            if (! $order->wasChanged('driver_id') || blank($order->driver_id)) {
+                return;
+            }
+
+            app(DriverAssignmentNotificationService::class)
+                ->notifyJewelleryDeliveryAssigned($order);
         });
     }
 
@@ -137,6 +150,11 @@ class JewelleryOrder extends Model
         return $this->hasMany(JewelleryOrderItem::class);
     }
 
+    public function invoice(): HasOne
+    {
+        return $this->hasOne(Invoice::class);
+    }
+
     public function isEmi(): bool
     {
         return $this->payment_mode === 'emi';
@@ -168,7 +186,8 @@ class JewelleryOrder extends Model
     }
 
     /**
-     * EMI jewellery is held until every monthly installment is paid.
+     * EMI jewellery can be delivered only after every installment is paid
+     * and the customer has requested delivery.
      */
     public function isDeliveryEligible(): bool
     {
@@ -177,6 +196,32 @@ class JewelleryOrder extends Model
         }
 
         return $this->emiInstallmentsFullyPaid();
+    }
+
+    public function hasRequestedDelivery(): bool
+    {
+        return filled($this->delivery_requested_at);
+    }
+
+    public function canRequestDelivery(): bool
+    {
+        if (! $this->isEmi()) {
+            return false;
+        }
+
+        if (! $this->emiInstallmentsFullyPaid()) {
+            return false;
+        }
+
+        if ($this->hasRequestedDelivery()) {
+            return false;
+        }
+
+        if (in_array($this->status, ['cancelled', 'failed', 'completed', 'cart'], true)) {
+            return false;
+        }
+
+        return blank($this->delivered_at);
     }
 
     public function emiProgressLabel(): string

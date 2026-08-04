@@ -99,7 +99,7 @@ return new class extends Migration
             $table->decimal('amount', 14, 2);
             $table->decimal('balance_after', 14, 2);
             $table->string('description');
-            $table->enum('source', ['admin', 'investment', 'redemption', 'refund', 'other'])->default('other');
+            $table->enum('source', ['admin', 'investment', 'redemption', 'refund', 'welcome_bonus', 'referral_bonus', 'other'])->default('other');
             $table->foreignId('created_by')->nullable()->constrained('admins')->nullOnDelete();
             $table->timestamps();
         });
@@ -165,7 +165,7 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->text('body');
-            $table->enum('target', ['all', 'investors', 'specific'])->default('all');
+            $table->enum('target', ['all', 'investors', 'specific', 'all_drivers', 'specific_drivers'])->default('all');
             $table->json('target_user_ids')->nullable();
             $table->enum('status', ['draft', 'scheduled', 'sent', 'failed'])->default('draft');
             $table->timestamp('scheduled_at')->nullable();

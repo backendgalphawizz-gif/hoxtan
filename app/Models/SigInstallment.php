@@ -25,7 +25,7 @@ class SigInstallment extends Model
     {
         return [
             'amount' => 'decimal:2',
-            'quantity_grams' => 'decimal:4',
+            'quantity_grams' => 'decimal:6',
             'rate_per_gram' => 'decimal:2',
             'scheduled_at' => 'datetime',
             'processed_at' => 'datetime',

@@ -6,6 +6,7 @@ use App\Events\UserAssetsUpdated;
 use App\Models\Investment;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\KycPayload;
 use App\Support\WalletHoldingsSnapshot;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +17,7 @@ class MetalPurchaseService
         protected MetalRateService $metalRates,
         protected GstService $gst,
         protected UserHoldingsService $holdings,
+        protected ReferralService $referrals,
     ) {}
 
     /**
@@ -32,28 +34,127 @@ class MetalPurchaseService
 
     /**
      * Simple buy insert (no Razorpay) — creates completed investment and credits holdings.
+     * When request includes weight_grams, that exact value is stored (not recalculated from amount).
+     * When client_calculated=true (holdings mobile), both grams and amount are trusted as-is.
      *
      * @param  array{
      *     metal_type: string,
-     *     input_mode: string,
+     *     input_mode?: string,
      *     amount?: float,
      *     weight_grams?: float,
      *     payment_method?: string,
-     *     transaction_id?: string|null
+     *     transaction_id?: string|null,
+     *     client_calculated?: bool
      * }  $data
      * @return array<string, mixed>
      */
     public function purchase(User $user, array $data): array
     {
-        $estimate = $this->estimate(
-            $user,
-            $data['metal_type'],
-            $data['input_mode'],
-            isset($data['amount']) ? (float) $data['amount'] : null,
-            isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
-        );
+        KycPayload::assertCanPerformTransactions($user);
 
-        $grams = round((float) ($estimate['weight_grams'] ?? 0), 4);
+        $data['metal_type'] = strtolower((string) ($data['metal_type'] ?? 'gold'));
+        if (! in_array($data['metal_type'], ['gold', 'silver'], true)) {
+            $data['metal_type'] = 'gold';
+        }
+
+        $clientCalculated = (bool) ($data['client_calculated'] ?? false);
+        $requestGrams = isset($data['weight_grams']) && (float) $data['weight_grams'] > 0
+            ? round((float) $data['weight_grams'], 4)
+            : null;
+        $requestAmount = isset($data['amount']) && (float) $data['amount'] > 0
+            ? round((float) $data['amount'], 2)
+            : null;
+
+        // Mobile already converted gram ↔ rupee — store both values exactly.
+        if ($clientCalculated && $requestGrams !== null && $requestAmount !== null) {
+            $rate = round($requestAmount / $requestGrams, 2);
+            $liveRate = (float) $this->metalRates->getCurrentRatePerGram($data['metal_type']);
+            if ($rate <= 0 && $liveRate > 0) {
+                $rate = round($liveRate, 2);
+            }
+
+            $estimate = $this->withUserContext($user, $this->buildEstimate(
+                metalType: $data['metal_type'],
+                inputMode: 'weight',
+                rate: $rate > 0 ? $rate : $liveRate,
+                weightGrams: $requestGrams,
+                taxableAmount: $requestAmount,
+                gstAmount: 0,
+                totalAmount: $requestAmount,
+                gstIncluded: true,
+                gstPercent: $this->gst->ratePercent(),
+            ));
+            $estimate['input_mode'] = 'weight';
+            $estimate['weight_grams'] = $requestGrams;
+            $estimate['weight_grams_display'] = rtrim(rtrim(number_format($requestGrams, 4, '.', ''), '0'), '.');
+            $estimate['amount'] = $requestAmount;
+            $estimate['taxable_amount'] = $requestAmount;
+            $estimate['gst_amount'] = 0.0;
+            $estimate['total_amount'] = $requestAmount;
+            $estimate['amount_with_gst'] = $requestAmount;
+            $estimate['amount_display'] = '₹'.number_format($requestAmount, 2);
+            $estimate['total_amount_display'] = '₹'.number_format($requestAmount, 2);
+            $estimate['amount_with_gst_display'] = '₹'.number_format($requestAmount, 2);
+            $estimate['rate_per_gram'] = $rate > 0 ? $rate : $liveRate;
+            $estimate['client_calculated'] = true;
+            $estimate['estimated_asset_quantity'] = [
+                'value' => $requestGrams,
+                'unit' => 'grams',
+                'label' => 'GRAMS OF '.ucfirst($data['metal_type']),
+                'display' => $estimate['weight_grams_display'],
+            ];
+            $grams = $requestGrams;
+        } elseif ($requestGrams !== null) {
+            $estimate = $this->estimateFromWeight($data['metal_type'], $requestGrams);
+            $estimate = $this->withUserContext($user, $estimate);
+            $estimate['input_mode'] = $data['input_mode'] ?? 'weight';
+
+            if ($requestAmount !== null) {
+                $amount = $requestAmount;
+                $gstIncluded = (bool) config('buy_metal.gst_included_for_currency_mode', false);
+
+                if ($gstIncluded) {
+                    $totalAmount = $amount;
+                    $taxableAmount = round($totalAmount / (1 + $this->gst->rate()), 2);
+                    $gstAmount = round($totalAmount - $taxableAmount, 2);
+                } else {
+                    $taxableAmount = $amount;
+                    $gstBreakup = $this->gst->calculateGstAmount($taxableAmount);
+                    $gstAmount = $gstBreakup['gst_amount'];
+                    $totalAmount = $gstBreakup['total'];
+                }
+
+                $estimate['amount'] = $taxableAmount;
+                $estimate['amount_display'] = '₹'.number_format($taxableAmount, 2);
+                $estimate['taxable_amount'] = $taxableAmount;
+                $estimate['gst_amount'] = $gstAmount;
+                $estimate['amount_with_gst'] = $totalAmount;
+                $estimate['amount_with_gst_display'] = '₹'.number_format($totalAmount, 2);
+                $estimate['total_amount'] = $totalAmount;
+                $estimate['total_amount_display'] = '₹'.number_format($totalAmount, 2);
+            }
+
+            // Force exact client grams (never overwrite from rate math).
+            $estimate['weight_grams'] = $requestGrams;
+            $estimate['weight_grams_display'] = rtrim(rtrim(number_format($requestGrams, 4, '.', ''), '0'), '.');
+            $estimate['estimated_asset_quantity'] = [
+                'value' => $requestGrams,
+                'unit' => 'grams',
+                'label' => $estimate['weight_label'] ?? ('GRAMS OF '.ucfirst($data['metal_type'])),
+                'display' => $estimate['weight_grams_display'],
+            ];
+            $grams = $requestGrams;
+        } else {
+            $estimate = $this->estimate(
+                $user,
+                $data['metal_type'],
+                $data['input_mode'] ?? 'currency',
+                $requestAmount,
+                null,
+            );
+            $grams = round((float) ($estimate['weight_grams'] ?? 0), 4);
+        }
+
         $rate = round((float) ($estimate['rate_per_gram'] ?? 0), 2);
 
         if ($rate <= 0) {
@@ -64,26 +165,31 @@ class MetalPurchaseService
 
         if ($grams <= 0) {
             throw ValidationException::withMessages([
-                $data['input_mode'] === 'weight' ? 'weight_grams' : 'amount' => [
+                ($requestGrams !== null || ($data['input_mode'] ?? '') === 'weight') ? 'weight_grams' : 'amount' => [
                     'Purchase quantity must be greater than zero.',
                 ],
             ]);
         }
 
-        $result = DB::transaction(function () use ($user, $estimate, $data, $grams): array {
+        $result = DB::transaction(function () use ($user, $estimate, $data, $grams, $clientCalculated): array {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
 
             $investmentData = [
                 'user_id' => $lockedUser->id,
                 'metal_type' => $estimate['metal_type'],
                 'type' => 'buy',
-                'quantity_grams' => $grams,
+                'quantity_grams' => $grams, // exact request grams when provided
+                'remaining_grams' => $grams,
                 'rate_per_gram' => $estimate['rate_per_gram'],
                 'amount' => $estimate['taxable_amount'],
                 'gst_amount' => $estimate['gst_amount'],
                 'total_amount' => $estimate['total_amount'],
                 'status' => 'completed',
-                'notes' => 'Mobile buy metal (direct insert, '.$estimate['input_mode'].')',
+                'hold_started_at' => now(),
+                'purpose' => 'hold',
+                'notes' => $clientCalculated
+                    ? 'Holdings purchase (mobile-calculated)'
+                    : 'Mobile buy metal (direct insert, '.$estimate['input_mode'].')',
             ];
 
             if (! empty($data['transaction_id'])) {
@@ -129,15 +235,20 @@ class MetalPurchaseService
         });
 
         // After commit: push updated wallet on private WebSocket so app/home refreshes.
-        UserAssetsUpdated::dispatch(
+        UserAssetsUpdated::dispatchSafe(
             (int) $user->id,
             array_merge($result['assets'], [
                 'withdraw_assets' => $result['withdraw_assets'],
                 'gold_holdings' => $result['gold_holdings'],
                 'silver_holdings' => $result['silver_holdings'],
+                'sig_holdings' => data_get($result, 'assets.sig.grams'),
+                'sig_metal_type' => data_get($result, 'assets.sig.metal_type'),
+                'sig_value' => data_get($result, 'assets.sig.value'),
             ]),
             'metal_purchase',
         );
+
+        $this->referrals->evaluatePendingBonusAfterCommit($user);
 
         return $result;
     }
@@ -149,8 +260,22 @@ class MetalPurchaseService
     {
         $rate = $this->metalRates->getCurrentRatePerGram($metalType);
         $gstPercent = $this->gst->ratePercent();
-        $taxableAmount = round($amount / (1 + $this->gst->rate()), 2);
-        $gstAmount = round($amount - $taxableAmount, 2);
+        $gstIncluded = (bool) config('buy_metal.gst_included_for_currency_mode', false);
+
+        if ($gstIncluded) {
+            // Entered amount = pay total (GST inside) → wallet metal ≈ amount / 1.03
+            $totalAmount = round($amount, 2);
+            $taxableAmount = round($totalAmount / (1 + $this->gst->rate()), 2);
+            $gstAmount = round($totalAmount - $taxableAmount, 2);
+        } else {
+            // Entered amount = gold/silver wallet value → GST added on top for payment.
+            // Buy ₹508 gold → wallet shows ~₹508 (grams × rate); pay ₹508 + GST.
+            $taxableAmount = round($amount, 2);
+            $gstBreakup = $this->gst->calculateGstAmount($taxableAmount);
+            $gstAmount = $gstBreakup['gst_amount'];
+            $totalAmount = $gstBreakup['total'];
+        }
+
         $grams = $rate > 0 ? round($taxableAmount / $rate, 4) : 0.0;
 
         return $this->buildEstimate(
@@ -160,8 +285,8 @@ class MetalPurchaseService
             weightGrams: $grams,
             taxableAmount: $taxableAmount,
             gstAmount: $gstAmount,
-            totalAmount: round($amount, 2),
-            gstIncluded: true,
+            totalAmount: $totalAmount,
+            gstIncluded: $gstIncluded,
             gstPercent: $gstPercent,
         );
     }
@@ -232,10 +357,9 @@ class MetalPurchaseService
             'purity_display' => $metalConfig['purity_display'] ?? null,
             'rate_per_gram' => round($rate, 2),
             'rate_per_gram_display' => '₹'.number_format($rate, 2).' / gm',
-            'amount' => $inputMode === 'currency' ? $totalAmount : $taxableAmount,
-            'amount_display' => $inputMode === 'currency'
-                ? '₹'.number_format($totalAmount, 2)
-                : '₹'.number_format($taxableAmount, 2),
+            // For currency mode: amount = value credited to metal wallet; amount_with_gst = what customer pays.
+            'amount' => $taxableAmount,
+            'amount_display' => '₹'.number_format($taxableAmount, 2),
             'taxable_amount' => $taxableAmount,
             'gst_percent' => $gstPercent,
             'gst_amount' => $gstAmount,

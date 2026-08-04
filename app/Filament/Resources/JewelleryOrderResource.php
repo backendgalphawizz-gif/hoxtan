@@ -10,6 +10,7 @@ use App\Models\JewelleryOrder;
 use App\Models\JewelleryOrderListing;
 use App\Models\OldGoldBooking;
 use App\Support\FilamentDateFilters;
+use App\Support\FilamentFormFields;
 use App\Support\FilamentTableActions;
 use App\Support\NavigationBadgeCounts;
 use App\Support\SellJewelleryPayload;
@@ -48,7 +49,7 @@ class JewelleryOrderResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'payment', 'items.product', 'address', 'driver', 'emiPlan', 'emiInstallments']);
+            ->with(['user', 'payment', 'items.product', 'address', 'driver', 'emiPlan', 'emiInstallments', 'invoice']);
     }
 
     public static function form(Form $form): Form
@@ -203,9 +204,7 @@ class JewelleryOrderResource extends Resource
                             ->label('Tracking Number')
                             ->maxLength(100)
                             ->disabled(fn (string $operation): bool => $operation === 'view'),
-                        Forms\Components\TextInput::make('courier_name')
-                            ->label('Courier Name')
-                            ->maxLength(100)
+                        FilamentFormFields::name('courier_name', 'Courier Name', false, 100)
                             ->disabled(fn (string $operation): bool => $operation === 'view'),
                         Forms\Components\DateTimePicker::make('dispatched_at')
                             ->label('Dispatched At')
@@ -229,7 +228,10 @@ class JewelleryOrderResource extends Resource
                             ->content(fn (?JewelleryOrder $record): string => $record?->payment
                                 ? '₹'.number_format((float) $record->payment->amount, 2)
                                 : '—'),
-                    ])->columns(3)
+                        Forms\Components\Placeholder::make('invoice_number')
+                            ->label('Invoice')
+                            ->content(fn (?JewelleryOrder $record): string => $record?->invoice?->invoice_number ?? '—'),
+                    ])->columns(2)
                     ->visible(fn (?JewelleryOrder $record): bool => $record?->payment !== null),
                 Forms\Components\Section::make('Order Items')
                     ->schema([
@@ -322,14 +324,15 @@ class JewelleryOrderResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('listing_type')
-                    ->label('Type')
+                    ->label('Order Type')
                     ->options([
                         'buy' => 'Buy',
                         'sell' => 'Sell',
                     ]),
                 Tables\Filters\SelectFilter::make('status')
+                    ->label('Status')
                     ->options([
-                        'pending' => 'Pending',
+                        'pending' => 'Pending / Pending for Acceptance',
                         'processing' => 'Processing',
                         'accepted' => 'Accepted',
                         'pickup_scheduling' => 'Pickup Scheduling',
@@ -338,19 +341,21 @@ class JewelleryOrderResource extends Resource
                         'failed' => 'Failed',
                         'cancelled' => 'Cancelled',
                     ]),
+                FilamentDateFilters::tableFilter('ordered_date', 'created_at', 'Order Date'),
                 Tables\Filters\SelectFilter::make('driver_id')
                     ->label('Driver')
                     ->relationship('driver', 'name')
                     ->searchable()
                     ->preload(),
-                FilamentDateFilters::tableFilter('ordered_date', 'created_at', 'Order Date'),
-            ])
+            ], layout: Tables\Enums\FiltersLayout::AboveContent)
+            ->filtersFormColumns(4)
             ->actions([
                 FilamentTableActions::view()
                     ->url(fn (JewelleryOrderListing $record): string => $record->isSell()
                         ? static::getUrl('view-sell', ['record' => $record->source_id])
                         : static::getUrl('view', ['record' => $record->source_id])),
                 FilamentTableActions::edit()
+                    ->visible(fn (JewelleryOrderListing $record): bool => static::canEdit($record))
                     ->url(fn (JewelleryOrderListing $record): string => $record->isSell()
                         ? static::getUrl('edit-sell', ['record' => $record->source_id])
                         : static::getUrl('edit', ['record' => $record->source_id])),
@@ -358,7 +363,7 @@ class JewelleryOrderResource extends Resource
                     ->icon('heroicon-o-user-plus')
                     ->color('info')
                     ->tooltip('Assign Driver')
-                    ->visible(fn (JewelleryOrderListing $record): bool => ! in_array($record->status, ['completed', 'cancelled', 'failed'], true))
+                    ->visible(fn (JewelleryOrderListing $record): bool => static::canEdit($record))
                     ->form(fn (JewelleryOrderListing $record): array => [
                         ($record->isSell()
                             ? static::sellDriverAssignmentSelect($record->driver_id)
@@ -393,6 +398,7 @@ class JewelleryOrderResource extends Resource
 
                         Notification::make()
                             ->title('Driver assigned')
+                            ->body('If the driver logged in with fcm_token, a push was sent.')
                             ->success()
                             ->send();
                     }),
@@ -423,6 +429,24 @@ class JewelleryOrderResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        if (! parent::canEdit($record)) {
+            return false;
+        }
+
+        return ! static::isOrderLocked($record);
+    }
+
+    public static function isOrderLocked(mixed $record): bool
+    {
+        $status = is_object($record) && isset($record->status)
+            ? (string) $record->status
+            : null;
+
+        return in_array($status, ['completed', 'cancelled', 'failed'], true);
     }
 
     public static function getNavigationBadge(): ?string
@@ -563,9 +587,9 @@ class JewelleryOrderResource extends Resource
 
                                         if (! $doc['uploaded'] || blank($doc['url'])) {
                                             return <<<HTML
-                                                <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-                                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{$label}</p>
-                                                    <p class="text-sm text-gray-500">Not uploaded</p>
+                                                <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fff;">
+                                                    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151;">{$label}</p>
+                                                    <p style="margin:0;font-size:13px;color:#6b7280;">Not uploaded</p>
                                                 </div>
                                             HTML;
                                         }
@@ -573,16 +597,17 @@ class JewelleryOrderResource extends Resource
                                         $url = e($doc['url']);
 
                                         return <<<HTML
-                                            <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-                                                <p class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{$label}</p>
-                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" class="block">
+                                            <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#fff;max-width:260px;">
+                                                <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151;">{$label}</p>
+                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;">
                                                     <img
                                                         src="{$url}"
                                                         alt="{$label}"
-                                                        class="h-40 w-full rounded-md object-cover border border-gray-100 dark:border-gray-600"
+                                                        loading="lazy"
+                                                        style="display:block;width:220px;height:140px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;background:#f3f4f6;"
                                                     />
                                                 </a>
-                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-xs text-primary-600 hover:underline">
+                                                <a href="{$url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-top:8px;font-size:12px;color:#ea580c;text-decoration:underline;">
                                                     Open full image
                                                 </a>
                                             </div>
@@ -595,7 +620,7 @@ class JewelleryOrderResource extends Resource
                                 }
 
                                 return new HtmlString(
-                                    '<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">'.$cards.'</div>'
+                                    '<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">'.$cards.'</div>'
                                 );
                             })
                             ->columnSpanFull(),
@@ -607,15 +632,21 @@ class JewelleryOrderResource extends Resource
     {
         return Forms\Components\Select::make('driver_id')
             ->label('Assigned Driver')
-            ->options(function (?JewelleryOrder $record) use ($includeDriverId): array {
-                return Driver::assignmentOptions($includeDriverId ?? $record?->driver_id);
+            ->options(function ($record = null) use ($includeDriverId): array {
+                $currentDriverId = $includeDriverId;
+
+                if ($currentDriverId === null && is_object($record)) {
+                    $currentDriverId = $record->driver_id ?? null;
+                }
+
+                return Driver::assignmentOptions($currentDriverId !== null ? (int) $currentDriverId : null);
             })
             ->placeholder('Select an online driver')
             ->searchable()
             ->nullable()
             ->live()
-            ->afterStateUpdated(function (?int $state, JewelleryOrder $record, Forms\Set $set, $livewire): void {
-                if (! $livewire instanceof Pages\ViewJewelleryOrder) {
+            ->afterStateUpdated(function (?int $state, $record, Forms\Set $set, $livewire): void {
+                if (! $livewire instanceof Pages\ViewJewelleryOrder || ! $record instanceof JewelleryOrder) {
                     return;
                 }
 
@@ -635,17 +666,19 @@ class JewelleryOrderResource extends Resource
     {
         return Forms\Components\Select::make('driver_id')
             ->label('Assigned Driver')
-            ->options(function (?OldGoldBooking $record, Forms\Get $get) use ($includeDriverId): array {
-                return Driver::assignmentOptions(
-                    $includeDriverId ?? $record?->driver_id ?? $get('driver_id'),
-                );
+            ->options(function ($record = null, ?Forms\Get $get = null) use ($includeDriverId): array {
+                $currentDriverId = $includeDriverId
+                    ?? (is_object($record) ? ($record->driver_id ?? null) : null)
+                    ?? ($get ? $get('driver_id') : null);
+
+                return Driver::assignmentOptions($currentDriverId !== null ? (int) $currentDriverId : null);
             })
             ->placeholder('Select an online driver')
             ->searchable()
             ->nullable()
             ->live()
-            ->afterStateUpdated(function (?int $state, OldGoldBooking $record, Forms\Set $set, $livewire): void {
-                if (! $livewire instanceof Pages\ViewSellJewelleryOrder) {
+            ->afterStateUpdated(function (?int $state, $record, Forms\Set $set, $livewire): void {
+                if (! $livewire instanceof Pages\ViewSellJewelleryOrder || ! $record instanceof OldGoldBooking) {
                     return;
                 }
 

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Investment;
 use App\Models\JewelleryOrder;
+use App\Models\MetalWithdrawal;
 use App\Models\OldGoldBooking;
 use App\Models\Redemption;
 use App\Models\SigInstallment;
@@ -17,9 +18,36 @@ class AccountActivityService
     /**
      * @return array{transactions: list<array<string, mixed>>, pagination: array<string, int|bool>}
      */
-    public function listTransactions(User $user, string $filter = 'all', int $page = 1, int $perPage = 20): array
-    {
-        $transactions = $this->collectTransactions($user, $filter)
+    public function listTransactions(
+        User $user,
+        string $filter = 'all',
+        int $page = 1,
+        int $perPage = 20,
+        ?string $metalType = null,
+        ?string $category = null,
+    ): array {
+        $metalFilter = $metalType
+            ?? (in_array($filter, ['gold', 'silver'], true) ? $filter : null);
+
+        // Explicit category wins; otherwise use filter when it is not a metal type.
+        $categoryFilter = filled($category) && $category !== 'all'
+            ? $category
+            : (in_array($filter, ['gold', 'silver'], true) ? 'all' : $filter);
+
+        // Metal filters skip pure wallet rows (no metal_type).
+        if ($metalFilter !== null && $categoryFilter === 'all') {
+            $transactions = $this->collectTransactions($user, 'all', includeWallet: false);
+        } else {
+            $transactions = $this->collectTransactions($user, $categoryFilter);
+        }
+
+        if ($metalFilter !== null) {
+            $transactions = $transactions
+                ->filter(fn (array $item) => ($item['metal_type'] ?? null) === $metalFilter)
+                ->values();
+        }
+
+        $transactions = $transactions
             ->sortByDesc(fn (array $item) => $item['occurred_at'] ?? '')
             ->values();
 
@@ -29,6 +57,11 @@ class AccountActivityService
 
         return [
             'transactions' => $slice->all(),
+            'filter' => $filter,
+            'category' => filled($category) && $category !== 'all' ? $category : (
+                in_array($filter, ['gold', 'silver'], true) ? null : $categoryFilter
+            ),
+            'metal_type' => $metalFilter,
             'pagination' => [
                 'current_page' => $page,
                 'per_page' => $perPage,
@@ -55,6 +88,7 @@ class AccountActivityService
             'jewellery_order' => $this->findJewelleryOrder($user, $sourceId),
             'old_gold' => $this->findOldGold($user, $sourceId),
             'redemption' => $this->findRedemption($user, $sourceId),
+            'holdings_sell' => $this->findHoldingsSell($user, $sourceId),
             default => null,
         };
     }
@@ -62,14 +96,30 @@ class AccountActivityService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    protected function collectTransactions(User $user, string $filter): Collection
+    protected function collectTransactions(User $user, string $filter, bool $includeWallet = true): Collection
     {
         $items = collect();
 
         if ($this->includesFilter($filter, ['all', 'buy', 'sell'])) {
-            $investments = $user->investments()->latest('id')->limit(100)->get();
+            $linkedSellInvestmentIds = MetalWithdrawal::query()
+                ->where('user_id', $user->id)
+                ->where('from_holdings', true)
+                ->whereNotNull('investment_id')
+                ->pluck('investment_id')
+                ->all();
+
+            $investments = $user->investments()
+                ->with(['holdingCertificate', 'invoice'])
+                ->latest('id')
+                ->limit(100)
+                ->get();
 
             foreach ($investments as $investment) {
+                // Avoid duplicating holdings sells (shown via holdings_sell source).
+                if ($investment->type === 'sell' && in_array($investment->id, $linkedSellInvestmentIds, true)) {
+                    continue;
+                }
+
                 $payload = AccountTransactionPayload::fromInvestment($investment);
 
                 if ($filter === 'buy' && $payload['category'] !== 'buy') {
@@ -84,7 +134,22 @@ class AccountActivityService
             }
         }
 
-        if ($this->includesFilter($filter, ['all', 'wallet'])) {
+        if ($this->includesFilter($filter, ['all', 'sell', 'holdings'])) {
+            MetalWithdrawal::query()
+                ->where('user_id', $user->id)
+                ->where(function ($q): void {
+                    $q->where('from_holdings', true)
+                        ->orWhereNotNull('source_lot_id');
+                })
+                ->latest('id')
+                ->limit(100)
+                ->get()
+                ->each(fn (MetalWithdrawal $withdrawal) => $items->push(
+                    AccountTransactionPayload::fromHoldingsSell($withdrawal),
+                ));
+        }
+
+        if ($includeWallet && $this->includesFilter($filter, ['all', 'wallet'])) {
             $user->walletTransactions()->latest('id')->limit(100)->get()
                 ->each(fn (WalletTransaction $transaction) => $items->push(
                     AccountTransactionPayload::fromWallet($transaction),
@@ -106,7 +171,7 @@ class AccountActivityService
         if ($this->includesFilter($filter, ['all', 'jewellery', 'buy'])) {
             $user->jewelleryOrders()
                 ->where('status', '!=', 'cart')
-                ->with('items.product')
+                ->with(['items.product', 'invoice'])
                 ->latest('id')
                 ->limit(100)
                 ->get()
@@ -134,7 +199,7 @@ class AccountActivityService
 
     protected function findInvestment(User $user, int $id): ?array
     {
-        $investment = $user->investments()->find($id);
+        $investment = $user->investments()->with(['holdingCertificate', 'invoice'])->find($id);
 
         return $investment ? AccountTransactionPayload::fromInvestment($investment) : null;
     }
@@ -160,7 +225,7 @@ class AccountActivityService
     {
         $order = $user->jewelleryOrders()
             ->where('status', '!=', 'cart')
-            ->with('items.product')
+            ->with(['items.product', 'invoice'])
             ->find($id);
 
         return $order ? AccountTransactionPayload::fromJewelleryOrder($order) : null;
@@ -178,6 +243,61 @@ class AccountActivityService
         $redemption = $user->redemptions()->find($id);
 
         return $redemption ? AccountTransactionPayload::fromRedemption($redemption) : null;
+    }
+
+    protected function findHoldingsSell(User $user, int $id): ?array
+    {
+        $withdrawal = MetalWithdrawal::query()
+            ->where('user_id', $user->id)
+            ->where(function ($q): void {
+                $q->where('from_holdings', true)
+                    ->orWhereNotNull('source_lot_id');
+            })
+            ->find($id);
+
+        return $withdrawal ? AccountTransactionPayload::fromHoldingsSell($withdrawal) : null;
+    }
+
+    /**
+     * Sell-only holdings transactions for the holdings screen.
+     *
+     * @return array{transactions: list<array<string, mixed>>, pagination: array<string, int|bool>}
+     */
+    public function listHoldingsSellTransactions(
+        User $user,
+        int $page = 1,
+        int $perPage = 20,
+        ?string $metalType = null,
+    ): array {
+        $query = MetalWithdrawal::query()
+            ->where('user_id', $user->id)
+            ->where(function ($q): void {
+                $q->where('from_holdings', true)
+                    ->orWhereNotNull('source_lot_id');
+            })
+            ->when($metalType, fn ($q) => $q->where('metal_type', $metalType))
+            ->latest('id');
+
+        $total = (clone $query)->count();
+        $items = $query
+            ->forPage($page, $perPage)
+            ->get()
+            ->map(fn (MetalWithdrawal $withdrawal) => AccountTransactionPayload::fromHoldingsSell($withdrawal))
+            ->values();
+
+        return [
+            'transactions' => $items->all(),
+            'filter' => 'sell',
+            'metal_type' => $metalType,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'has_more' => ($page * $perPage) < $total,
+                'showing' => $items->count(),
+            ],
+        ];
     }
 
     /**

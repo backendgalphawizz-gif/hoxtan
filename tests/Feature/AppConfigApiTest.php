@@ -74,6 +74,8 @@ class AppConfigApiTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.surepass_token', (string) config('kyc.surepass.token', ''))
+            ->assertJsonPath('data.surepass.token', (string) config('kyc.surepass.token', ''))
             ->assertJsonPath('data.privacy.slug', 'user-privacy-policy')
             ->assertJsonPath('data.terms.slug', 'user-terms-and-conditions')
             ->assertJsonPath('data.driver_privacy.slug', 'driver-privacy-policy')

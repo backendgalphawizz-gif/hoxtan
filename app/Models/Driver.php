@@ -6,6 +6,7 @@ use App\Support\PhoneRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class Driver extends Model
@@ -129,5 +130,15 @@ class Driver extends Model
     public function oldGoldBookings(): HasMany
     {
         return $this->hasMany(OldGoldBooking::class);
+    }
+
+    public function deviceTokens(): MorphMany
+    {
+        return $this->morphMany(DeviceToken::class, 'tokenable');
+    }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(DriverNotification::class)->latest('id');
     }
 }

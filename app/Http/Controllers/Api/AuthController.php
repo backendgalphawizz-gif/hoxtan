@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\FirebaseCloudMessagingService;
 use App\Services\UserRegistrationService;
 use App\Support\ApiResponse;
+use App\Support\FcmTokenRequest;
 use App\Support\MpinRules;
 use App\Support\PhoneRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -19,9 +22,13 @@ class AuthController extends Controller
             array_merge([
                 'name' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z\s]+$/'],
                 'phone' => ['required', 'string', 'regex:/^\d{10}$/'],
+                'date_of_birth' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
                 'referral_code' => ['nullable', 'string', 'max:12'],
             ], MpinRules::validationRules()),
-            MpinRules::validationMessages(),
+            array_merge(MpinRules::validationMessages(), [
+                'date_of_birth.before' => 'You must be at least 18 years old.',
+                'date_of_birth.after' => 'Please enter a valid date of birth.',
+            ]),
         );
 
         $user = $registration->register(
@@ -29,6 +36,7 @@ class AuthController extends Controller
             $data['phone'],
             $data['mpin'],
             $data['referral_code'] ?? null,
+            $data['date_of_birth'] ?? null,
         );
 
         $token = $user->createToken('mobile-app')->plainTextToken;
@@ -88,6 +96,7 @@ class AuthController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'phone' => $user->phone,
+            'date_of_birth' => $user->date_of_birth?->toDateString(),
             'referral_code' => $user->referral_code,
             'wallet_balance' => (float) $user->wallet_balance,
             'gold_holdings' => (float) $user->gold_holdings,
@@ -101,8 +110,14 @@ class AuthController extends Controller
         ];
     }
 
-    protected function loginWithMpin(User $user, string $phone, string $mpin, \App\Services\OtpService $otp): JsonResponse
-    {
+    protected function loginWithMpin(
+        User $user,
+        string $phone,
+        string $mpin,
+        \App\Services\OtpService $otp,
+        ?Request $request = null,
+        ?FirebaseCloudMessagingService $fcm = null,
+    ): JsonResponse {
         if ($user->is_blocked) {
             return ApiResponse::error('Your account has been blocked.', [], 403);
         }
@@ -117,11 +132,35 @@ class AuthController extends Controller
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 
+        $fcmRegistered = false;
+        $deviceTokenId = null;
+        $fcmToken = $request ? FcmTokenRequest::from($request) : null;
+
+        if ($fcmToken !== null && $fcm instanceof FirebaseCloudMessagingService) {
+            try {
+                $device = $fcm->registerToken(
+                    $user,
+                    $fcmToken,
+                    $request ? FcmTokenRequest::platform($request) : null,
+                    $request ? FcmTokenRequest::deviceName($request) : null,
+                );
+                $fcmRegistered = true;
+                $deviceTokenId = $device->id;
+            } catch (\Throwable $e) {
+                Log::error('User FCM token save failed', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return ApiResponse::success([
             'phone' => $phone,
             'mpin' => $mpin,
             'mpin_length' => MpinRules::length(),
             'token' => $token,
+            'fcm_token_registered' => $fcmRegistered,
+            'device_token_id' => $deviceTokenId,
             'user' => $this->userPayload($user),
         ], 'Login successful.');
     }

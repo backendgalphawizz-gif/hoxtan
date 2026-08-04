@@ -21,8 +21,8 @@ class DispatchScheduledNotifications extends Command
             ->get();
 
         foreach ($notifications as $notification) {
-            $count = $dispatch->dispatch($notification);
-            $this->info("Dispatched \"{$notification->title}\" to {$count} users.");
+            $result = $dispatch->dispatch($notification);
+            $this->info("Dispatched \"{$notification->title}\" to {$result['recipients']} recipients (push {$result['push_success']}/{$result['push_tokens']}).");
         }
 
         return self::SUCCESS;
