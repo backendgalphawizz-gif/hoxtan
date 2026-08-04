@@ -22,7 +22,7 @@
     </div>
     <div class="particles" aria-hidden="true"></div>
 
-    @include('landing.partials.nav', ['isHome' => $isHome ?? false])
+    @include('landing.partials.nav', ['isHome' => true])
 
     @yield('content')
 

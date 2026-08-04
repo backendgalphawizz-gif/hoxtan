@@ -2,9 +2,9 @@
 
 @section('content')
     {{-- Hero --}}
-    <section class="hero">
+    <section class="hero" id="rates">
         <div class="container hero__grid">
-            <div class="hero__content">
+            <div class="hero__content" id="rates">
                 <div class="hero__badge">
                     <span class="hero__badge-dot"></span>
                     Live market rates · 24/7 trading
@@ -43,7 +43,7 @@
                 <div class="hero__ring" aria-hidden="true"></div>
                 <div class="hero__card">
                     <div class="hero__card-shine" aria-hidden="true"></div>
-                    <p style="font-size:0.75rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:1.25rem;">Today's Live Rates</p>
+                    <p style="font-size:1.0rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:1.25rem;">Today's Live Rates</p>
 
                     <div class="rate-card">
                         <div class="rate-card__metal">
@@ -67,7 +67,7 @@
                         <div class="rate-card__price" data-count="{{ $silverRate }}" data-prefix="₹">₹0.00</div>
                     </div>
 
-                    <p style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin-top:0.5rem;">
+                    <p style="font-size:0.98rem; color:var(--text-muted); text-align:center; margin-top:0.5rem;">
                         Rates update in real-time from live market feed
                     </p>
                 </div>
@@ -94,7 +94,8 @@
     <section class="section" id="features">
         <div class="container">
             <div class="section__header reveal">
-                <p class="section__eyebrow">Why {{ $appName }}</p>
+                <p class="section__eyebrow">
+Features</p>
                 <h2 class="section__title">Everything You Need to Build Wealth in Precious Metals</h2>
                 <p class="section__desc">From digital bullion to premium jewellery — one secure platform for India's smartest investors.</p>
             </div>
@@ -164,6 +165,7 @@
                         Google Play
                     </a>
                     <a href="#" class="btn btn--outline">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
                         </svg>

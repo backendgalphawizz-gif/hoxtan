@@ -1,16 +1,19 @@
 <nav class="nav{{ ($isHome ?? false) ? '' : ' scrolled' }}">
     <div class="container nav__inner">
         <a href="{{ route('home') }}" class="brand">
-            <div class="brand__icon">H</div>
-            <div>
+            <div class="brand__icon">
+            <img src="{{ asset('images/Hoxtan Web logo 2.png') }}" alt="{{ $appName }}" class="brand__logo">
+        </div>
+
+            <!-- <div>
                 <div class="brand__name">{{ $appName }}</div>
                 <div class="brand__tag">Gold · Silver · Jewellery</div>
-            </div>
+            </div> -->
         </a>
         <ul class="nav__links">
             @if ($isHome ?? false)
-                <li><a href="#features">Features</a></li>
-                <li><a href="#rates">Live Rates</a></li>
+            <li><a href="#rates">Live Rates</a></li>
+            <li><a href="#features">Features</a></li>
                 <li><a href="#how">How It Works</a></li>
                 <li><a href="#contact">Contact</a></li>
             @else
