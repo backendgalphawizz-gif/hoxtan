@@ -14,7 +14,7 @@
             <img
                 src="{{ asset('images/hoxtan-icon.png') }}"
                 alt="hoxtan"
-                class="gs-auth-card__form-logo"
+                class="gs-auth-card__form-logo center"
             >
 
             <div class="gs-auth-card__form-header">

@@ -16,12 +16,12 @@ return [
         ['key' => 'about', 'slug' => 'about-us', 'label' => 'About Us'],
         ['key' => 'terms', 'slug' => 'terms-and-conditions', 'label' => 'Terms & Conditions'],
         ['key' => 'privacy', 'slug' => 'privacy-policy', 'label' => 'Privacy Policy'],
-        ['key' => 'user_terms', 'slug' => 'user-terms-and-conditions', 'label' => 'User Terms & Conditions'],
-        ['key' => 'user_privacy', 'slug' => 'user-privacy-policy', 'label' => 'User Privacy Policy'],
-        ['key' => 'cancel_policy', 'slug' => 'cancel-policy', 'label' => 'Cancel Policy'],
-        ['key' => 'driver_terms', 'slug' => 'driver-terms-and-conditions', 'label' => 'Driver Terms & Conditions'],
-        ['key' => 'driver_privacy', 'slug' => 'driver-privacy-policy', 'label' => 'Driver Privacy Policy'],
-        ['key' => 'delete_account', 'slug' => 'delete-account', 'label' => 'Delete Account'],
+        //  ['key' => 'user_terms', 'slug' => 'user-terms-and-conditions', 'label' => 'User Terms & Conditions'],
+        //  ['key' => 'user_privacy', 'slug' => 'user-privacy-policy', 'label' => 'User Privacy Policy'],
+        //  ['key' => 'cancel_policy', 'slug' => 'cancel-policy', 'label' => 'Cancel Policy'],
+        //  ['key' => 'driver_terms', 'slug' => 'driver-terms-and-conditions', 'label' => 'Driver Terms & Conditions'],
+        //  ['key' => 'driver_privacy', 'slug' => 'driver-privacy-policy', 'label' => 'Driver Privacy Policy'],
+        //  ['key' => 'delete_account', 'slug' => 'delete-account', 'label' => 'Delete Account'],
     ],
 
     /*

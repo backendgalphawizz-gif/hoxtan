@@ -2,9 +2,9 @@
 
 @section('content')
     {{-- Hero --}}
-    <section class="hero">
+    <section class="hero" id="rates">
         <div class="container hero__grid">
-            <div class="hero__content">
+            <div class="hero__content" id="rates">
                 <div class="hero__badge">
                     <span class="hero__badge-dot"></span>
                     Live market rates · 24/7 trading
@@ -43,7 +43,7 @@
                 <div class="hero__ring" aria-hidden="true"></div>
                 <div class="hero__card">
                     <div class="hero__card-shine" aria-hidden="true"></div>
-                    <p style="font-size:0.75rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:1.25rem;">Today's Live Rates</p>
+                    <p style="font-size:1.0rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:1.25rem;">Today's Live Rates</p>
 
                     <div class="rate-card">
                         <div class="rate-card__metal">
@@ -67,7 +67,7 @@
                         <div class="rate-card__price" data-count="{{ $silverRate }}" data-prefix="₹">₹0.00</div>
                     </div>
 
-                    <p style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin-top:0.5rem;">
+                    <p style="font-size:0.98rem; color:var(--text-muted); text-align:center; margin-top:0.5rem;">
                         Rates update in real-time from live market feed
                     </p>
                 </div>
@@ -94,7 +94,8 @@
     <section class="section" id="features">
         <div class="container">
             <div class="section__header reveal">
-                <p class="section__eyebrow">Why {{ $appName }}</p>
+                <p class="section__eyebrow">
+Features</p>
                 <h2 class="section__title">Everything You Need to Build Wealth in Precious Metals</h2>
                 <p class="section__desc">From digital bullion to premium jewellery — one secure platform for India's smartest investors.</p>
             </div>
@@ -164,7 +165,7 @@
                         Google Play
                     </a>
                     <a href="#" class="btn btn--outline">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-2.29-.79-.53 0-1.34.74-2.29.79-.53 0-1.09-.49-2.17-.79-1.09-.29-2.09-.45-3.27-.45-1.61 0-3.07.45-4.38 1.35-1.31.9-2.34 2.12-3.09 3.66-.75 1.54-1.13 3.24-1.13 5.09 0 1.85.38 3.55 1.13 5.09.75 1.54 1.78 2.76 3.09 3.66 1.31.9 2.77 1.35 4.38 1.35 1.18 0 2.18-.16 3.27-.45 1.09-.3 1.64-.79 2.17-.79.53 0 1.36.76 2.29.79.53 0 1.71-.16 3.05-2.47.53-.79 1.08-1.58 1.65-2.37.57-.79 1.14-1.58 1.71-2.37zM13.01 4.42c.73-.88 1.22-1.9 1.47-3.06-.88.35-1.83.88-2.85 1.59-.51.35-.98.74-1.41 1.17-.43.43-.8.9-1.11 1.41-.31.51-.56 1.05-.75 1.62 1.12-.07 2.19.26 3.21.99.51.35.96.78 1.35 1.29.39.51.72 1.08.99 1.71.27.63.47 1.3.6 2.01-.88-.35-1.83-.88-2.85-1.59-.51-.35-.98-.74-1.41-1.17-.43-.43-.8-.9-1.11-1.41-.31-.51-.56-1.05-.75-1.62z"/></svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
                         App Store
                     </a>
                 </div>

@@ -3,11 +3,9 @@
         <div class="footer__grid">
             <div class="footer__about">
                 <a href="{{ route('home') }}" class="brand">
-                    <div class="brand__icon">H</div>
-                    <div>
-                        <div class="brand__name">{{ $appName }}</div>
-                        <div class="brand__tag">Gold · Silver · Jewellery</div>
-                    </div>
+                    <div class="brand__icon">
+            <img src="{{ asset('images/Hoxtan Web logo 2.png') }}" alt="{{ $appName }}" class="brand__logo">
+        </div>
                 </a>
                 <p>India's premium digital bullion platform. Buy, sell, invest, and shop with complete transparency and elite-grade security.</p>
                 <div class="social">
@@ -21,10 +19,10 @@
             <div>
                 <h4 class="footer__heading">Platform</h4>
                 <ul class="footer__links">
+                    <li><a href="{{ route('home') }}#rates">Live Rates</a></li>
                     <li><a href="{{ route('home') }}#features">Digital Gold</a></li>
                     <li><a href="{{ route('home') }}#features">SIG Invest</a></li>
                     <li><a href="{{ route('home') }}#features">Jewellery</a></li>
-                    <li><a href="{{ route('home') }}#rates">Live Rates</a></li>
                 </ul>
             </div>
             <div>
@@ -41,10 +39,15 @@
                 <h4 class="footer__heading">Support</h4>
                 <ul class="footer__links">
                     @if ($supportEmail)
-                        <li><a href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a></li>
+                        <li><a href="https://mail.google.com/mail/?view=cm&to={{ $supportEmail }}" target="_blank">{{ $supportEmail }}</a></li>
                     @endif
                     @if ($supportPhone)
-                        <li><a href="tel:{{ preg_replace('/\D/', '', $supportPhone) }}">Toll Free: {{ $supportPhoneFormatted }}</a></li>
+                        <li>
+    <a href="tel:{{ preg_replace('/\D/', '', $supportPhone) }}">
+        <i class="fas fa-phone-alt me-2"></i>
+        Call Us: {{ $supportPhoneFormatted }}
+    </a>
+</li>
                     @endif
                 </ul>
             </div>

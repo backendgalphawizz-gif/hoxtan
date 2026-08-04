@@ -43,6 +43,7 @@ class Login extends BaseLogin
     {
         return TextInput::make('password')
             ->label('Password')
+
             ->password()
             ->revealable(filament()->arePasswordsRevealable())
             ->autocomplete('current-password')
