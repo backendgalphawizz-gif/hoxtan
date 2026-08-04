@@ -21,6 +21,8 @@ class AdminNotificationResource extends Resource
 {
     use InteractsWithAdminPermissions;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static function adminPermissionModule(): string
     {
         return 'admin_notifications';
@@ -165,11 +167,11 @@ class AdminNotificationResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return NavigationBadgeCounts::format(NavigationBadgeCounts::unreadAdminNotifications());
+        return null;
     }
 
     public static function getNavigationBadgeColor(): ?string
     {
-        return 'warning';
+        return null;
     }
 }

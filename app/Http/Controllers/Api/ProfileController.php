@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\HoldingCertificate;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\HoldingCertificateService;
 use App\Services\InvoiceService;
+use App\Services\KycService;
 use App\Support\ApiResponse;
 use App\Support\AssetsBalancePayload;
+use App\Support\FilamentFormFields;
 use App\Support\MpinRules;
 use App\Support\ProfilePhotoStorage;
 use App\Support\UserProfilePayload;
@@ -34,9 +38,21 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request, KycService $kyc): JsonResponse
     {
         $user = $request->user();
+
+        // Accept common client alias for date of birth.
+        if ($request->filled('dob') && ! $request->filled('date_of_birth')) {
+            $request->merge(['date_of_birth' => $request->input('dob')]);
+        }
+
+        $bankFieldsPresent = $request->hasAny([
+            'account_holder_name',
+            'bank_name',
+            'account_number',
+            'ifsc_code',
+        ]);
 
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:100', 'regex:/^[A-Za-z\s]+$/'],
@@ -48,7 +64,8 @@ class ProfileController extends Controller
             ],
             'primary_residence' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'string', Rule::in(['male', 'female', 'other'])],
-            'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'date_of_birth' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
+            'dob' => ['nullable', 'date', 'before:'.now()->subYears(18)->toDateString(), 'after:'.now()->subYears(100)->toDateString()],
             'market_alerts' => ['nullable', 'boolean'],
             'profile_photo' => ['nullable'],
             'image' => ['nullable'],
@@ -67,6 +84,18 @@ class ProfileController extends Controller
             'nominee_relation' => ['nullable', 'string', 'max:50'],
             'nominee_phone' => ['nullable', 'string', 'regex:/^\d{10}$/'],
             'nominee_date_of_birth' => ['nullable', 'date', 'before:today'],
+            'account_holder_name' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'max:100', 'regex:'.FilamentFormFields::NAME_REGEX],
+            'bank_name' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'max:100'],
+            'account_number' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'min:6', 'max:30', 'regex:/^\d+$/'],
+            'ifsc_code' => [$bankFieldsPresent ? 'required' : 'nullable', 'string', 'size:11', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'],
+        ], [
+            'account_holder_name.regex' => 'Account holder name may only contain letters and spaces.',
+            'account_number.regex' => 'Account number must contain digits only.',
+            'ifsc_code.regex' => 'Invalid IFSC code format.',
+            'date_of_birth.before' => 'You must be at least 18 years old.',
+            'date_of_birth.after' => 'Please enter a valid date of birth.',
+            'dob.before' => 'You must be at least 18 years old.',
+            'dob.after' => 'Please enter a valid date of birth.',
         ]);
 
         $updates = collect($data)->only([
@@ -79,7 +108,7 @@ class ProfileController extends Controller
         ])->all();
 
         if (array_key_exists('email', $updates) && blank($updates['email'])) {
-            $updates['email'] = $user->phone.'@hoxtan.app';
+            $updates['email'] = null;
         }
 
         if ($photoPath = ProfilePhotoStorage::storeForUser($user, $request)) {
@@ -102,13 +131,23 @@ class ProfileController extends Controller
             }
         }
 
-        if ($updates === []) {
-            throw ValidationException::withMessages([
-                'message' => ['No profile fields were provided to update.'],
-            ]);
+        if ($updates !== []) {
+            $user->update($updates);
         }
 
-        $user->update($updates);
+        if ($bankFieldsPresent) {
+            $detail = $kyc->getOrCreateDetail($user->fresh());
+            $detail->update([
+                'account_holder_name' => $data['account_holder_name'],
+                'bank_name' => $data['bank_name'],
+                'account_number' => $data['account_number'],
+                'ifsc_code' => strtoupper($data['ifsc_code']),
+                'bank_verification_status' => $detail->bank_verification_status === 'verified'
+                    ? 'verified'
+                    : 'pending',
+                'bank_submitted_at' => now(),
+            ]);
+        }
 
         return ApiResponse::success([
             'user' => UserProfilePayload::make($user->fresh()),
@@ -196,6 +235,12 @@ class ProfileController extends Controller
             ]);
         }
 
+        if ($user->hasActiveJewelleryEmi()) {
+            throw ValidationException::withMessages([
+                'account' => ['Your account cannot be closed while you have an active jewellery EMI. Please complete or cancel the EMI plan first.'],
+            ]);
+        }
+
         $user->tokens()->delete();
 
         if (filled($user->profile_photo)) {
@@ -231,39 +276,52 @@ class ProfileController extends Controller
     {
         $invoices = $request->user()
             ->invoices()
-            ->with('investment:id,reference_id,type')
+            ->with([
+                'investment:id,reference_id,type',
+                'jewelleryOrder:id,order_number',
+                'oldGoldBooking:id,booking_number',
+            ])
             ->latest('issued_at')
             ->get()
-            ->map(fn (Invoice $invoice) => [
-                'invoice_number' => $invoice->invoice_number,
-                'investment_reference' => $invoice->investment?->reference_id,
-                'metal_type' => $invoice->metal_type,
-                'quantity_grams' => (float) $invoice->quantity_grams,
-                'total_amount' => (float) $invoice->total_amount,
-                'issued_at' => $invoice->issued_at?->toIso8601String(),
-                'download_url' => route('api.invoices.download', $invoice),
-            ]);
+            ->map(fn (Invoice $invoice) => app(InvoiceService::class)->apiPayload($invoice));
 
         return ApiResponse::success([
             'invoices' => $invoices,
         ]);
     }
 
-    public function downloadInvoice(Request $request, Invoice $invoice, InvoiceService $invoices): StreamedResponse|JsonResponse
+    public function downloadInvoice(Invoice $invoice, InvoiceService $invoices): StreamedResponse|JsonResponse
     {
-        if ($invoice->user_id !== $request->user()->id) {
-            return ApiResponse::error('Unauthorized.', [], 403);
-        }
+        $invoices->writeFile($invoice);
+        $invoice->refresh();
 
         if (! $invoice->file_path || ! Storage::disk('local')->exists($invoice->file_path)) {
-            $invoices->generateForInvestment($invoice->investment()->firstOrFail());
-            $invoice->refresh();
+            return ApiResponse::error('Invoice file not found.', [], 404);
         }
 
         return Storage::disk('local')->download(
             $invoice->file_path,
-            $invoice->invoice_number.'.html',
-            ['Content-Type' => 'text/html'],
+            $invoice->invoice_number.'.pdf',
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    public function downloadCertificate(
+        HoldingCertificate $certificate,
+        HoldingCertificateService $certificates,
+    ): StreamedResponse|JsonResponse {
+        $investment = $certificate->investment()->with('user')->firstOrFail();
+        $certificates->writeFile($certificate, $investment, $investment->user);
+        $certificate->refresh();
+
+        if (! $certificate->file_path || ! Storage::disk('local')->exists($certificate->file_path)) {
+            return ApiResponse::error('Certificate file not found.', [], 404);
+        }
+
+        return Storage::disk('local')->download(
+            $certificate->file_path,
+            $certificate->certificate_number.'.pdf',
+            ['Content-Type' => 'application/pdf'],
         );
     }
 }

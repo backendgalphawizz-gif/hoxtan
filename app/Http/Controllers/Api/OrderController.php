@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\JewelleryOrder;
+use App\Services\InvoiceService;
 use App\Services\JewelleryEmiCancellationService;
+use App\Services\JewelleryEmiService;
 use App\Support\ApiResponse;
 use App\Support\OrderPayload;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +39,7 @@ class OrderController extends Controller
         $query = $request->user()
             ->jewelleryOrders()
             ->where('status', '!=', 'cart')
-            ->with(['items.product', 'payment', 'emiInstallments'])
+            ->with(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice', 'driver'])
             ->latest('id');
 
         if ($status !== 'all') {
@@ -68,11 +70,16 @@ class OrderController extends Controller
         ]);
     }
 
-    public function show(Request $request, JewelleryOrder $order): JsonResponse
+    public function show(Request $request, JewelleryOrder $order, InvoiceService $invoices): JsonResponse
     {
         $this->ensureOwnedByUser($request, $order);
 
-        $order->load(['items.product', 'payment', 'emiInstallments']);
+        $order->load(['items.product', 'items.variant', 'payment', 'emiInstallments', 'invoice', 'driver']);
+
+        if (! $order->invoice) {
+            $invoices->generateForJewelleryOrder($order);
+            $order->load('invoice');
+        }
 
         return ApiResponse::success([
             'order' => OrderPayload::make($order, detailed: true),
@@ -102,6 +109,52 @@ class OrderController extends Controller
             'refund_request' => $result['refund_request'],
             'order' => OrderPayload::make($result['order']->loadMissing(['items.product', 'payment', 'emiInstallments', 'emiRefundRequests']), detailed: true),
         ], 'EMI order cancelled. Refund request sent for admin approval.');
+    }
+
+    public function payAllEmiPreview(Request $request, JewelleryOrder $order, JewelleryEmiService $emi): JsonResponse
+    {
+        $this->ensureOwnedByUser($request, $order);
+
+        return ApiResponse::success([
+            'pay_all' => $emi->payAllPreview($order, $request->user()),
+        ]);
+    }
+
+    public function payAllEmi(Request $request, JewelleryOrder $order, JewelleryEmiService $emi): JsonResponse
+    {
+        $this->ensureOwnedByUser($request, $order);
+
+        $data = $request->validate([
+            'payment_method' => ['nullable', 'string', Rule::in(['direct', 'wallet'])],
+        ]);
+
+        $result = $emi->payAllRemaining(
+            $order,
+            $request->user(),
+            $data['payment_method'] ?? 'direct',
+        );
+
+        return ApiResponse::success([
+            'amount_paid' => $result['amount_paid'],
+            'amount_paid_display' => $result['amount_paid_display'],
+            'installments_paid' => $result['installments_paid'],
+            'payment_method' => $result['payment_method'],
+            'wallet_balance' => $result['wallet_balance'],
+            'fully_paid' => $result['fully_paid'],
+            'delivery_unlocked' => $result['delivery_unlocked'],
+            'order' => OrderPayload::make($result['order'], detailed: true),
+        ], 'All remaining EMIs paid successfully.');
+    }
+
+    public function requestEmiDelivery(Request $request, JewelleryOrder $order, JewelleryEmiService $emi): JsonResponse
+    {
+        $this->ensureOwnedByUser($request, $order);
+
+        $result = $emi->requestDelivery($order, $request->user());
+
+        return ApiResponse::success([
+            'order' => OrderPayload::make($result['order'], detailed: true),
+        ], 'Delivery requested. Your jewellery is ready for delivery.');
     }
 
     protected function ensureOwnedByUser(Request $request, JewelleryOrder $order): void

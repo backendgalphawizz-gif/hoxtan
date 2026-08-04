@@ -41,11 +41,13 @@ class RegistrationApiTest extends TestCase
         $details = $this->postJson('/api/v1/register/details', [
             'registration_token' => $registrationToken,
             'name' => 'Rahul Sharma',
+            'date_of_birth' => '1995-06-15',
         ]);
 
         $details->assertOk()
             ->assertJsonPath('data.name', 'Rahul Sharma')
-            ->assertJsonPath('data.phone', '9876543210');
+            ->assertJsonPath('data.phone', '9876543210')
+            ->assertJsonPath('data.date_of_birth', '1995-06-15');
 
         $complete = $this->postJson('/api/v1/register/mpin', [
             'registration_token' => $registrationToken,
@@ -54,10 +56,19 @@ class RegistrationApiTest extends TestCase
 
         $complete->assertCreated()
             ->assertJsonPath('success', true)
-            ->assertJsonStructure(['data' => ['token', 'mpin', 'mpin_length', 'user' => ['id', 'name', 'phone', 'referral_code']]])
+            ->assertJsonStructure(['data' => ['token', 'mpin', 'mpin_length', 'user' => ['id', 'name', 'phone', 'referral_code', 'date_of_birth']]])
             ->assertJsonPath('data.user.name', 'Rahul Sharma')
+            ->assertJsonPath('data.user.date_of_birth', '1995-06-15')
             ->assertJsonPath('data.mpin', '1234')
             ->assertJsonPath('message', 'M-PIN created successfully.');
+
+        $this->assertDatabaseHas('users', [
+            'phone' => '9876543210',
+            'name' => 'Rahul Sharma',
+        ]);
+        $created = User::query()->where('phone', '9876543210')->first();
+        $this->assertNotNull($created);
+        $this->assertSame('1995-06-15', $created->date_of_birth?->toDateString());
 
         $this->assertDatabaseHas('users', [
             'phone' => '9876543210',
@@ -243,5 +254,110 @@ class RegistrationApiTest extends TestCase
             ->assertJsonPath('success', false)
             ->assertJsonPath('data.valid', false)
             ->assertJsonPath('message', 'Invalid referral code.');
+    }
+
+    public function test_verify_otp_stores_fcm_token_for_existing_user(): void
+    {
+        config([
+            'otp.expose_in_response' => true,
+            'otp.resend_after_seconds' => 0,
+        ]);
+
+        $user = User::factory()->create([
+            'phone' => '9090909090',
+            'mpin' => '1234',
+        ]);
+
+        $send = $this->postJson('/api/v1/register/send-otp', [
+            'phone' => '9090909090',
+        ]);
+
+        $verify = $this->postJson('/api/v1/register/verify-otp', [
+            'phone' => '9090909090',
+            'otp' => $send->json('data.otp'),
+            'fcm_token' => 'test-fcm-token-existing-user',
+            'platform' => 'android',
+        ]);
+
+        $verify->assertOk()
+            ->assertJsonPath('data.fcm_token_registered', true);
+
+        $this->assertDatabaseHas('device_tokens', [
+            'tokenable_type' => User::class,
+            'tokenable_id' => $user->id,
+            'fcm_token' => 'test-fcm-token-existing-user',
+            'platform' => 'android',
+        ]);
+    }
+
+    public function test_verify_otp_keeps_fcm_token_and_saves_on_registration_complete(): void
+    {
+        config([
+            'otp.expose_in_response' => true,
+            'otp.resend_after_seconds' => 0,
+        ]);
+
+        $send = $this->postJson('/api/v1/register/send-otp', [
+            'phone' => '9012345678',
+        ]);
+
+        $verify = $this->postJson('/api/v1/register/verify-otp', [
+            'phone' => '9012345678',
+            'otp' => $send->json('data.otp'),
+            'fcm_token' => 'test-fcm-token-new-user',
+            'platform' => 'ios',
+        ]);
+
+        $verify->assertOk()
+            ->assertJsonPath('data.already_registered', false)
+            ->assertJsonPath('data.fcm_token_received', true);
+
+        $registrationToken = $verify->json('data.registration_token');
+
+        $this->postJson('/api/v1/register/details', [
+            'registration_token' => $registrationToken,
+            'name' => 'Fcm User',
+        ])->assertOk();
+
+        $complete = $this->postJson('/api/v1/register/mpin', [
+            'registration_token' => $registrationToken,
+            'mpin' => '4321',
+        ]);
+
+        $complete->assertCreated()
+            ->assertJsonPath('data.fcm_token_registered', true);
+
+        $userId = $complete->json('data.user.id');
+
+        $this->assertDatabaseHas('device_tokens', [
+            'tokenable_type' => User::class,
+            'tokenable_id' => $userId,
+            'fcm_token' => 'test-fcm-token-new-user',
+            'platform' => 'ios',
+        ]);
+    }
+
+    public function test_verify_otp_allows_empty_fcm_token(): void
+    {
+        config([
+            'otp.expose_in_response' => true,
+            'otp.resend_after_seconds' => 0,
+        ]);
+
+        $send = $this->postJson('/api/v1/register/send-otp', [
+            'phone' => '9080706050',
+        ]);
+
+        $verify = $this->postJson('/api/v1/register/verify-otp', [
+            'phone' => '9080706050',
+            'otp' => $send->json('data.otp'),
+            'fcm_token' => '',
+        ]);
+
+        $verify->assertOk()
+            ->assertJsonPath('data.already_registered', false)
+            ->assertJsonPath('data.fcm_token_received', false)
+            ->assertJsonPath('data.fcm_token_registered', false)
+            ->assertJsonPath('data.fcm_token_skipped_reason', 'empty_or_missing');
     }
 }

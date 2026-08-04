@@ -59,7 +59,7 @@ class AdminRoleSeeder extends Seeder
         $permissions['sig_plans']['edit'] = true;
         $permissions['sig_plans']['export'] = true;
 
-        foreach (['jewellery_categories', 'jewellery_sub_categories', 'jewellery_sub_sub_categories', 'jewellery_products', 'jewellery_emi_plans', 'jewellery_orders', 'jewellery_emi_refunds'] as $module) {
+        foreach (['jewellery_categories', 'jewellery_sub_categories', 'jewellery_sub_sub_categories', 'jewellery_products', 'jewellery_karat_rates', 'jewellery_emi_plans', 'jewellery_orders', 'jewellery_emi_refunds'] as $module) {
             $permissions[$module]['view'] = true;
             $permissions[$module]['create'] = true;
             $permissions[$module]['edit'] = true;
@@ -68,6 +68,7 @@ class AdminRoleSeeder extends Seeder
 
         $permissions['jewellery_orders']['create'] = false;
         $permissions['jewellery_orders']['delete'] = false;
+        $permissions['jewellery_orders']['export'] = true;
 
         $permissions['metal_withdrawals']['view'] = true;
         $permissions['metal_withdrawals']['edit'] = true;

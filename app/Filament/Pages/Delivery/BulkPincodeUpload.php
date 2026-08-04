@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Delivery;
 
 use App\Filament\Concerns\InteractsWithAdminPermissions;
 use App\Services\BlockedPincodeService;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -11,6 +12,7 @@ use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 
 class BulkPincodeUpload extends Page implements HasForms
 {
@@ -21,6 +23,9 @@ class BulkPincodeUpload extends Page implements HasForms
     {
         return 'blocked_pincodes';
     }
+
+    // Hidden from sidebar for now.
+   
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up-tray';
 
@@ -41,7 +46,19 @@ class BulkPincodeUpload extends Page implements HasForms
 
     public function getSubheading(): ?string
     {
-        return 'Upload a CSV/TXT file or paste pincodes to block delivery to those areas.';
+        return 'Download the sample file, fill in your pincodes, then upload the CSV/TXT here (or paste them below).';
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('downloadSample')
+                ->label('Download sample file')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(asset('samples/blocked-pincodes-sample.csv'))
+                ->openUrlInNewTab(),
+        ];
     }
 
     public function form(Form $form): Form
@@ -49,10 +66,15 @@ class BulkPincodeUpload extends Page implements HasForms
         return $form
             ->schema([
                 Forms\Components\Section::make('Upload File')
-                    ->description('One pincode per line. Optional CSV columns: pincode, city, state, reason.')
+                    ->description(new HtmlString(
+                        'CSV columns: <strong>pincode</strong>, city, state, reason (header row required for CSV). '
+                        .'<a href="'.e(asset('samples/blocked-pincodes-sample.csv')).'" download class="text-primary-600 underline font-medium">Download sample file</a>'
+                        .' and replace the example rows with your data.'
+                    ))
                     ->schema([
                         Forms\Components\FileUpload::make('file')
                             ->label('Pincode File')
+                            ->helperText('Use the sample CSV format: pincode,city,state,reason')
                             ->disk('local')
                             ->directory('imports/blocked-pincodes')
                             ->acceptedFileTypes([

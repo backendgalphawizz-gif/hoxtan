@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{ $metaDescription ?? '' }}">
     <title>{{ isset($pageTitle) ? $pageTitle.' — '.$appName : $appName }}</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/hoxtan-icon.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/hoxtan-icon.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">

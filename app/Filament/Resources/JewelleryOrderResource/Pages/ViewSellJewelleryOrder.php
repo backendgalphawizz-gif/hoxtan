@@ -35,6 +35,7 @@ class ViewSellJewelleryOrder extends ViewRecord
     {
         return [
             Actions\EditAction::make()
+                ->visible(fn (): bool => JewelleryOrderResource::canEdit($this->getRecord()))
                 ->url(fn (): string => JewelleryOrderResource::getUrl('edit-sell', ['record' => $this->getRecord()])),
         ];
     }

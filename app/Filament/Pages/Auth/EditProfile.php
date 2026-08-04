@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Auth;
 
 use App\Support\FilamentFormFields;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -20,8 +21,17 @@ class EditProfile extends BaseEditProfile
         return $form
             ->schema([
                 Section::make('Profile Information')
-                    ->description('Update your admin account details.')
+                    ->description('Update your admin account details and profile photo.')
                     ->schema([
+                        FileUpload::make('avatar')
+                            ->label('Profile Photo')
+                            ->image()
+                            ->avatar()
+                            ->disk('public')
+                            ->directory('admin-avatars')
+                            ->maxSize(2048)
+                            ->imageEditor()
+                            ->columnSpanFull(),
                         FilamentFormFields::name('name', 'Full Name')
                             ->required(),
                         FilamentFormFields::email()
@@ -39,5 +49,18 @@ class EditProfile extends BaseEditProfile
                     ])
                     ->columns(1),
             ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (array_key_exists('avatar', $data) && is_array($data['avatar'])) {
+            $data['avatar'] = $data['avatar'][0] ?? null;
+        }
+
+        return $data;
     }
 }

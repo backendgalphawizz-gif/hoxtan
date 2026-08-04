@@ -16,6 +16,8 @@ class StubKycVerificationProvider implements KycVerificationProvider
         return [
             'provider_reference' => 'STUB-PAN-'.Str::upper(Str::random(8)),
             'message' => 'PAN OTP request accepted. Third-party verification will be connected later.',
+            'verified' => false,
+            'otp_required' => true,
         ];
     }
 

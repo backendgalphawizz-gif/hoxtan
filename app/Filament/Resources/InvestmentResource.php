@@ -79,9 +79,9 @@ abstract class InvestmentResource extends Resource
                             ->numeric()
                             ->minValue(0.01)
                             ->prefix('₹')
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(fn (Forms\Set $set, Forms\Get $get) => static::recalculateFormAmounts($set, $get))
-                            ->helperText('Auto-filled from the active metal rate. You can override if needed.'),
+                            ->disabled()
+                            ->dehydrated()
+                            ->helperText('Auto-filled from the current active metal rate.'),
                         Forms\Components\TextInput::make('amount')
                             ->label('Base Amount')
                             ->numeric()

@@ -14,12 +14,42 @@ class KycController extends Controller
 {
     public function config(): JsonResponse
     {
+        $provider = config('kyc.provider', 'stub');
+        $steps = array_values(config('kyc.steps', []));
+
+        if ($provider === 'surepass') {
+            $steps = array_map(function (array $step): array {
+                if (($step['key'] ?? null) === 'pan') {
+                    $step['description'] = 'Verify your PAN with Surepass (no OTP required).';
+                    $step['provider_label'] = 'Surepass';
+                    $step['otp_required'] = false;
+                }
+
+                if (($step['key'] ?? null) === 'aadhaar') {
+                    $step['description'] = 'Verify your Aadhaar via Surepass DigiLocker.';
+                    $step['provider_label'] = 'Surepass DigiLocker';
+                    $step['otp_required'] = false;
+                    $step['digilocker_required'] = true;
+                }
+
+                return $step;
+            }, $steps);
+        }
+
         return ApiResponse::success([
             'title' => config('kyc.title', 'Identity Vault'),
-            'steps' => array_values(config('kyc.steps', [])),
+            'steps' => $steps,
             'face_requirements' => config('kyc.face_requirements', []),
-            'provider' => config('kyc.provider', 'stub'),
-            'third_party_enabled' => config('kyc.provider') !== 'stub',
+            'provider' => $provider,
+            'third_party_enabled' => $provider !== 'stub',
+            'pan_otp_required' => $provider !== 'surepass',
+            'aadhaar_otp_required' => $provider !== 'surepass',
+            'aadhaar_digilocker_required' => $provider === 'surepass',
+            'bank_verify_via_provider' => $provider === 'surepass',
+            'digilocker' => $provider === 'surepass' ? [
+                'initialize_endpoint' => '/api/v1/digilocker/initialize',
+                'status_endpoint' => '/api/v1/digilocker/status/{client_id}',
+            ] : null,
             'user_kyc_statuses' => config('kyc.user_kyc_statuses', []),
         ]);
     }
@@ -41,22 +71,51 @@ class KycController extends Controller
             'pan_number' => ['required', 'string', 'size:10', 'regex:'.FilamentFormFields::PAN_REGEX],
         ]);
 
-        return ApiResponse::success(
-            $kyc->requestPanOtp($request->user(), $data['pan_number']),
-            'PAN OTP sent successfully.',
-        );
+        $result = $kyc->requestPanOtp($request->user(), $data['pan_number']);
+        $message = ($result['verified'] ?? false)
+            ? (string) ($result['message'] ?? 'PAN verified successfully.')
+            : 'PAN OTP sent successfully.';
+
+        return ApiResponse::success($result, $message);
     }
 
     public function verifyPanOtp(Request $request, KycService $kyc): JsonResponse
     {
+        $otpRequired = config('kyc.provider') !== 'surepass';
+
         $data = $request->validate([
             'pan_number' => ['required', 'string', 'size:10', 'regex:'.FilamentFormFields::PAN_REGEX],
-            'otp' => ['required', 'string', 'min:4', 'max:6'],
+            'otp' => [$otpRequired ? 'required' : 'nullable', 'string', 'min:4', 'max:6'],
         ]);
 
-        $result = $kyc->verifyPanOtp($request->user(), $data['pan_number'], $data['otp']);
+        $result = $kyc->verifyPanOtp(
+            $request->user(),
+            $data['pan_number'],
+            $data['otp'] ?? null,
+        );
 
         return ApiResponse::success($result, $result['message']);
+    }
+
+    /**
+     * Direct PAN verify (preferred when pan_otp_required is false / Surepass).
+     */
+    public function verifyPan(Request $request, KycService $kyc): JsonResponse
+    {
+        $data = $request->validate([
+            'pan_number' => ['required', 'string', 'size:10', 'regex:'.FilamentFormFields::PAN_REGEX],
+        ]);
+
+        $result = $kyc->requestPanOtp($request->user(), $data['pan_number']);
+
+        if (! ($result['verified'] ?? false)) {
+            return ApiResponse::success($result, 'PAN OTP sent successfully.');
+        }
+
+        return ApiResponse::success(
+            $result,
+            (string) ($result['message'] ?? 'PAN verified successfully.'),
+        );
     }
 
     public function requestAadhaarOtp(Request $request, KycService $kyc): JsonResponse
@@ -122,6 +181,9 @@ class KycController extends Controller
 
         $result = $kyc->submitBank($request->user(), $data);
 
-        return ApiResponse::success($result, $result['message']);
+        return ApiResponse::success(
+            $result,
+            (string) ($result['message'] ?? 'Bank details submitted successfully.'),
+        );
     }
 }

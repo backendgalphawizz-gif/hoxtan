@@ -5,7 +5,6 @@ namespace App\Filament\Resources\SilverRateResource\Pages;
 use App\Filament\Exports\MetalRateExporter;
 use App\Filament\Resources\SilverRateResource;
 use App\Support\FilamentExportActions;
-use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListSilverRates extends ListRecords
@@ -21,7 +20,7 @@ class ListSilverRates extends ListRecords
     {
         return [
             FilamentExportActions::headerExport(MetalRateExporter::class, 'silver_rate_history'),
-            Actions\CreateAction::make(),
+            // CreateAction temporarily hidden — re-enable when needed.
         ];
     }
 }

@@ -33,7 +33,7 @@ class SigPayload
             'total_invested' => (float) $plan->total_invested,
             'total_invested_display' => '₹'.number_format((float) $plan->total_invested, 0),
             'metal_accumulated_grams' => (float) $plan->metal_accumulated_grams,
-            'metal_accumulated_display' => rtrim(rtrim(number_format((float) $plan->metal_accumulated_grams, 3, '.', ''), '0'), '.').'g',
+            'metal_accumulated_display' => rtrim(rtrim(number_format((float) $plan->metal_accumulated_grams, 6, '.', ''), '0'), '.').'g',
             'completed_installments' => (int) $plan->completed_installments,
             'total_installments' => $plan->total_installments !== null ? (int) $plan->total_installments : null,
             'progress_label' => $plan->progress_label,
@@ -57,20 +57,29 @@ class SigPayload
 
         $plan = $installment->plan;
         $processedAt = $installment->processed_at ?? $installment->scheduled_at;
+        $isWithdrawal = in_array($installment->status, ['withdrawal_pending', 'withdrawal', 'withdrawal_rejected'], true);
 
         return [
             'id' => $installment->id,
             'reference_id' => $installment->reference_id,
-            'title' => $plan ? self::transactionTitle($plan) : 'SIG Transaction',
+            'transaction_id' => $installment->reference_id,
+            'type' => $isWithdrawal ? 'withdrawal' : 'installment',
+            'title' => $isWithdrawal
+                ? 'SIG Withdrawal'
+                : ($plan ? self::transactionTitle($plan) : 'SIG Transaction'),
             'metal_type' => $plan?->metal_type,
             'frequency' => $plan?->frequency,
             'amount' => (float) $installment->amount,
             'amount_display' => '₹'.number_format((float) $installment->amount, 2),
-            'quantity_grams' => $installment->quantity_grams !== null ? (float) $installment->quantity_grams : null,
-            'quantity_display' => $installment->quantity_grams !== null
-                ? rtrim(rtrim(number_format((float) $installment->quantity_grams, 4, '.', ''), '0'), '.').' g'
+            'quantity_grams' => $installment->quantity_grams !== null
+                ? round((float) $installment->quantity_grams, 6)
                 : null,
-            'rate_per_gram' => $installment->rate_per_gram !== null ? (float) $installment->rate_per_gram : null,
+            'quantity_display' => $installment->quantity_grams !== null
+                ? rtrim(rtrim(number_format((float) $installment->quantity_grams, 6, '.', ''), '0'), '.').' g'
+                : null,
+            'rate_per_gram' => $installment->rate_per_gram !== null
+                ? round((float) $installment->rate_per_gram, 2)
+                : null,
             'status' => $installment->status,
             'status_label' => self::installmentStatusLabel($installment->status),
             'scheduled_at' => $installment->scheduled_at?->toIso8601String(),
@@ -78,6 +87,7 @@ class SigPayload
             'time_display' => $processedAt
                 ? $processedAt->format('H:i').' • '.$processedAt->format('d F Y')
                 : null,
+            'note' => $isWithdrawal ? $installment->failure_reason : null,
         ];
     }
 

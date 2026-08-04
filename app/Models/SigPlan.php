@@ -34,7 +34,7 @@ class SigPlan extends Model
         return [
             'amount' => 'decimal:2',
             'total_invested' => 'decimal:2',
-            'metal_accumulated_grams' => 'decimal:4',
+            'metal_accumulated_grams' => 'decimal:6',
             'next_debit_at' => 'datetime',
             'activated_at' => 'datetime',
             'paused_at' => 'datetime',

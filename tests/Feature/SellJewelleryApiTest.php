@@ -18,7 +18,7 @@ class SellJewelleryApiTest extends TestCase
     {
         Storage::fake('public');
 
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'phone' => '9876543211',
             'mpin' => '1234',
         ]);
@@ -51,6 +51,7 @@ class SellJewelleryApiTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.estimate.metal_type', 'gold')
             ->assertJsonPath('data.estimate.purity', '22K')
+            ->assertJsonPath('data.estimate.rate_source', 'metal_api')
             ->assertJsonStructure([
                 'data' => [
                     'estimate' => [
@@ -118,11 +119,60 @@ class SellJewelleryApiTest extends TestCase
             ->assertJsonPath('data.request.documents.1.uploaded', true);
     }
 
+    public function test_sell_request_show_includes_assigned_driver_details(): void
+    {
+        $user = $this->userWithTransactionKyc([
+            'phone' => '9876543213',
+            'mpin' => '1234',
+        ]);
+        Sanctum::actingAs($user);
+
+        $booking = OldGoldBooking::query()->create([
+            'booking_number' => 'SELLDRIVER1',
+            'user_id' => $user->id,
+            'metal_type' => 'gold',
+            'purity' => '22K',
+            'estimated_weight_grams' => 10,
+            'quoted_amount' => 50000,
+            'status' => 'pending',
+            'pickup_address' => '12 MG Road, Mumbai',
+            'pickup_name' => 'Test User',
+            'pickup_phone' => '9876543213',
+        ]);
+
+        $this->getJson("/api/v1/sell-jewellery/requests/{$booking->id}")
+            ->assertOk()
+            ->assertJsonPath('data.request.driver', null);
+
+        $driver = \App\Models\Driver::query()->create([
+            'name' => 'Suresh Pickup',
+            'phone' => '9911223344',
+            'vehicle_type' => 'van',
+            'vehicle_number' => 'MH14CD5678',
+            'is_active' => true,
+            'is_online' => true,
+        ]);
+
+        $booking->update([
+            'driver_id' => $driver->id,
+            'driver_assigned_at' => now(),
+        ]);
+
+        $this->getJson("/api/v1/sell-jewellery/requests/{$booking->id}")
+            ->assertOk()
+            ->assertJsonPath('data.request.driver_id', $driver->id)
+            ->assertJsonPath('data.request.driver.name', 'Suresh Pickup')
+            ->assertJsonPath('data.request.driver.phone', '9911223344')
+            ->assertJsonPath('data.request.driver.phone_display', '+91 9911223344')
+            ->assertJsonPath('data.request.driver.vehicle_type', 'van')
+            ->assertJsonPath('data.request.driver.vehicle_number', 'MH14CD5678');
+    }
+
     public function test_id_proof_required_only_when_jewellery_is_in_someone_elses_name(): void
     {
         Storage::fake('public');
 
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'phone' => '9876543212',
             'mpin' => '1234',
         ]);
@@ -183,5 +233,38 @@ class SellJewelleryApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.recently_sold.0.booking_number', 'SELL12345')
             ->assertJsonPath('data.recently_sold.0.status', 'completed');
+    }
+
+    public function test_estimate_uses_admin_karat_rate_for_18k_gold(): void
+    {
+        \App\Models\JewelleryGoldKaratRate::query()->create([
+            'purity' => '18K',
+            'rate_per_gram' => 5500.50,
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/sell-jewellery/estimate', [
+            'metal_type' => 'gold',
+            'weight_grams' => 2,
+            'purity' => '18K',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.estimate.purity', '18K')
+            ->assertJsonPath('data.estimate.rate_source', 'karat_admin')
+            ->assertJsonPath('data.estimate.rate_per_gram', 5500.5)
+            ->assertJsonPath('data.estimate.purity_factor', 1)
+            ->assertJsonPath('data.estimate.estimated_value', 11001);
+
+        $this->postJson('/api/v1/sell-jewellery/estimate', [
+            'metal_type' => 'gold',
+            'weight_grams' => 1,
+            'purity' => '16K',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
     }
 }

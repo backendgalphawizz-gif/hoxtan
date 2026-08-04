@@ -106,6 +106,38 @@ class JewelleryOrderDriverAssignmentTest extends TestCase
         $this->assertSame('completed', $order->status);
     }
 
+    public function test_assigning_driver_creates_driver_and_customer_notifications(): void
+    {
+        $user = User::factory()->create();
+        $driver = Driver::query()->create([
+            'name' => 'Notify Driver',
+            'phone' => '9876543299',
+            'primary_residence' => 'Mumbai',
+            'vehicle_type' => 'bike',
+            'is_active' => true,
+        ]);
+
+        $order = JewelleryOrder::query()->create([
+            'order_number' => 'HOX88888',
+            'user_id' => $user->id,
+            'subtotal' => 10000,
+            'total_amount' => 10000,
+            'status' => 'pending',
+        ]);
+
+        $order->update(['driver_id' => $driver->id]);
+
+        $this->assertDatabaseHas('driver_notifications', [
+            'driver_id' => $driver->id,
+            'type' => 'new_assigned_order',
+        ]);
+
+        $this->assertDatabaseHas('user_notifications', [
+            'user_id' => $user->id,
+            'type' => 'order_driver_assigned',
+        ]);
+    }
+
     public function test_removing_driver_clears_assigned_timestamp(): void
     {
         $user = User::factory()->create();

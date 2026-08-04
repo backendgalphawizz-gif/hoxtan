@@ -107,6 +107,7 @@ class MetalPurchaseController extends Controller
             'input_mode' => ['required', Rule::in(['currency', 'weight'])],
             'amount' => ['required_if:input_mode,currency', 'nullable', 'numeric', 'min:'.config('buy_metal.min_amount', 100)],
             'weight_grams' => [
+                // When provided, purchase stores this exact gram value (no amount→gram convert).
                 'required_if:input_mode,weight',
                 'nullable',
                 'numeric',

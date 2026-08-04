@@ -11,6 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class DriverDeliveryService
 {
+    public function __construct(
+        protected DriverAssignmentNotificationService $assignmentNotifications,
+    ) {}
+
     public function markPickedUp(Driver $driver, JewelleryOrder $order): JewelleryOrder
     {
         $this->ensureAssigned($driver, $order);
@@ -65,7 +69,10 @@ class DriverDeliveryService
             'delivery_failure_reason' => null,
         ]);
 
-        return $order->fresh(['items.product', 'payment', 'user']);
+        $order = $order->fresh(['items.product', 'payment', 'user']);
+        $this->assignmentNotifications->notifyJewelleryDeliveryCompleted($order);
+
+        return $order;
     }
 
     public function markUnableToDeliver(Driver $driver, JewelleryOrder $order, string $reason): JewelleryOrder

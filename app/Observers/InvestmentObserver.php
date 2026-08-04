@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\Investment;
 use App\Models\User;
+use App\Services\HoldingCertificateService;
 use App\Services\InvestmentGoalService;
 use App\Services\InvoiceService;
 
@@ -12,6 +13,7 @@ class InvestmentObserver
     public function __construct(
         protected InvestmentGoalService $goals,
         protected InvoiceService $invoices,
+        protected HoldingCertificateService $certificates,
     ) {}
 
     public function saved(Investment $investment): void
@@ -24,10 +26,11 @@ class InvestmentObserver
             }
         }
 
-        if ($investment->wasChanged('status')
+        if ($investment->type === 'buy'
             && $investment->status === 'completed'
-            && $investment->type === 'buy') {
+            && ($investment->wasRecentlyCreated || $investment->wasChanged('status'))) {
             $this->invoices->generateForInvestment($investment);
+            $this->certificates->generateForInvestment($investment);
         }
     }
 

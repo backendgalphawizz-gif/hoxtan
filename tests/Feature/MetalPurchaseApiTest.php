@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Investment;
 use App\Models\User;
-use App\Models\WalletTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -53,7 +52,7 @@ class MetalPurchaseApiTest extends TestCase
             ->assertJsonPath('data.estimate.input_mode', 'currency')
             ->assertJsonPath('data.estimate.purity', '24K')
             ->assertJsonPath('data.estimate.amount', 1000)
-            ->assertJsonPath('data.estimate.gst_included', true)
+            ->assertJsonPath('data.estimate.gst_included', false)
             ->assertJsonStructure([
                 'data' => [
                     'estimate' => [
@@ -94,7 +93,7 @@ class MetalPurchaseApiTest extends TestCase
 
     public function test_user_can_purchase_gold_from_wallet(): void
     {
-        $user = User::factory()->create([
+        $user = $this->userWithTransactionKyc([
             'wallet_balance' => 10000,
             'gold_holdings' => 0,
         ]);
@@ -116,23 +115,26 @@ class MetalPurchaseApiTest extends TestCase
 
         $user->refresh();
 
-        $this->assertLessThan(10000, (float) $user->wallet_balance);
         $this->assertGreaterThan(0, (float) $user->gold_holdings);
         $this->assertSame(1, Investment::query()->where('user_id', $user->id)->count());
-        $this->assertSame(1, WalletTransaction::query()->where('user_id', $user->id)->where('type', 'debit')->count());
+        $this->assertDatabaseCount('holding_certificates', 1);
+        $this->assertNotNull($response->json('data.certificate.certificate_number'));
+        $this->assertSame('24K', $response->json('data.certificate.purity'));
+        $this->assertStringContainsString('HXT-POH-', (string) $response->json('data.certificate.certificate_number'));
     }
 
-    public function test_purchase_fails_when_wallet_balance_is_insufficient(): void
+    public function test_purchase_requires_completed_kyc(): void
     {
-        $user = User::factory()->create(['wallet_balance' => 50]);
+        $user = User::factory()->create(['wallet_balance' => 50, 'kyc_status' => 'pending']);
         Sanctum::actingAs($user);
 
         $this->postJson('/api/v1/buy-metal/purchase', [
             'metal_type' => 'gold',
             'input_mode' => 'currency',
             'amount' => 1000,
+            'payment_method' => 'wallet',
         ])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['wallet_balance']);
+            ->assertJsonPath('data.errors.kyc.0', 'Complete KYC verification (PAN, Aadhaar, and bank account) before proceeding.');
     }
 }

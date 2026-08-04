@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\MetalWithdrawal;
 use App\Models\SigInstallment;
 use App\Models\SigPlan;
 use App\Models\User;
 use App\Services\GstService;
 use App\Services\MetalRateService;
+use App\Support\KycPayload;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +17,7 @@ class SigPlanService
     public function __construct(
         protected MetalRateService $metalRates,
         protected GstService $gst,
+        protected ReferralService $referrals,
     ) {}
 
     /**
@@ -32,29 +35,43 @@ class SigPlanService
      *     gold_grams_display: string
      * }
      */
-    public function estimate(float $amount, string $metalType): array
+    public function estimate(float $amount, string $metalType, ?float $weightGrams = null): array
     {
         $rate = $this->metalRates->getCurrentRatePerGram($metalType);
         $gstPercent = $this->gst->ratePercent();
-        $taxableAmount = round($amount / (1 + $this->gst->rate()), 2);
-        $gstAmount = round($amount - $taxableAmount, 2);
-        $grams = $rate > 0 ? round($taxableAmount / $rate, 4) : 0.0;
+
+        // SIG wallet credits full entered amount as metal value (GST is on payment only).
+        $taxableAmount = round($amount, 2);
+        $gstBreakup = $this->gst->calculateGstAmount($taxableAmount);
+        $gstAmount = $gstBreakup['gst_amount'];
+        $totalAmount = $gstBreakup['total'];
+
+        if ($weightGrams !== null && $weightGrams > 0) {
+            $grams = round($weightGrams, 6);
+        } else {
+            // 6dp so ₹100 ≈ grams×rate (4dp caused ~₹96 after GST bugs / rounding).
+            $grams = $rate > 0 ? round($taxableAmount / $rate, 6) : 0.0;
+        }
 
         return [
             'metal_type' => $metalType,
-            'amount' => $amount,
-            'amount_display' => '₹'.number_format($amount, 0),
+            'amount' => $taxableAmount,
+            'amount_display' => '₹'.number_format($taxableAmount, 0),
             'rate_per_gram' => round($rate, 2),
             'rate_per_gram_display' => '₹'.number_format($rate, 0).' / gm',
             'gst_percent' => $gstPercent,
-            'gst_included' => true,
-            'gst_note' => 'GST included '.$gstPercent.'%',
+            'gst_included' => false,
+            'gst_note' => 'GST '.$gstPercent.'% added on metal value',
             'taxable_amount' => $taxableAmount,
             'gst_amount' => $gstAmount,
+            'amount_with_gst' => $totalAmount,
+            'amount_with_gst_display' => '₹'.number_format($totalAmount, 2),
             'gold_grams' => $grams,
-            'gold_grams_display' => rtrim(rtrim(number_format($grams, 3, '.', ''), '0'), '.').' g Gold',
+            'gold_grams_display' => rtrim(rtrim(number_format($grams, 6, '.', ''), '0'), '.').' g Gold',
             'metal_grams' => $grams,
-            'metal_grams_display' => rtrim(rtrim(number_format($grams, 3, '.', ''), '0'), '.').' g '.ucfirst($metalType),
+            'metal_grams_display' => rtrim(rtrim(number_format($grams, 6, '.', ''), '0'), '.').' g '.ucfirst($metalType),
+            'wallet_amount' => $taxableAmount,
+            'wallet_amount_display' => '₹'.number_format($taxableAmount, 2),
         ];
     }
 
@@ -63,6 +80,7 @@ class SigPlanService
         return DB::transaction(function () use ($data, $adminId): SigPlan {
             /** @var User $user */
             $user = User::query()->with('kycDetail')->findOrFail($data['user_id']);
+            KycPayload::assertCanPerformTransactions($user);
 
             $plan = SigPlan::query()->create([
                 'user_id' => $user->id,
@@ -80,11 +98,15 @@ class SigPlanService
             ]);
 
             if ($data['record_initial_installment'] ?? true) {
-                $estimate = $this->estimate((float) $data['amount'], $plan->metal_type);
+                $estimate = $this->estimate(
+                    (float) $data['amount'],
+                    $plan->metal_type,
+                    isset($data['weight_grams']) ? (float) $data['weight_grams'] : null,
+                );
 
                 $this->recordInstallment($plan, [
                     'amount' => $data['amount'],
-                    'quantity_grams' => $estimate['gold_grams'],
+                    'quantity_grams' => $estimate['metal_grams'],
                     'rate_per_gram' => $estimate['rate_per_gram'],
                     'status' => 'success',
                     'scheduled_at' => now(),
@@ -143,10 +165,18 @@ class SigPlanService
     {
         $successful = $plan->installments()->where('status', 'success');
 
+        $withdrawnGrams = (float) MetalWithdrawal::query()
+            ->where('sig_plan_id', $plan->id)
+            ->where('asset_source', 'sig')
+            ->whereIn('status', ['approved', 'paid'])
+            ->sum('quantity_grams');
+
+        $investedGrams = (float) (clone $successful)->sum('quantity_grams');
+
         $plan->update([
             'completed_installments' => (clone $successful)->count(),
             'total_invested' => (clone $successful)->sum('amount'),
-            'metal_accumulated_grams' => (clone $successful)->sum('quantity_grams'),
+            'metal_accumulated_grams' => max(0, round($investedGrams - $withdrawnGrams, 6)),
         ]);
 
         return $plan->fresh();
@@ -167,6 +197,13 @@ class SigPlanService
         ]);
 
         $this->syncStats($plan);
+
+        if (($data['status'] ?? 'success') === 'success') {
+            $user = $plan->user ?? User::query()->find($plan->user_id);
+            if ($user) {
+                $this->referrals->evaluatePendingBonusAfterCommit($user);
+            }
+        }
 
         return $installment;
     }

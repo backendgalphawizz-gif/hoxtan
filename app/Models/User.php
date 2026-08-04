@@ -39,6 +39,7 @@ class User extends Authenticatable
         'block_reason',
         'referral_code',
         'referred_by_id',
+        'created_by_employee_id',
         'gender',
         'date_of_birth',
         'primary_residence',
@@ -80,10 +81,6 @@ class User extends Authenticatable
             if (blank($user->referral_code)) {
                 $user->referral_code = ReferralService::generateUniqueCode();
             }
-
-            if (blank($user->email) && filled($user->phone)) {
-                $user->email = $user->phone.'@hoxtan.app';
-            }
         });
     }
 
@@ -100,6 +97,11 @@ class User extends Authenticatable
     public function investments(): HasMany
     {
         return $this->hasMany(Investment::class);
+    }
+
+    public function metalWithdrawals(): HasMany
+    {
+        return $this->hasMany(MetalWithdrawal::class);
     }
 
     public function investmentGoals(): HasMany
@@ -137,6 +139,11 @@ class User extends Authenticatable
         return $this->belongsTo(User::class, 'referred_by_id');
     }
 
+    public function createdByEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'created_by_employee_id');
+    }
+
     public function referralsMade(): HasMany
     {
         return $this->hasMany(Referral::class, 'referrer_id');
@@ -150,6 +157,11 @@ class User extends Authenticatable
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    public function holdingCertificates(): HasMany
+    {
+        return $this->hasMany(HoldingCertificate::class);
     }
 
     public function addresses(): HasMany
@@ -175,6 +187,18 @@ class User extends Authenticatable
     public function oldGoldBookings(): HasMany
     {
         return $this->hasMany(OldGoldBooking::class);
+    }
+
+    /**
+     * True when the user has a jewellery EMI order with at least one unpaid installment.
+     */
+    public function hasActiveJewelleryEmi(): bool
+    {
+        return $this->jewelleryOrders()
+            ->where('payment_mode', 'emi')
+            ->whereNotIn('status', ['cancelled', 'failed', 'cart'])
+            ->whereHas('emiInstallments', fn ($query) => $query->where('status', 'pending'))
+            ->exists();
     }
 
     public function isInvestor(): bool

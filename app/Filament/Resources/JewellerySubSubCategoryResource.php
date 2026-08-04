@@ -55,10 +55,17 @@ class JewellerySubSubCategoryResource extends Resource
                             ->required()
                             ->maxLength(255),
                         Forms\Components\TextInput::make('sort_order')
+                            ->label('Sort order')
                             ->numeric()
-                            ->minValue(0)
-                            ->default(0)
-                            ->required(),
+                            ->minValue(1)
+                            ->default(function (Forms\Get $get): int {
+                                $parentId = $get('jewellery_sub_category_id');
+                                $model = new JewellerySubSubCategory(['jewellery_sub_category_id' => $parentId]);
+
+                                return JewellerySubSubCategory::nextSortOrder($model);
+                            })
+                            ->required()
+                            ->helperText('Sequence within the parent. Changing to a taken number swaps positions.'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
@@ -83,7 +90,10 @@ class JewellerySubSubCategoryResource extends Resource
                 Tables\Columns\TextColumn::make('products_count')
                     ->counts('products')
                     ->label('Products'),
-                Tables\Columns\TextColumn::make('sort_order')->sortable(),
+                Tables\Columns\TextColumn::make('sort_order')
+                    ->label('Sort order')
+                    ->sortable()
+                    ->alignCenter(),
                 Tables\Columns\IconColumn::make('is_active')->boolean()->label('Active'),
             ])
             ->filters([

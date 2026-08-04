@@ -22,6 +22,7 @@ class OfferResource extends Resource
         return 'offers';
     }
 
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $model = Offer::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';

@@ -4,10 +4,12 @@ namespace App\Support;
 
 use App\Models\Investment;
 use App\Models\JewelleryOrder;
+use App\Models\MetalWithdrawal;
 use App\Models\OldGoldBooking;
 use App\Models\Redemption;
 use App\Models\SigInstallment;
 use App\Models\WalletTransaction;
+use App\Services\HoldingCertificateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -17,8 +19,28 @@ class AccountTransactionPayload
     {
         $metal = ucfirst((string) $investment->metal_type);
         $type = $investment->type === 'sell' ? 'sell' : 'buy';
+        $investment->loadMissing(['holdingCertificate', 'invoice']);
 
-        return self::base(
+        $meta = [
+            'investment_id' => $investment->id,
+            'rate_per_gram' => $investment->rate_per_gram !== null ? (float) $investment->rate_per_gram : null,
+            'gst_amount' => $investment->gst_amount !== null ? (float) $investment->gst_amount : null,
+        ];
+
+        $certificate = null;
+        if ($type === 'buy' && $investment->holdingCertificate) {
+            $certificate = app(HoldingCertificateService::class)
+                ->payload($investment->holdingCertificate);
+            $meta['certificate_number'] = $investment->holdingCertificate->certificate_number;
+        }
+
+        $invoice = $investment->invoice;
+        if ($invoice) {
+            $meta['invoice_number'] = $invoice->invoice_number;
+            $meta['invoice_download_url'] = route('api.invoices.download', $invoice);
+        }
+
+        $payload = self::base(
             id: 'investment:'.$investment->id,
             sourceType: 'investment',
             category: $type,
@@ -32,12 +54,15 @@ class AccountTransactionPayload
             occurredAt: $investment->created_at,
             metalType: $investment->metal_type,
             quantityGrams: $investment->quantity_grams !== null ? (float) $investment->quantity_grams : null,
-            meta: [
-                'investment_id' => $investment->id,
-                'rate_per_gram' => $investment->rate_per_gram !== null ? (float) $investment->rate_per_gram : null,
-                'gst_amount' => $investment->gst_amount !== null ? (float) $investment->gst_amount : null,
-            ],
+            meta: $meta,
         );
+
+        $payload['certificate'] = $certificate;
+        $payload['invoice'] = $invoice
+            ? app(\App\Services\InvoiceService::class)->apiPayload($invoice)
+            : null;
+
+        return $payload;
     }
 
     public static function fromWallet(WalletTransaction $transaction): array
@@ -95,10 +120,23 @@ class AccountTransactionPayload
 
     public static function fromJewelleryOrder(JewelleryOrder $order): array
     {
-        $order->loadMissing('items.product');
+        $order->loadMissing(['items.product', 'invoice']);
         $firstItem = $order->items->first();
+        $invoice = $order->invoice;
 
-        return self::base(
+        $meta = [
+            'order_id' => $order->id,
+            'order_number_display' => '#'.$order->order_number,
+            'item_count' => (int) $order->items->sum('quantity'),
+            'payment_mode' => $order->payment_mode,
+        ];
+
+        if ($invoice) {
+            $meta['invoice_number'] = $invoice->invoice_number;
+            $meta['invoice_download_url'] = route('api.invoices.download', $invoice);
+        }
+
+        $payload = self::base(
             id: 'jewellery_order:'.$order->id,
             sourceType: 'jewellery_order',
             category: 'jewellery',
@@ -112,16 +150,30 @@ class AccountTransactionPayload
             occurredAt: $order->created_at,
             metalType: $firstItem?->product?->metal_type,
             quantityGrams: null,
-            meta: [
-                'order_id' => $order->id,
-                'order_number_display' => '#'.$order->order_number,
-                'item_count' => (int) $order->items->sum('quantity'),
-            ],
+            meta: $meta,
         );
+
+        $payload['invoice'] = $invoice
+            ? app(\App\Services\InvoiceService::class)->apiPayload($invoice)
+            : null;
+
+        return $payload;
     }
 
     public static function fromOldGoldBooking(OldGoldBooking $booking): array
     {
+        $booking->loadMissing(['invoice']);
+
+        $meta = [
+            'booking_id' => $booking->id,
+            'booking_number_display' => '#'.$booking->booking_number,
+        ];
+
+        if ($booking->invoice) {
+            $meta['invoice_number'] = $booking->invoice->invoice_number;
+            $meta['invoice_download_url'] = route('api.invoices.download', $booking->invoice);
+        }
+
         return self::base(
             id: 'old_gold:'.$booking->id,
             sourceType: 'old_gold',
@@ -136,9 +188,47 @@ class AccountTransactionPayload
             occurredAt: $booking->created_at,
             metalType: $booking->metal_type,
             quantityGrams: $booking->estimated_weight_grams !== null ? (float) $booking->estimated_weight_grams : null,
+            meta: $meta,
+        );
+
+        $payload['invoice'] = null;
+
+        return $payload;
+    }
+
+    public static function fromHoldingsSell(MetalWithdrawal $withdrawal): array
+    {
+        $metal = ucfirst((string) $withdrawal->metal_type);
+        $statusLabels = [
+            'pending' => 'Pending',
+            'approved' => 'Approved',
+            'paid' => 'Paid',
+            'rejected' => 'Rejected',
+            'cancelled' => 'Cancelled',
+        ];
+
+        return self::base(
+            id: 'holdings_sell:'.$withdrawal->id,
+            sourceType: 'holdings_sell',
+            category: 'sell',
+            referenceId: $withdrawal->reference_id,
+            title: $metal.' Holdings Sell',
+            subtitle: 'Digital '.$withdrawal->metal_type.' holdings sell',
+            amount: (float) $withdrawal->amount,
+            direction: 'credit',
+            status: (string) $withdrawal->status,
+            statusLabel: $statusLabels[$withdrawal->status] ?? Str::headline((string) $withdrawal->status),
+            occurredAt: $withdrawal->requested_at ?? $withdrawal->created_at,
+            metalType: $withdrawal->metal_type,
+            quantityGrams: $withdrawal->quantity_grams !== null ? (float) $withdrawal->quantity_grams : null,
             meta: [
-                'booking_id' => $booking->id,
-                'booking_number_display' => '#'.$booking->booking_number,
+                'withdrawal_id' => $withdrawal->id,
+                'source_lot_id' => $withdrawal->source_lot_id,
+                'from_holdings' => true,
+                'rate_per_gram' => $withdrawal->rate_per_gram !== null ? (float) $withdrawal->rate_per_gram : null,
+                'investment_id' => $withdrawal->investment_id,
+                'auto_approve_at' => $withdrawal->auto_approve_at?->toIso8601String(),
+                'payout_reference' => $withdrawal->payout_reference,
             ],
         );
     }
@@ -208,6 +298,7 @@ class AccountTransactionPayload
                 ? $occurredAt->format('H:i').' • '.$occurredAt->format('d F Y')
                 : null,
             'meta' => $meta,
+            'invoice' => null,
         ];
     }
 }

@@ -11,6 +11,6 @@ class ListReferrals extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Track referral sign-ups and bonus payouts to referrers.';
+        return 'Track referral sign-ups. Bonus is paid after the referred user crosses the purchase threshold.';
     }
 }
