@@ -129,7 +129,7 @@ Features</p>
     <section class="section" id="how" style="background: rgba(16,19,28,0.5);">
         <div class="container">
             <div class="section__header reveal">
-                <p class="section__eyebrow">Simple Process</p>
+                <p class="section__eyebrow">How It Works</p>
                 <h2 class="section__title">Start Investing in 4 Easy Steps</h2>
             </div>
             <div class="steps">

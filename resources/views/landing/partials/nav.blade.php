@@ -12,10 +12,14 @@
         </a>
         <ul class="nav__links">
             @if ($isHome ?? false)
-            <li><a href="#rates">Live Rates</a></li>
+            <!-- <li><a href="#rates">Live Rates</a></li>
             <li><a href="#features">Features</a></li>
                 <li><a href="#how">How It Works</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="#contact">Contact</a></li> -->
+                <li><a href="{{ route('home') }}#rates">Live Rates</a></li>
+<li><a href="{{ route('home') }}#features">Features</a></li>
+<li><a href="{{ route('home') }}#how">How It Works</a></li>
+<li><a href="{{ route('home') }}#contact">Contact</a></li>
             @else
                 <li><a href="{{ route('home') }}">Home</a></li>
                 @foreach ($websitePages as $navPage)
